@@ -1,0 +1,9 @@
+[submodule "deps/node-amqp"]
+	path = deps/node-amqp
+	url = https://github.com/ry/node-amqp.git
+[submodule "deps/node-libdtrace"]
+	path = deps/node-libdtrace
+	url = https://github.com/bcantrill/node-libdtrace.git
+[submodule "deps/node-kstat"]
+	path = deps/node-kstat
+	url = https://github.com/bcantrill/node-kstat.git

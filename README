@@ -1,35 +1,67 @@
 OVERVIEW
 
-This is the repo for the cloud-analytics project, including agents,
-daemons, libraries, etc.  Project lead is Dave Pacheco (dap@joyent.com).
+This is the repo for the cloud-analytics project, including agents, daemons,
+libraries, etc.  Project lead is Dave Pacheco (dap@joyent.com).
 
 Subdirectories in this repo include:
 
 cmd
-	source files implementing executables, including servers and
-	command line tools
+	source files implementing executables, including servers and command
+	line tools
 
 deps
-	library dependencies
+	library dependencies (see below)
 
 lib
-	source files implementing library code, shared by multiple
-	consumers
+	source files implementing library code, shared by multiple consumers
 
 tools
-	miscellaneous tools, including
+	miscellaneous tools, including:
 
-	jsl - javascript lint
-	jsstype - javascript style checker based on OpenSolaris's cstyle
-	ws - set up environment for running executables
+		jsl - javascript lint
+		jsstyle - javascript style checker based on OpenSolaris's cstyle
+		ws - set up environment for running executables
+
+
+DEPENDENCIES
+
+The project depends on the following components that are assumed to be
+installed already on the dev/test machine:
+
+	o node, used by most components
+	o python for jsl only
+	o perl for jsstyle only
+
+The project also depends on the following bundled components:
+
+	o node-amqp, a pure-JS node module in deps/node-amqp
+	o node-kstat, a native node module in deps/node-kstat
+	o node-libdtrace, a native node module in deps/node-libdtrace
+
+To check these out, use
+
+	# git submodule update --init
+
+Then build the native modules:
+
+	# cd deps
+	# cd node-kstat
+	# node-waf configure && node-waf build && node-waf install
+	# cd ..
+
+	# cd node-libdtrace
+	# node-waf configure && node-waf build && node-waf install
+
+These will only build on Solaris, since they require native kstat and dtrace
+libraries.  The native libraries are only used by the instrumenter component.
 
 
 COMMANDS
 
 To run commands, you generally use:
 
-	$ tools/ws
-	$ node cmd/<source>.js
+	# tools/ws
+	# node cmd/<source>.js
 
 The "ws" tool takes care of setting NODE_PATH appropriately.
 
@@ -41,8 +73,6 @@ Checked in code should be lint-clean and jsstyle-clean.
 The "jsl" implementation here assumes a Solaris environment and several
 Python-related paths.  It should work on a stock COAL-S zone, as of
 November, 2010.
-
-XXX node-kstat, node-libdtrace dependencies
 
 
 ADDITIONAL INFORMATION

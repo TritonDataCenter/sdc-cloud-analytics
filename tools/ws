@@ -4,13 +4,24 @@
 # ws: set up NODE_PATH for use in this workspace
 #
 
-arg0="$(dirname $0)"
-cd "$arg0/.."
-root=$PWD
+#
+# Find the root of the workspace assuming a fixed relative path to this script.
+#
+ws_arg0="$(dirname $0)"
+cd "$ws_arg0/.."
+ws_root=$(pwd)
 cd - > /dev/null
 
-for dir in $root/lib/*; do
-	export NODE_PATH="$NODE_PATH:$root/lib/$(basename $dir)"
+#
+# For each subdir under 'lib' and 'deps', add it to NODE_PATH.  This isn't
+# pretty but it gets the job done.
+#
+for dir in $ws_root/lib/*; do
+	export NODE_PATH="$NODE_PATH:$ws_root/lib/$(basename $dir)"
+done
+
+for dir in $ws_root/deps/*; do
+	export NODE_PATH="$NODE_PATH:$ws_root/deps/$(basename $dir)"
 done
 
 echo "NODE_PATH=$NODE_PATH"

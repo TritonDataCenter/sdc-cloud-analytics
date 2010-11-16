@@ -1,4 +1,55 @@
+OVERVIEW
 
-This is the repo for the cloud-analytics project, including agents, daemons,
-libraries, etc.  Project lead is Dave Pacheco (dap@joyent.com).
+This is the repo for the cloud-analytics project, including agents,
+daemons, libraries, etc.  Project lead is Dave Pacheco (dap@joyent.com).
 
+Subdirectories in this repo include:
+
+cmd
+	source files implementing executables, including servers and
+	command line tools
+
+deps
+	library dependencies
+
+lib
+	source files implementing library code, shared by multiple
+	consumers
+
+tools
+	miscellaneous tools, including
+
+	jsl - javascript lint
+	jsstype - javascript style checker based on OpenSolaris's cstyle
+	ws - set up environment for running executables
+
+
+COMMANDS
+
+To run commands, you generally use:
+
+	$ tools/ws
+	$ node cmd/<source>.js
+
+The "ws" tool takes care of setting NODE_PATH appropriately.
+
+
+NOTES
+
+Checked in code should be lint-clean and jsstyle-clean.
+
+The "jsl" implementation here assumes a Solaris environment and several
+Python-related paths.  It should work on a stock COAL-S zone, as of
+November, 2010.
+
+XXX node-kstat, node-libdtrace dependencies
+
+
+ADDITIONAL INFORMATION
+
+The architecture, API, protocol, and other technical details are
+described here:
+
+    https://hub.joyent.com/wiki/display/dev/Introspection
+
+Bugs should be reported in the INTRO (Introspection) bug category.

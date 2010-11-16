@@ -1,0 +1,17 @@
+#!/bin/bash
+
+#
+# ws: set up NODE_PATH for use in this workspace
+#
+
+arg0="$(dirname $0)"
+cd "$arg0/.."
+root=$PWD
+cd - > /dev/null
+
+for dir in $root/lib/*; do
+	export NODE_PATH="$NODE_PATH:$root/lib/$(basename $dir)"
+done
+
+echo "NODE_PATH=$NODE_PATH"
+exec $SHELL

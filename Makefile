@@ -11,6 +11,7 @@ JS_SUBDIRS=cmd lib
 #
 # Tools
 #
+CSCOPE=cscope
 JSL=$(TOOLSDIR)/jsl
 JSSTYLE=$(TOOLSDIR)/jsstyle
 
@@ -32,3 +33,9 @@ check-jsstyle:
 	$(JSSTYLE) $(JS_FILES)
 
 check: check-jsstyle check-jsl
+
+cscope.files:
+	find $(JS_SUBDIRS) -name '*.js' > cscope.files
+
+xref: cscope.files
+	$(CSCOPE) -bqR

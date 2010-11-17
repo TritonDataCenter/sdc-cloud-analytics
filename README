@@ -22,6 +22,14 @@ tools
 		jsstyle - javascript style checker based on OpenSolaris's cstyle
 		ws - set up environment for running executables
 
+You can build a cscope database to browse the source with:
+
+	# make xref
+
+and you can use it with:
+
+	# cscope -dq
+
 
 DEPENDENCIES
 

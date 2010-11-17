@@ -8,6 +8,8 @@
 var mod_sys = require('sys');
 var mod_http = require('http');
 var mod_events = require('events');
+var mod_url = require('url');
+var mod_querystring = require('querystring');
 
 var HTTP = require('http-constants');
 
@@ -132,11 +134,22 @@ caConfigHttp.prototype.gotRequest = function (request, response)
 caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 {
 	var cfghttp = this;
-	var parts = cfgHttpUriToComponents(request.url);
-	var part;
+	var url, params, bodyparams, part, parts, content_type, key;
+
 	var callback = function (code, data, headers) {
 	    cfghttp.sendResponse(response, code, data, headers);
 	};
+
+	/*
+	 * Recall that form fields can be specified either in the URL's query
+	 * string or encoded in the request body.  While these two approaches
+	 * are typically used with GET and POST respectively, the standards do
+	 * not require that so we always ignore the HTTP method in processing
+	 * the form fields.
+	 */
+	url = mod_url.parse(request.url);
+	params = 'query' in url ? mod_querystring.parse(url.query) : {};
+	parts = cfgHttpUriToComponents(url.pathname);
 
 	if (!parts)
 		return (callback(HTTP.EBADREQUEST,
@@ -146,8 +159,41 @@ caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 		return (callback(HTTP.ENOTFOUND,
 		    'error: requested resource was not found'));
 
+	/*
+	 * For form fields encoded in the request body, we only support the more
+	 * common url-encoding, not multipart/form-data.  See HTML4 section
+	 * 17.13.4 for details.
+	 */
+	content_type = request.headers['content-type'];
+	if (content_type !== undefined &&
+	    content_type.indexOf('multipart/form-data;') === 0)
+		return (callback(HTTP.EUNSUPMEDIATYPE,
+		    'error: multipart form data is not supported.'));
+
+	/*
+	 * Neither the HTML nor HTTP (via RFC2616) specifications say how the
+	 * server should interpret form fields that are specified in both the
+	 * URL's query string and the request body.  CGI (RFC 3875), which we're
+	 * not implementing but is at least related, suggests that both should
+	 * be used but doesn't specify whether the two sets of fields should be
+	 * kept separately or merged or if merged then how.  We take the easiest
+	 * way out: if a form field is specified both in the URL and the body,
+	 * we ignore the values in the URL.  This isn't even a proper merge,
+	 * since we could actually combine the values (as would happen if the
+	 * same values had been specified multiple times in either the URL or
+	 * body), but it's unreasonable for the client to expect any particular
+	 * behavior here.  This behavior should be made explicitly unspecified
+	 * in the API.
+	 */
+	if (content_type == 'application/x-www-form-urlencoded') {
+		bodyparams = mod_querystring.parse(reqdata);
+
+		for (key in bodyparams)
+			params[key] = bodyparams[key];
+	}
+
 	if (parts.length === 0)
-		return (this.createInst(request, reqdata, callback));
+		return (this.createInst(request, params, reqdata, callback));
 
 	part = parts.shift();
 
@@ -155,7 +201,7 @@ caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 		return (callback(HTTP.ENOTFOUND,
 		    'error: the requested resource was not found'));
 
-	return (this.processInst(request, part, parts, reqdata, callback));
+	return (this.processInst(request, part, parts, callback));
 };
 
 caConfigHttp.prototype.sendResponse = function (response, code, data, headers)
@@ -177,11 +223,9 @@ caConfigHttp.prototype.sendResponse = function (response, code, data, headers)
 	response.end(rspdata);
 };
 
-caConfigHttp.prototype.createInst = function (request, reqdata, callback)
+caConfigHttp.prototype.createInst = function (request, params, reqdata,
+    callback)
 {
-	/*
-	 * For now, we only use the JSON interface.
-	 */
 	var instspec;
 
 	if (request.method != 'POST') {
@@ -190,8 +234,31 @@ caConfigHttp.prototype.createInst = function (request, reqdata, callback)
 		return;
 	}
 
+	if (request.headers['content-type'] !=
+	    'application/x-www-form-urlencoded') {
+		try {
+			instspec = JSON.parse(reqdata);
+		} catch (ex) {
+			callback(HTTP.EBADREQUEST,
+			    'error: failed to parse JSON: ' + ex.message);
+			return;
+		}
+	} else {
+		instspec = {};
+
+		if ('module' in params)
+			instspec['module'] = HTTP.oneParam(params, 'module');
+		if ('stat' in params)
+			instspec['stat'] = HTTP.oneParam(params, 'stat');
+		if ('predicate' in params)
+			instspec['predicate'] = params['predicate'];
+		if ('decomposition' in params)
+			instspec['decomposition'] = params['decomposition'];
+		if ('nodes' in params)
+			instspec['nodes'] = params['nodes'];
+	}
+
 	try {
-		instspec = JSON.parse(reqdata);
 		this.emit('inst-create', { spec: instspec }, callback);
 	} catch (ex) {
 		callback(HTTP.ESERVER,
@@ -199,8 +266,7 @@ caConfigHttp.prototype.createInst = function (request, reqdata, callback)
 	}
 };
 
-caConfigHttp.prototype.processInst = function (request, instid, uri,
-    reqdata, callback)
+caConfigHttp.prototype.processInst = function (request, instid, uri, callback)
 {
 	if (uri.length === 0) {
 		if (request.method != 'DELETE') {

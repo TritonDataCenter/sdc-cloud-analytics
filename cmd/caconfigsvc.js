@@ -90,6 +90,12 @@ function cfgCreateInstrumentation(args, callback)
 	check(instspec, 'predicate', [], false);
 	check(instspec, 'decomposition', [], false);
 
+	if (!instspec['predicate'])
+		instspec['predicate'] = [];
+
+	if (!instspec['decomposition'])
+		instspec['decomposition'] = [];
+
 	id = cfg_inst_id++;  /* XXX should be unique across time. */
 	cfg_insts[id] = true;
 	callback(HTTP.CREATED, { new_id: id });
@@ -109,6 +115,7 @@ function cfgCreateInstrumentation(args, callback)
 		    is_predicate: instspec['predicate'],
 		    is_decomposition: instspec['decomposition']
 		});
+		cfg_instrumenters[key].ins_ninsts++;
 	}
 }
 
@@ -128,6 +135,7 @@ function cfgDeleteInstrumentation(args, callback)
 	 * XXX filter these based on 'nodes'
 	 */
 	for (key in cfg_instrumenters) {
+		cfg_instrumenters[key].ins_ninsts--;
 		cfg_cap.send(cfg_instrumenters[key].ins_routekey, {
 		    ca_type: 'cmd',
 		    ca_subtype: 'disable_instrumentation',

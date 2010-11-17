@@ -113,10 +113,13 @@ insBackendInterface.prototype.registerModule = function (args)
  *			Instrumenter uses the one that supports all desired
  *			breakdowns and decompositions that has the lowest cost.
  *
+ *	XXX add costs either here or to module
+ *
  *	label		Human-readable label for this metric
  *
  *	type		String type name for the scalar unit of this metric.
- *			May be one of "ops", "size", "throughput", or "time".
+ *			May be one of "ops", "size", "throughput", "time", or
+ *			"percent".
  *
  *	fields		Set of fields based on which data can be filtered or
  *			decomposed.  'fields' is an object whose keys are field
@@ -176,6 +179,7 @@ insBackendInterface.prototype.registerMetric = function (args)
 	case 'size':
 	case 'throughput':
 	case 'time':
+	case 'percent':
 		break;
 	default:
 		throw (new Error('metric has invalid type: ' + type));
@@ -200,7 +204,7 @@ insBackendInterface.prototype.registerMetric = function (args)
  */
 function insInitBackends()
 {
-	var backends = [ /* 'kstat', 'dtrace', */ 'test' ]; /* XXX */
+	var backends = [ 'kstat', /* 'dtrace', */ 'test' ]; /* XXX */
 	var bemgr = new insBackendInterface();
 	var plugin, ii;
 

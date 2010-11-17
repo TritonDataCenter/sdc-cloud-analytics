@@ -192,6 +192,19 @@ function ccAckStatus(msg)
 
 		break;
 
+	case 'instrumenter':
+		elts = msg.s_instrumentations;
+		console.log('Active inst:   (' + elts.length + ' total)');
+		for (ii = 0; ii < elts.length; ii++) {
+			console.log('    ' + elts[ii].s_inst_id + ': ' +
+			    elts[ii].s_module + '.' + elts[ii].s_stat + '.' +
+			    ' (' + (elts[ii].s_predicate ? 'P' : '_') +
+			    (elts[ii].s_decomposition ? 'D' : '_') + ')' +
+			    ' since ' + elts[ii].s_since);
+		}
+
+		break;
+
 	default:
 		console.log('unknown component type');
 		break;

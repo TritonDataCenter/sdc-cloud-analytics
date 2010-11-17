@@ -90,7 +90,7 @@ function caConfigHttp(conf)
 mod_sys.inherits(caConfigHttp, mod_events.EventEmitter);
 exports.caConfigHttp = caConfigHttp;
 
-caConfigHttp.prototype.start = function(callback)
+caConfigHttp.prototype.start = function (callback)
 {
 	this.cah_server.listen(this.cah_port, callback);
 };
@@ -105,9 +105,9 @@ caConfigHttp.prototype.gotRequest = function (request, response)
 	var reqdata = '';
 
 	/*
- 	 * We shouldn't be getting large requests, so we slurp it all in at
- 	 * once.  If it's bigger than 4K, though, we bomb out to avoid someone
- 	 * shoving too much data at us.
+	 * We shouldn't be getting large requests, so we slurp it all in at
+	 * once.  If it's bigger than 4K, though, we bomb out to avoid someone
+	 * shoving too much data at us.
 	 */
 	request.on('data', function (chunk) {
 		if (reqdata.length + chunk.length > cfg_http_maxentity) {

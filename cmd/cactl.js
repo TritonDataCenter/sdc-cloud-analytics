@@ -54,7 +54,7 @@ function main()
 	});
 	cc_amqp.on('msg', ccReceiveMsg);
 	/* XXX */
-	cc_amqp.start(function () { setTimeout(ccRunCmd, 500) });
+	cc_amqp.start(function () { setTimeout(ccRunCmd, 500); });
 }
 
 function usage(msg)
@@ -142,10 +142,10 @@ function ccReceiveMsg(msg)
 
 	if (mod_ca.caIncompatible(msg))
 		die('response had incompatible version');
-	
+
 	if (msg.ca_type !== 'ack')
 		die('response message had wrong type: ' + msg.ca_type);
-	
+
 	if (msg.ca_subtype !== cc_cmd)
 		die('response message had wrong subtype: ' + msg.ca_subtype);
 

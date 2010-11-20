@@ -84,9 +84,9 @@ Try the 'basicvis' demo.  Start with COAL-S.
 - Create a new zone (I'll call this 'devel') using the MCP API and set
   it up as usual (add ssh keys for yourself, etc.)
 
-- Set up port forwarding for two HTTP ports to the new zone.  The
-  easiest way to do this is to modify /root/coal4devs/gzone-ipnat.sh in
-  the global zone to add this:
+- Set up port forwarding for three HTTP ports to the new zone.  The easiest way
+  to do this is to modify /root/coal4devs/gzone-ipnat.sh in the global zone to
+  add this:
 
 	echo $0: configuring HTTP pass-through to devel zone "(192.168.2.31)"
 	cat >> /etc/ipf/ipnat.conf <<CONF
@@ -94,34 +94,36 @@ Try the 'basicvis' demo.  Start with COAL-S.
 	map external0 from any to 192.168.2.31/32 port = 23181 -> 192.168.3.7/32
 	rdr external0 192.168.3.7/32 port 23182 -> 192.168.2.31 port 23182 tcp
 	map external0 from any to 192.168.2.31/32 port = 23182 -> 192.168.3.7/32
+	rdr external0 192.168.3.7/32 port 23183 -> 192.168.2.31 port 23183 tcp
+	map external0 from any to 192.168.2.31/32 port = 23183 -> 192.168.3.7/32
 	CONF
 
-  In this case, the zone's IP address is 192.168.2.31.  You'll have to
-  fill in yours.  Then run this script.
+  In this case, the zone's IP address is 192.168.2.31.  You'll have to fill in
+  yours.  Then run this script.
 
 - Checkout node (I'm using v0.3.1-pre) into the devel zone.  Build and
   install.
 
-- Checkout this repo into the devel node.  Build as described above
-  under "Dependencies".
+- Checkout this repo into the devel zone.  Build as described above under
+  "Dependencies".
 
 - Run tools/ws to set up NODE_PATH, then start up instances of the
-  configsvc, aggregator, and instrumenter, in that order:
+  configsvc, aggregator, instrumenter, and demo server, in that order:
 
 	# node cmd/caconfigsvc.js
 	# node cmd/caaggsvc.js
 	# node cmd/cainstsvc.js
+	# node demo/basicvis/demo.js
 
   Note that HOST must be set in the environment.  This should be set to the
   system's hostname, though it can be any identifier for the machine.  Note
   too that in production these services would run in a system's global zone
   and/or the head node but for testing we run them all in a local zone.
 
-- On a machine where you have a web browser (i.e. your laptop), open up
-  demo/basicvis/graph.htm.  Note that you may need to tweak the ports in
-  demo/basicvis/graph.js if you used different ports above or if your
-  VM's IP address is not 192.168.3.7.  (In the latter case you should
-  have changed 192.168.3.7 in the above ipnat script, too.)
+- On a machine where you have a web browser (i.e. your laptop), connect to
+  http://<COAL VM>:23183/.  Note that if you used different ports above you'll
+  have to tweak demo/basicvis/caflot.js.  If your COAL VM is not at
+  192.168.3.7, you should have tweaked the above gzone-ipnat.sh fragment.
 
 - You should be able to create and delete graphs for the few stats
   already supported.  Enjoy!

@@ -112,6 +112,11 @@ Try the 'basicvis' demo.  Start with COAL-S.
 	# node cmd/caaggsvc.js
 	# node cmd/cainstsvc.js
 
+  Note that HOST must be set in the environment.  This should be set to the
+  system's hostname, though it can be any identifier for the machine.  Note
+  too that in production these services would run in a system's global zone
+  and/or the head node but for testing we run them all in a local zone.
+
 - On a machine where you have a web browser (i.e. your laptop), open up
   demo/basicvis/graph.htm.  Note that you may need to tweak the ports in
   demo/basicvis/graph.js if you used different ports above or if your

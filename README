@@ -9,6 +9,9 @@ cmd
 	source files implementing executables, including servers and command
 	line tools
 
+demo
+	demos
+
 deps
 	library dependencies (see below)
 
@@ -72,6 +75,51 @@ To run commands, you generally use:
 	# node cmd/<source>.js
 
 The "ws" tool takes care of setting NODE_PATH appropriately.
+
+
+DEMO
+
+Try the 'basicvis' demo.  Start with COAL-S.
+
+- Create a new zone (I'll call this 'devel') using the MCP API and set
+  it up as usual (add ssh keys for yourself, etc.)
+
+- Set up port forwarding for two HTTP ports to the new zone.  The
+  easiest way to do this is to modify /root/coal4devs/gzone-ipnat.sh in
+  the global zone to add this:
+
+	echo $0: configuring HTTP pass-through to devel zone "(192.168.2.31)"
+	cat >> /etc/ipf/ipnat.conf <<CONF
+	rdr external0 192.168.3.7/32 port 23181 -> 192.168.2.31 port 23181 tcp
+	map external0 from any to 192.168.2.31/32 port = 23181 -> 192.168.3.7/32
+	rdr external0 192.168.3.7/32 port 23182 -> 192.168.2.31 port 23182 tcp
+	map external0 from any to 192.168.2.31/32 port = 23182 -> 192.168.3.7/32
+	CONF
+
+  In this case, the zone's IP address is 192.168.2.31.  You'll have to
+  fill in yours.  Then run this script.
+
+- Checkout node (I'm using v0.3.1-pre) into the devel zone.  Build and
+  install.
+
+- Checkout this repo into the devel node.  Build as described above
+  under "Dependencies".
+
+- Run tools/ws to set up NODE_PATH, then start up instances of the
+  configsvc, aggregator, and instrumenter, in that order:
+
+	# node cmd/caconfigsvc.js
+	# node cmd/caaggsvc.js
+	# node cmd/cainstsvc.js
+
+- On a machine where you have a web browser (i.e. your laptop), open up
+  demo/basicvis/graph.htm.  Note that you may need to tweak the ports in
+  demo/basicvis/graph.js if you used different ports above or if your
+  VM's IP address is not 192.168.3.7.  (In the latter case you should
+  have changed 192.168.3.7 in the above ipnat script, too.)
+
+- You should be able to create and delete graphs for the few stats
+  already supported.  Enjoy!
 
 
 NOTES

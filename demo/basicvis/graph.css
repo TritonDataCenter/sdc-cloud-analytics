@@ -1,0 +1,9 @@
+body {
+	font-family: sans-serif;
+}
+
+graph {
+	padding-top: 15px;
+	width: 600px;
+	height: 300px;
+}

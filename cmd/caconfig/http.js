@@ -201,17 +201,19 @@ caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 		return (callback(HTTP.ENOTFOUND,
 		    'error: the requested resource was not found'));
 
-	return (this.processInst(request, part, parts, callback));
+	return (this.processInst(request, part, parts, params, callback));
 };
 
 caConfigHttp.prototype.sendResponse = function (response, code, data, headers)
 {
 	var rspdata;
 
-	if (headers)
-		response.writeHead(code, headers);
-	else
-		response.writeHead(code); /* XXX */
+	if (!headers)
+		headers = {};
+
+	headers['Access-Control-Allow-Origin'] = '*';
+	headers['Access-Control-Allow-Methods'] = 'POST, GET, DELETE';
+	response.writeHead(code, headers);
 
 	if (!data)
 		rspdata = '';
@@ -266,7 +268,8 @@ caConfigHttp.prototype.createInst = function (request, params, reqdata,
 	}
 };
 
-caConfigHttp.prototype.processInst = function (request, instid, uri, callback)
+caConfigHttp.prototype.processInst = function (request, instid, uri, params,
+    callback)
 {
 	if (uri.length === 0) {
 		if (request.method != 'DELETE') {
@@ -293,7 +296,8 @@ caConfigHttp.prototype.processInst = function (request, instid, uri, callback)
 			return;
 		}
 
-		this.emit('inst-value', { instid: instid }, callback);
+		params.instid = instid;
+		this.emit('inst-value', params, callback);
 		break;
 
 	default:

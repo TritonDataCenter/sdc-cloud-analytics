@@ -11,7 +11,7 @@ var mod_cap = require('ca-amqp-cap');
 var mod_cahttp = require('./caconfig/http');
 var HTTP = require('http-constants');
 
-var cfg_http_port = 8280;	/* HTTP port for API endpoint */
+var cfg_http_port = 23181;	/* HTTP port for API endpoint */
 var cfg_http;			/* http interface handle */
 var cfg_cap;			/* camqp CAP wrapper */
 var cfg_aggregators = {};	/* all aggregators, by hostname */
@@ -45,12 +45,12 @@ function main()
 	cfg_cap.on('msg-notify-instrumenter_error', cfgNotifyInstrumenterError);
 	cfg_cap.on('msg-ack-enable_instrumentation', cfgAckEnable);
 	cfg_cap.on('msg-ack-disable_instrumentation', cfgAckDisable);
+	cfg_cap.on('msg-ack-enable_aggregation', cfgAckEnableAgg);
 	cfg_cap.on('msg-data', cfgGotData);
 
 	cfg_http = new mod_cahttp.caConfigHttp({ port: http_port });
 	cfg_http.on('inst-create', cfgCreateInstrumentation);
 	cfg_http.on('inst-delete', cfgDeleteInstrumentation);
-	cfg_http.on('inst-value', cfgGetInstrumentation);
 
 	console.log('Hostname:    ' + hostname);
 	console.log('AMQP broker: ' + JSON.stringify(broker));
@@ -72,7 +72,9 @@ var cfg_insts = {};
 function cfgCreateInstrumentation(args, callback)
 {
 	var id, key;
+	var mincount, minkey;
 	var instspec = args['spec'];
+	var statkey, ninsts;
 	var check = function (obj, field, type, required) {
 		if (required && !obj[field])
 			throw (new Error('missing required field: ' + field));
@@ -96,19 +98,47 @@ function cfgCreateInstrumentation(args, callback)
 	if (!instspec['decomposition'])
 		instspec['decomposition'] = [];
 
+	/*
+	 * Pick *one* aggregator and have it collect data for this.  This
+	 * algorithm could be smarter.  We currently just compare the number of
+	 * stats an aggregator is already aggregating.  We should also try other
+	 * ones if the one we pick seems down.
+	 */
+	for (key in cfg_aggregators) {
+		if (mincount === undefined ||
+		    cfg_aggregators[key].cag_ninsts < mincount) {
+			mincount = cfg_aggregators[key].cag_ninsts;
+			minkey = key;
+		}
+	}
+
+	if (mincount === undefined) {
+		callback(HTTP.ESERVER, 'no aggregators available');
+		return;
+	}
+
 	id = cfg_inst_id++;  /* XXX should be unique across time. */
-	cfg_insts[id] = true;
-	callback(HTTP.CREATED, { new_id: id });
+	statkey = mod_ca.caKeyForInst(id);
+
+	cfg_cap.send(cfg_aggregators[minkey].cag_routekey, {
+	    ca_id: id,
+	    ca_type: 'cmd',
+	    ca_subtype: 'enable_aggregation',
+	    ag_inst_id: id,
+	    ag_key: statkey
+	});
 
 	/*
 	 * XXX filter these based on 'nodes'
 	 */
+	ninsts = 0;
 	for (key in cfg_instrumenters) {
+		ninsts++;
 		cfg_cap.send(cfg_instrumenters[key].ins_routekey, {
 		    ca_id: id,
 		    ca_type: 'cmd',
 		    ca_subtype: 'enable_instrumentation',
-		    is_inst_key: 'ca.config', /* XXX */
+		    is_inst_key: statkey,
 		    is_inst_id: id,
 		    is_module: instspec['module'],
 		    is_stat: instspec['stat'],
@@ -117,6 +147,16 @@ function cfgCreateInstrumentation(args, callback)
 		});
 		cfg_instrumenters[key].ins_ninsts++;
 	}
+
+	cfg_insts[id] = {
+	    agg_result: undefined,
+	    insts_failed: 0,
+	    insts_ok: 0,
+	    insts_total: ninsts,
+	    callback: callback
+	};
+
+	/* XXX timeout HTTP request */
 }
 
 function cfgDeleteInstrumentation(args, callback)
@@ -145,26 +185,73 @@ function cfgDeleteInstrumentation(args, callback)
 	}
 }
 
-function cfgGetInstrumentation(args, callback)
+function cfgCheckNewInstrumentation(id)
 {
-	if (!(args['instid'] in cfg_insts)) {
-		callback(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+	var inst = cfg_insts[id];
+	var callback = inst.callback;
+
+	if (inst.agg_done === undefined ||
+	    inst.insts_failed + inst.insts_ok < inst.insts_total)
+		return;
+
+	if (inst.agg_done === false) {
+		/* XXX could try another aggregator. */
+		callback(HTTP.ESERVER, 'error: failed to enable aggregator');
 		return;
 	}
 
-	callback(HTTP.OK, { value: parseInt(Math.random() * 50, 10) });
+	if (inst.insts_failed > 0) {
+		callback(HTTP.ESERVER,
+		    'error: failed to enable some instrumenters');
+		return;
+	}
+
+	callback(HTTP.CREATED, { id: id });
+}
+
+function cfgAckEnableAgg(msg)
+{
+	var id;
+
+	if (!('ag_inst_id' in msg)) {
+		console.log('dropped ack-enable_aggregation message with ' +
+		    'missing id');
+		return;
+	}
+
+	id = msg.ag_inst_id;
+
+	if (msg.ag_status != 'enabled') {
+		cfg_insts[id].agg_done = false;
+	} else {
+		cfg_insts[id].agg_done = true;
+	}
+
+	cfgCheckNewInstrumentation(id);
 }
 
 function cfgAckEnable(msg)
 {
-	var result;
+	var id, result;
 
+	if (!('is_inst_id' in msg)) {
+		console.log('dropped ack-enable_instrumentation message with ' +
+		    'missing id');
+		return;
+	}
+
+	id = msg.is_inst_id;
 	result = msg.is_status;
-	if (msg.is_status != 'enabled')
+	if (msg.is_status != 'enabled') {
+		cfg_insts[id].insts_failed++;
 		result += ' (' + msg.is_error + ')';
+	} else {
+		cfg_insts[id].insts_ok++;
+	}
 
 	console.log(msg.ca_hostname + '   instrument id ' + msg.is_inst_id +
 	    ': ' + result);
+	cfgCheckNewInstrumentation(id);
 }
 
 function cfgAckDisable(msg)

@@ -248,7 +248,7 @@ function insTick()
 		    ca_type: 'data',
 		    d_inst_id: id,
 		    d_value: value,
-		    ca_time: when
+		    d_time: when.getTime()
 		});
 	}
 }

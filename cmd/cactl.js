@@ -5,6 +5,7 @@
 var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
+var mod_sys = require('sys');
 
 var cc_timeout_msec = 3 * 1000;		/* timeout after 3s */
 var cc_cmdswitch = {};			/* dispatch cmds */
@@ -201,6 +202,20 @@ function ccAckStatus(msg)
 			    ' (' + (elts[ii].s_predicate ? 'P' : '_') +
 			    (elts[ii].s_decomposition ? 'D' : '_') + ')' +
 			    ' since ' + elts[ii].s_since);
+		}
+
+		break;
+
+	case 'aggregator':
+		elts = msg.s_instrumentations;
+		console.log('Active inst:   (' + elts.length + ' total)');
+		for (ii = 0; ii < elts.length; ii++) {
+			console.log('    ' + elts[ii].s_inst_id + ' from ' +
+			    elts[ii].s_nsources + ' sources since ' +
+			    elts[ii].s_since + ' (last: ' +
+			    new Date(elts[ii].s_last * 1000) + ')');
+			console.log('    ' + mod_sys.inspect(elts[ii].s_data,
+			    false, 4));
 		}
 
 		break;

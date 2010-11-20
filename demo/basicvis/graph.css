@@ -2,8 +2,30 @@ body {
 	font-family: sans-serif;
 }
 
-graph {
-	padding-top: 15px;
+Graph {
 	width: 600px;
 	height: 300px;
+}
+
+GraphContainer {
+	padding-top: 15px;
+}
+
+GraphText {
+	float: right;
+}
+
+tr {
+	vertical-align: top;
+}
+
+a {
+	cursor: pointer;
+	color: gray;
+	margin-right: 5px;
+	padding-left: 5px;
+	padding-right: 5px;
+	padding-bottom: 2px;
+	border: 1px solid gray;
+	text-align: center;
 }

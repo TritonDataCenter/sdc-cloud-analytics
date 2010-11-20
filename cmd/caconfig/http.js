@@ -234,6 +234,9 @@ caConfigHttp.prototype.sendResponse = function (response, code, data, headers)
 	else
 		rspdata = JSON.stringify(data);
 
+	if (code >= HTTP.EBADREQUEST)
+		console.log('operation failed: ' + data);
+
 	response.end(rspdata);
 };
 
@@ -267,7 +270,7 @@ caConfigHttp.prototype.createInst = function (request, params, reqdata,
 		if ('predicate' in params)
 			instspec['predicate'] = params['predicate'];
 		if ('decomposition' in params)
-			instspec['decomposition'] = params['decomposition'];
+			instspec['decomposition'] = [ params['decomposition'] ];
 		if ('nodes' in params)
 			instspec['nodes'] = params['nodes'];
 	}

@@ -4,6 +4,7 @@
 
 var mod_dtrace = require('libdtrace');
 var mod_sys = require('sys');
+var ASSERT = require('assert');
 
 exports.insinit = function (ins)
 {
@@ -11,46 +12,37 @@ exports.insinit = function (ins)
 	ins.registerMetric({
 	    module: 'syscall',
 	    stat: 'ops',
-	    label: 'operations',
-	    type: 'ops',
-	    fields: [],
-	    metric: insdScalarMetric
-	});
-	ins.registerMetric({
-	    module: 'syscall',
-	    stat: 'opsbyexecname', /* XXX */
-	    label: 'operations',
+	    label: 'syscalls',
 	    type: 'ops',
 	    fields: {
-		syscall: { label: 'system call', type: 'string' },
+		probefunc: { label: 'system call', type: 'string' },
 		execname: { label: 'application name', type: 'string' }
 	    },
-	    metric: insdVectorMetric
+	    metric: insdSyscalls
 	});
 };
 
-var syscalls_dscript = [
-    'syscall:::entry',
-    '{',
-    '    @ = count();',
-    '}'
-].join('\n');
-
-function insdScalarMetric()
+function insdSyscalls(metric)
 {
-	return (new insDTraceScalarMetric(syscalls_dscript));
-}
+	var decomps = metric.is_decomposition;
+	var script;
 
-var syscalls_byexecname = [
-    'syscall:::entry',
-    '{',
-    '    @[execname] = count();',
-    '}'
-].join('\n');
+	ASSERT.ok(decomps.length < 2);
 
-function insdVectorMetric()
-{
-	return (new insDTraceVectorMetric(syscalls_byexecname));
+	script  = 'syscall:::entry\n';
+	script += '{\n';
+	script += '\t@';
+
+	if (decomps.length > 0)
+		script += '[' + decomps[0] + ']';
+
+	script += ' = count();\n';
+	script += '}\n';
+
+	if (decomps.length > 0)
+		return (new insDTraceVectorMetric(script));
+
+	return (new insDTraceScalarMetric(script));
 }
 
 function insDTraceMetric(prog)
@@ -61,6 +53,8 @@ function insDTraceMetric(prog)
 
 insDTraceMetric.prototype.instrument = function (callback)
 {
+	console.log([ '---------------------', this.cad_prog,
+	    '---------------------' ].join('\n'));
 	this.cad_dtr.strcompile(this.cad_prog);
 	this.cad_dtr.go(); /* XXX should be asynch? */
 	callback();

@@ -140,7 +140,7 @@ caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 	var url, params, bodyparams, part, parts, content_type, key;
 
 	var callback = function (code, data, headers) {
-	    cfghttp.sendResponse(response, code, data, headers);
+	    cfghttp.sendResponse(request, response, code, data, headers);
 	};
 
 	/*
@@ -216,7 +216,8 @@ caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 	return (this.processInst(request, part, parts, params, callback));
 };
 
-caConfigHttp.prototype.sendResponse = function (response, code, data, headers)
+caConfigHttp.prototype.sendResponse = function (request, response, code, data,
+    headers)
 {
 	var rspdata;
 
@@ -234,8 +235,10 @@ caConfigHttp.prototype.sendResponse = function (response, code, data, headers)
 	else
 		rspdata = JSON.stringify(data);
 
+	/* XXX should move under debug to avoid DOS */
 	if (code >= HTTP.EBADREQUEST)
-		console.log('operation failed: ' + data);
+		console.log('failed: ' + request.method + ' ' +
+		    request.url + ': ' + data);
 
 	response.end(rspdata);
 };

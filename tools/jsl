@@ -24,4 +24,4 @@ export PYTHONPATH="$PYTHONPATH:$root/javascriptlint"
 #
 # We have to explicitly use a path to a python 2.6.
 #
-exec /opt/local/bin/python "$root/jsl.py" --conf=$root/jsl.conf $@
+exec /opt/local/bin/python "$root/jsl.py" $@

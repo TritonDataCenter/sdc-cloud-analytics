@@ -4,7 +4,6 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
     <title>Instrumenter Visualizer</title> 
     <link href="graph.css" rel="stylesheet" type="text/css"></link> 
-    <!--[if IE]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]--> 
     <script language="javascript" type="text/javascript" src="flot/jquery.js"></script> 
     <script language="javascript" type="text/javascript" src="flot/jquery.flot.js"></script> 
     <script language="javascript" type="text/javascript" src="caflot.js"></script> 
@@ -14,13 +13,8 @@
  
     <div id="form">
 	<select id='gStatSelector'>
-	<option value='cpu.utilization'>CPU utilization (cpu.utilization)</option>
-	<option value='nic.bytes'>NIC bytes (nic.bytes)</option>
-	<option value='io.ops'>I/O operations (io.ops)</option>
-	<option value='io.bytes'>I/O bytes (io.bytes)</option>
-	<option value='test.seconds'>Ever increasing (test.seconds)</option>
 	</select>
-	<input type='button' onclick='javascript:gAddStat();' value="Visualize!" />
+	<input type='button' id='gStatAddButton' disabled='true' onclick='javascript:gAddStat();' value="Visualize!" />
     </div>
     <div id="gContainerDiv"></div>
  </body> 

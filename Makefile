@@ -18,7 +18,10 @@ JSSTYLE=$(TOOLSDIR)/jsstyle
 #
 # Files
 #
-JS_FILES= `find $(JS_SUBDIRS) -name '*.js'`
+JSL_CONF_MAIN = tools/jsl_support/jsl.conf
+JSL_CONF_WEB = tools/jsl_support/jsl.web.conf
+JS_FILES = `find $(JS_SUBDIRS) -name '*.js'` demo/basicvis/demo.js
+WEBJS_FILES = demo/basicvis/caflot.js
 
 #
 # Targets
@@ -26,11 +29,16 @@ JS_FILES= `find $(JS_SUBDIRS) -name '*.js'`
 all:
 	
 
-check-jsl:
-	$(JSL) $(JS_FILES)
+check-jsl: check-jsl-main check-jsl-web
+
+check-jsl-main:
+	$(JSL) --conf=$(JSL_CONF_MAIN) $(JS_FILES)
+
+check-jsl-web:
+	$(JSL) --conf=$(JSL_CONF_WEB) $(WEBJS_FILES)
 
 check-jsstyle:
-	$(JSSTYLE) $(JS_FILES)
+	$(JSSTYLE) $(JS_FILES) $(WEBJS_FILES)
 
 check: check-jsstyle check-jsl
 

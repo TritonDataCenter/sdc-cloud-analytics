@@ -16,6 +16,8 @@ var cfg_http;			/* http interface handle */
 var cfg_cap;			/* camqp CAP wrapper */
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
+var cfg_statmods = {};		/* describes available metrics and which */
+				/* instrumenters provide them. */
 
 function main()
 {
@@ -51,6 +53,7 @@ function main()
 	cfg_http = new mod_cahttp.caConfigHttp({ port: http_port });
 	cfg_http.on('inst-create', cfgCreateInstrumentation);
 	cfg_http.on('inst-delete', cfgDeleteInstrumentation);
+	cfg_http.on('list-metrics', cfgListMetrics);
 
 	console.log('Hostname:    ' + hostname);
 	console.log('AMQP broker: ' + JSON.stringify(broker));
@@ -183,6 +186,11 @@ function cfgDeleteInstrumentation(args, callback)
 		    is_inst_id: args['instid']
 		});
 	}
+}
+
+function cfgListMetrics(callback)
+{
+	callback(HTTP.OK, cfg_statmods);
 }
 
 function cfgCheckNewInstrumentation(id)
@@ -322,7 +330,17 @@ function cfgNotifyAggregatorOnline(msg)
 
 function cfgNotifyInstrumenterOnline(msg)
 {
-	var inst = {};
+	var inst, action;
+	var mod, mstats, stat, mfields, field;
+	var mm, ss, ff;
+
+	if (msg.ca_hostname in cfg_instrumenters) {
+		inst = cfg_instrumenters[msg.ca_hostname];
+		action = 'restarted';
+	} else {
+		inst = cfg_instrumenters[msg.ca_hostname] = {};
+		action = 'started';
+	}
 
 	inst.ins_hostname = msg.ca_hostname;
 	inst.ins_routekey = msg.ca_source;
@@ -334,13 +352,48 @@ function cfgNotifyInstrumenterOnline(msg)
 	inst.ins_nmetrics_avail = 0;
 	inst.ins_ninsts = 0;
 
-	/* XXX load module info into global cfg_statmods */
+	for (mm = 0; mm < msg.ca_modules.length; mm++) {
+		mod = msg.ca_modules[mm];
+
+		if (!(mod.cam_name in cfg_statmods)) {
+			cfg_statmods[mod.cam_name] = {
+				stats: {},
+				label: mod.cam_description
+			};
+		}
+
+		mstats = cfg_statmods[mod.cam_name]['stats'];
+		inst.ins_nmetrics_avail += mod.cam_stats.length;
+
+		for (ss = 0; ss < mod.cam_stats.length; ss++) {
+			stat = mod.cam_stats[ss];
+			if (!(stat.cas_name in mstats)) {
+				mstats[stat.cas_name] = {
+				    label: stat.cas_description,
+				    type: stat.cas_type,
+				    fields: {}
+				};
+			}
+
+			mfields = mstats[stat.cas_name]['fields'];
+
+			for (ff = 0; ff < stat.cas_fields.length; ff++) {
+				field = stat.cas_fields[ff];
+
+				if (!(field.caf_name in mfields)) {
+					mfields[field.caf_name] = {
+					    type: field.caf_type,
+					    label: field.caf_description
+					};
+				}
+			}
+		}
+	}
+
 	/* XXX if already exists, it restarted, so need to update its state! */
 
-	cfg_instrumenters[inst.ins_hostname] = inst;
-
 	console.log('NOTICE: ' + msg.ca_hostname + ': ' + new Date() +
-	    ': instrumenter started');
+	    ': instrumenter ' + action);
 }
 
 function cfgNotifyLog(msg)

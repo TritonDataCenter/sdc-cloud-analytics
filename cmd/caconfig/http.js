@@ -76,6 +76,9 @@ function cfgHttpUriToComponents(uri)
  *
  *	inst-delete	Request received to destroy an instrumentation.
  *			Named arguments: username, inst id
+ *
+ *	list-metrics	Request received to list all available metrics.
+ *			Named arguments: username
  */
 function caConfigHttp(conf)
 {
@@ -155,7 +158,9 @@ caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 		return (callback(HTTP.EBADREQUEST,
 		    'error: expected absolute URI'));
 
-	if ((part = parts.shift()) != 'instrumentation')
+	part = parts.shift();
+
+	if (part != 'metrics' && part != 'instrumentation')
 		return (callback(HTTP.ENOTFOUND,
 		    'error: requested resource was not found'));
 
@@ -190,6 +195,13 @@ caConfigHttp.prototype.processRequest = function (request, response, reqdata)
 
 		for (key in bodyparams)
 			params[key] = bodyparams[key];
+	}
+
+	if (part == 'metrics') {
+		if (parts.length > 0)
+			return (callback(HTTP.ENOTFOUND,
+			    'error: requested resource was not found'));
+		return (this.listMetrics(callback));
 	}
 
 	if (parts.length === 0)
@@ -305,4 +317,9 @@ caConfigHttp.prototype.processInst = function (request, instid, uri, params,
 		    'error: requested resource was not found');
 		break;
 	}
+};
+
+caConfigHttp.prototype.listMetrics = function (callback)
+{
+	this.emit('list-metrics', callback);
 };

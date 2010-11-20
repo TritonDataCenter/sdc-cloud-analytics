@@ -1,13 +1,18 @@
-var gnDataPoints = 30;
+/*
+ * caflot.js: flot-based visualization of CA metrics for demo
+ */
+
+var gnDataPoints = 30;	/* seconds */
 var gOptions = {
 	series: { lines: { show: true, fill: true } },
 	xaxis: { mode: 'time', ticks: 5 },
 	yaxis: { min: 0 }
 };
 
-var gServer = '192.168.3.7';
+var gServer = window.location.hostname;
 var gBaseUrlValue = 'http://' + gServer + ':23182/instrumentation/';
 var gBaseUrlCreate = 'http://' + gServer + ':23181/instrumentation';
+var gBaseUrlMetrics = 'http://' + gServer + ':23181/metrics';
 
 function gUrlValue(id)
 {
@@ -24,6 +29,11 @@ function gUrlDelete(id)
 	return (gBaseUrlCreate + '/' + id);
 }
 
+function gUrlMetrics()
+{
+	return (gBaseUrlMetrics);
+}
+
 var gId = 0;
 var gGraphs = [];
 
@@ -31,8 +41,7 @@ function gAddStat()
 {
 	var selector = document.getElementById('gStatSelector');
 	var option = selector.options[selector.selectedIndex];
-	var parts = option.value.split('.');
-	var metric = { module: parts[0], stat: parts[1] };
+	var metric = gMetrics[option.value];
 	var data = [];
 	var ii;
 	var container = document.getElementById('gContainerDiv');
@@ -50,7 +59,7 @@ function gAddStat()
 	link.value = 'Delete';
 	link.onclick = function () {
 		gRemoveStat(id, div, link);
-	}
+	};
 
 	for (ii = 0; ii < gnDataPoints; ii++)
 		data.push(null);
@@ -106,6 +115,7 @@ function gRemoveStat(ii, div, link)
 
 window.onload = function ()
 {
+	gInitMetrics();
 	setTimeout(gTick, 0);
 };
 
@@ -137,11 +147,23 @@ function gTick()
 
 function gRecomputeData(label, rawdata)
 {
-	var ii, data;
+	var ii;
 	var points = [];
 
-	for (ii = 0; ii < gnDataPoints; ii++)
-		points[ii] = rawdata[ii];
+	/*
+	 * Iterate backwards to back-fill NULL values with zero.  This should
+	 * really be filled with some other pattern to indicate "no data".
+	 */
+	for (ii = gnDataPoints - 1; ii >= 0; ii--) {
+		if (rawdata[ii] !== null || ii == gnDataPoints - 1) {
+			points[ii] = rawdata[ii];
+			continue;
+		}
+
+		/* XXX avoid hardcoding knowledge of data format? */
+		points[ii] =
+		    [ new Date(points[ii + 1][0].getTime() - 1000), 0 ];
+	}
 
 	return ([ { label: label, data: points } ]);
 }
@@ -158,8 +180,66 @@ function gRetrieveData(ii, callback)
 
 		var val = JSON.parse(request.responseText);
 		callback([ new Date(val.when * 1000), val.value ]);
-	}
+	};
 
 	request.open('GET', url, true);
 	request.send(null);
+}
+
+/*
+ * Retrieve list of available metrics from the server and populate 'select' box.
+ */
+function gInitMetrics()
+{
+	var request;
+
+	request = new XMLHttpRequest();
+	request.onreadystatechange = function () {
+		if (request.readyState != 4)
+			return;
+
+		if (request.status != 200) {
+			alert('failed to load metric list');
+			return;
+		}
+
+		var val = JSON.parse(request.responseText);
+		gInitMetricsFini(val);
+	};
+	request.open('GET', gUrlMetrics(), true);
+	request.send(null);
+}
+
+var gMetrics = [];
+
+function gInitMetricsFini(metrics)
+{
+	var modname, module, statname, stat, optname;
+	var elt, ii, option;
+
+	for (modname in metrics) {
+		module = metrics[modname];
+
+		for (statname in module['stats']) {
+			stat = module['stats'][statname];
+			optname = module['label'] + ': ' + stat['label'];
+			optname += ' (' + modname + '.' + statname + ')';
+			gMetrics.push({
+				module: modname,
+				stat: statname,
+				label: optname,
+				type: stat['type']
+			});
+		}
+	}
+
+	elt = document.getElementById('gStatSelector');
+	for (ii = 0; ii < gMetrics.length; ii++) {
+		option = elt.appendChild(document.createElement('option'));
+		option.value = ii;
+		option.appendChild(document.createTextNode(gMetrics[ii].label));
+	}
+
+	elt = document.getElementById('gStatAddButton');
+	elt.disabled = false;
 }

@@ -163,7 +163,7 @@ function ccAckPing(msg)
 
 function ccAckStatus(msg)
 {
-	var elts, ii;
+	var elts, elt, addl, fields, ii, jj;
 
 	ccCheckMsg(msg);
 	console.log('Hostname:      ' + msg.ca_hostname);
@@ -202,6 +202,27 @@ function ccAckStatus(msg)
 			    ' (' + (elts[ii].s_predicate ? 'P' : '_') +
 			    (elts[ii].s_decomposition ? 'D' : '_') + ')' +
 			    ' since ' + elts[ii].s_since);
+		}
+
+		elts = msg.s_modules;
+		console.log('Available modules:');
+		for (ii = 0; ii < elts.length; ii++) {
+			console.log('    ' + elts[ii].cam_name + ' (' +
+			    elts[ii].cam_description + ')');
+			for (jj = 0; jj < elts[ii].cam_stats.length; jj++) {
+				elt = elts[ii].cam_stats[jj];
+				addl = '';
+				fields = elt.cas_fields.map(function (field) {
+					return (field.caf_name);
+				});
+
+				if (fields.length > 0)
+					addl = ' by ' + fields.join(', ');
+
+				console.log('        ' + elt.cas_name + ' (' +
+				    elt.cas_description + ': ' + elt.cas_type +
+				    addl + ')');
+			}
 		}
 
 		break;

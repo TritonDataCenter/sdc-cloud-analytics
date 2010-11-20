@@ -192,6 +192,20 @@ insBackendInterface.prototype.registerMetric = function (args)
 	stat['label'] = label;
 	stat['type'] = type;
 	stat['metric'] = metric;
+
+	/*
+	 * XXX it should be illegal (and we should check for this here) to
+	 * define fields not already defined for this metric without also
+	 * defining all existing fields for this metric.  That is, you can't
+	 * define an implementation of a stat that's more flexible than an
+	 * existing implementation in some ways and less flexible in others.
+	 * Multiple implementations must be strictly more powerful (but of
+	 * course may be more expensive).  This allows us to expose the
+	 * abstraction of a single metric with multiple fields and then we just
+	 * pick which the cheapest implementation that's flexible enough to do
+	 * what we need, rather than having to expose multiple implementations
+	 * to the config svc.
+	 */
 	stat['fields'] = mod_ca.caDeepCopy(fields);
 
 	ins_modules[modname]['stats'][statname].push(stat);
@@ -204,7 +218,7 @@ insBackendInterface.prototype.registerMetric = function (args)
  */
 function insInitBackends()
 {
-	var backends = [ 'kstat', /* 'dtrace', */ 'test' ]; /* XXX */
+	var backends = [ 'kstat', 'dtrace', 'test' ];
 	var bemgr = new insBackendInterface();
 	var plugin, ii;
 
@@ -216,6 +230,54 @@ function insInitBackends()
 	}
 }
 
+function insGetModules()
+{
+	var modname, statname, fieldname;
+	var mod, stat, mstats, mstat, mfield, ii;
+	var donefields;
+	var ret = [];
+
+	for (modname in ins_modules) {
+		mod = {};
+		mod.cam_name = modname;
+		mod.cam_description = ins_modules[modname]['label'];
+		mod.cam_stats = [];
+
+		for (statname in ins_modules[modname]['stats']) {
+			donefields = {};
+			mstats = ins_modules[modname]['stats'][statname];
+			stat = {
+			    cas_name: statname,
+			    cas_fields: []
+			};
+
+			for (ii = 0; ii < mstats.length; ii++) {
+				mstat = mstats[ii];
+				stat.cas_description = mstat['label'];
+				stat.cas_type = mstat['type'];
+
+				for (fieldname in mstat['fields']) {
+					if (fieldname in donefields)
+						continue;
+					donefields[fieldname] = true;
+					mfield = mstat['fields'][fieldname];
+					stat.cas_fields.push({
+					    caf_name: fieldname,
+					    caf_description: mfield['label'],
+					    caf_type: mfield['type']
+					});
+				}
+			}
+
+			mod.cam_stats.push(stat);
+		}
+
+		ret.push(mod);
+	}
+
+	return (ret);
+}
+
 function insStarted()
 {
 	var msg;
@@ -225,7 +287,7 @@ function insStarted()
 	msg = {};
 	msg.ca_type = 'notify';
 	msg.ca_subtype = 'instrumenter_online';
-	msg.ca_modules = [];
+	msg.ca_modules = insGetModules();
 
 	/* XXX should we send this periodically too?  every 5 min or whatever */
 	ins_cap.send(mod_ca.ca_amqp_key_config, msg);
@@ -283,6 +345,8 @@ function insCmdStatus(msg)
 		    s_since: inst.is_since
 		});
 	}
+
+	sendmsg.s_modules = insGetModules();
 
 	ins_cap.send(msg.ca_source, sendmsg);
 }

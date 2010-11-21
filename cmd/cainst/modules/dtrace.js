@@ -6,8 +6,11 @@ var mod_dtrace = require('libdtrace');
 var mod_sys = require('sys');
 var ASSERT = require('assert');
 
-exports.insinit = function (ins)
+var insd_log;
+
+exports.insinit = function (ins, log)
 {
+	insd_log = log;
 	ins.registerModule({ name: 'syscall', label: 'System calls' });
 	ins.registerMetric({
 	    module: 'syscall',
@@ -53,8 +56,8 @@ function insDTraceMetric(prog)
 
 insDTraceMetric.prototype.instrument = function (callback)
 {
-	console.log([ '---------------------', this.cad_prog,
-	    '---------------------' ].join('\n'));
+	var sep = '----------------------------------------';
+	insd_log.dbg('\n%s\n%s%s', sep, this.cad_prog, sep);
 	this.cad_dtr.strcompile(this.cad_prog);
 	this.cad_dtr.go(); /* XXX should be asynch? */
 	callback();

@@ -47,3 +47,5 @@ cscope.files:
 
 xref: cscope.files
 	$(CSCOPE) -bqR
+
+.PHONY: cscope.files

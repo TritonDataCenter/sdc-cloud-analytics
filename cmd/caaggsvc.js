@@ -6,21 +6,30 @@ var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
 var mod_cahttp = require('./caconfig/http');
+var mod_log = require('ca-log');
 var HTTP = require('http-constants');
 
+var agg_name = 'aggsvc';	/* component name */
+var agg_vers = '0.0';		/* component version */
 var agg_http_port = 23182;	/* http port */
+
+var agg_insts = {};		/* active instrumentations by id */
+
 var agg_http;			/* http interface handle */
 var agg_cap;			/* cap wrapper */
-var agg_insts = {};		/* active instrumentations by id */
+var agg_log;			/* log handle */
 
 function main()
 {
 	var http_port = agg_http_port;
 	var broker = mod_ca.ca_amqp_default_broker;
-	var sysinfo = mod_ca.caSysinfo('aggsvc', '0.0');
+	var sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
 	var hostname = sysinfo.ca_hostname;
+	var amqp;
 
-	var amqp = new mod_caamqp.caAmqp({
+	agg_log = new mod_log.caLog({ out: process.stdout });
+
+	amqp = new mod_caamqp.caAmqp({
 		broker: broker,
 		exchange: mod_ca.ca_amqp_exchange,
 		exchange_opts: mod_ca.ca_amqp_exchange_opts,
@@ -31,23 +40,30 @@ function main()
 	amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
 	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
 
-	agg_cap = new mod_cap.capAmqpCap({ amqp: amqp, sysinfo: sysinfo });
+	agg_cap = new mod_cap.capAmqpCap({
+	    amqp: amqp,
+	    log: agg_log,
+	    sysinfo: sysinfo
+	});
 	agg_cap.on('msg-cmd-ping', aggCmdPing);
 	agg_cap.on('msg-cmd-status', aggCmdStatus);
 	agg_cap.on('msg-cmd-enable_aggregation', aggCmdEnableAggregation);
 	agg_cap.on('msg-data', aggData);
 
 	/* XXX refactor to non-config subdir */
-	agg_http = new mod_cahttp.caConfigHttp({ port: http_port });
+	agg_http = new mod_cahttp.caConfigHttp({
+	    log: agg_log, port: http_port
+	});
 	agg_http.on('inst-value', aggHttpValue);
 
-	console.log('Hostname:    ' + hostname);
-	console.log('AMQP broker: ' + JSON.stringify(broker));
-	console.log('Routing key: ' + amqp.routekey());
-	console.log('HTTP server: Port ' + http_port);
+	agg_log.info('Aggregator starting up (%s/%s)', agg_name, agg_vers);
+	agg_log.info('%-12s %s', 'Hostname:', hostname);
+	agg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
+	agg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
+	agg_log.info('%-12s Port %d', 'HTTP server:', http_port);
 
 	agg_http.start(function () {
-		console.log('HTTP server started.');
+		agg_log.info('HTTP server started.');
 		amqp.start(aggStarted);
 	});
 }
@@ -56,7 +72,7 @@ function aggStarted()
 {
 	var msg;
 
-	console.log('AMQP broker connected.');
+	agg_log.info('AMQP broker connected.');
 
 	msg = {};
 	msg.ca_type = 'notify';
@@ -153,7 +169,7 @@ function aggData(msg)
 	var callbacks, ii;
 
 	if (id === undefined || value === undefined || time === undefined) {
-		console.log('dropped data message with missing field');
+		agg_log.warn('dropped data message with missing field');
 		return;
 	}
 
@@ -161,7 +177,7 @@ function aggData(msg)
 	time = parseInt(time / 1000, 10);
 
 	if (inst === undefined) {
-		console.log('dropped data message for unknown id: ' + id);
+		agg_log.warn('dropped data message for unknown id: %s', id);
 		return;
 	}
 
@@ -209,7 +225,7 @@ function aggAggregateValue(inst, time, newval)
 		return;
 	}
 
-	console.log('unsupported aggregation type!');
+	agg_log.error('unsupported aggregation type: %s', typeof (newval));
 }
 
 /*

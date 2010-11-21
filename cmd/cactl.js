@@ -26,6 +26,12 @@ var cc_help = [
     '        log <msg>		report log message'
 ].join('\n');
 
+function printf()
+{
+	var text = mod_ca.caSprintf.apply(null, arguments);
+	process.stdout.write(text);
+}
+
 function main()
 {
 	if (process.argv.length <= 2)
@@ -44,10 +50,10 @@ function main()
 		bindings: []
 	});
 	cc_amqp.on('amqp-error', function (err) {
-		console.log('amqp: ' + err.message);
+		die('amqp: %s', err.message);
 	});
 	cc_amqp.on('amqp-fatal', function (err) {
-		die('amqp: ' + err.message);
+		die('amqp: %s', err.message);
 	});
 
 	cc_cap = new mod_cap.capAmqpCap({
@@ -62,14 +68,15 @@ function main()
 function usage(msg)
 {
 	if (msg)
-		console.log(cc_arg0 + ': ' + msg);
-	console.log(cc_help);
+		printf('%s: %s\n', cc_arg0, msg);
+	printf('%s\n', cc_help);
 	process.exit(2);
 }
 
-function die(msg)
+function die()
 {
-	console.log(cc_arg0 + ': fatal error: ' + msg);
+	var text = mod_ca.caSprintf.apply(null, arguments);
+	printf('%s: fatal error: %s\n', cc_arg0, text);
 	process.exit(1);
 }
 
@@ -80,7 +87,7 @@ function shutdown()
 
 function ccTimeout()
 {
-	console.log('Timed out.');
+	printf('Timed out.\n');
 	process.exit(3);
 }
 
@@ -140,88 +147,96 @@ function ccCheckMsg(msg)
 	var millis = end.getTime() - cc_start.getTime();
 
 	if (msg.ca_subtype !== cc_cmd)
-		die('response message had wrong subtype: ' + msg.ca_subtype);
+		die('response message had wrong subtype: %s', msg.ca_subtype);
 
 	if (msg.ca_id !== 1)
-		die('response message had wrong id: ' + msg.ca_id);
+		die('response message had wrong id: %s', msg.ca_id);
 
-	console.log('response time: ' + millis + ' milliseconds');
+	printf('%-12s %d ms\n', 'Latency:', millis);
 	clearTimeout(cc_toid);
 }
 
 function ccAckPing(msg)
 {
 	ccCheckMsg(msg);
-	console.log('Hostname:   ' + msg.ca_hostname);
-	console.log('Route key:  ' + msg.ca_source);
-	console.log('Agent:      ' + msg.ca_agent_name + '/' +
+	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
+	printf('%-12s %s\n', 'Route key:', msg.ca_source);
+	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
 	    msg.ca_agent_version);
-	console.log('OS:         ' + msg.ca_os_name + ' ' +
-	    msg.ca_os_release + ' ' + msg.ca_os_revision);
+	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
+	    msg.ca_os_release, msg.ca_os_revision);
 	shutdown();
 }
 
 function ccAckStatus(msg)
 {
-	var elts, elt, addl, fields, ii, jj;
+	var elts, elt, fields, ii, jj;
+	var metric, decomp;
 
 	ccCheckMsg(msg);
-	console.log('Hostname:      ' + msg.ca_hostname);
-	console.log('Route key:     ' + msg.ca_source);
-	console.log('Agent:         ' + msg.ca_agent_name + '/' +
+	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
+	printf('%-12s %s\n', 'Route key:', msg.ca_source);
+	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
 	    msg.ca_agent_version);
-	console.log('OS:            ' + msg.ca_os_name + ' ' +
-	    msg.ca_os_release + ' ' + msg.ca_os_revision);
-	console.log('Component:     ' + msg.s_component);
+	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
+	    msg.ca_os_release, msg.ca_os_revision);
+	printf('%-12s %s\n', 'Component:', msg.s_component);
 
 	switch (msg.s_component) {
 	case 'config':
 		elts = msg.s_aggregators;
-		console.log('Aggregators:   ' + elts.length + ' total');
-		for (ii = 0; ii < elts.length; ii++) {
-			console.log('    ' + elts[ii].sia_hostname + ' (' +
-			    elts[ii].sia_ninsts + ' instrumentations)');
-		}
+		printf('%-28s    %-7s\n', 'AGGREGATORS', 'ACTIVE');
+		for (ii = 0; ii < elts.length; ii++)
+			printf('  %3d.  %-20s    %6d\n', ii + 1,
+			    elts[ii].sia_hostname, elts[ii].sia_ninsts);
 
 		elts = msg.s_instrumenters;
-		console.log('Instrumenters: ' + elts.length + ' total');
-		for (ii = 0; ii < elts.length; ii++) {
-			console.log('    ' + elts[ii].sii_hostname + ' (' +
-			    elts[ii].sii_nmetrics_avail + ' metrics, ' +
-			    elts[ii].sii_ninsts + ' active instrumentations)');
-		}
-
+		printf('%-28s    %-7s    %-6s\n', 'INSTRUMENTERS',
+		    'ACTIVE', 'METRICS');
+		for (ii = 0; ii < elts.length; ii++)
+			printf('  %3d.  %-20s    %6d    %7d\n', ii + 1,
+			    elts[ii].sii_hostname, elts[ii].sii_ninsts,
+			    elts[ii].sii_nmetrics_avail);
 		break;
 
 	case 'instrumenter':
 		elts = msg.s_instrumentations;
-		console.log('Active inst:   (' + elts.length + ' total)');
+		if (elts.length > 0)
+			printf('%-6s  %-20s  %-5s  %s\n', 'INSTID', 'METRIC',
+			    'PRED?', 'DECOMP');
 		for (ii = 0; ii < elts.length; ii++) {
-			console.log('    ' + elts[ii].s_inst_id + ': ' +
-			    elts[ii].s_module + '.' + elts[ii].s_stat + '.' +
-			    ' (' + (elts[ii].s_predicate ? 'P' : '_') +
-			    (elts[ii].s_decomposition ? 'D' : '_') + ')' +
-			    ' since ' + elts[ii].s_since);
+			metric = mod_ca.caSprintf('%s.%s',
+			    elts[ii].s_module, elts[ii].s_stat);
+			decomp = elts[ii].s_decomposition.join(', ');
+			if (!decomp)
+				decomp = 'None';
+			printf('%6d  %-20s  %-5s  %s\n', elts[ii].s_inst_id,
+			    metric, elts[ii].s_predicate.length > 0 ?
+			    'Yes' : 'No',
+			    decomp);
 		}
 
 		elts = msg.s_modules;
-		console.log('Available modules:');
+		if (elts.length > 0)
+			printf('  %-45s  %-8s %s\n', 'METRIC', 'TYPE',
+			    'FIELDS');
+
 		for (ii = 0; ii < elts.length; ii++) {
-			console.log('    ' + elts[ii].cam_name + ' (' +
-			    elts[ii].cam_description + ')');
 			for (jj = 0; jj < elts[ii].cam_stats.length; jj++) {
 				elt = elts[ii].cam_stats[jj];
-				addl = '';
+				metric = mod_ca.caSprintf('%s: %s',
+				    elts[ii].cam_description,
+				    elt.cas_description);
 				fields = elt.cas_fields.map(function (field) {
 					return (field.caf_name);
 				});
 
+				decomp = 'None';
 				if (fields.length > 0)
-					addl = ' by ' + fields.join(', ');
+					decomp = fields.join(', ');
 
-				console.log('        ' + elt.cas_name + ' (' +
-				    elt.cas_description + ': ' + elt.cas_type +
-				    addl + ')');
+				printf('  %-45s  %-8s %s\n', metric,
+				    elt.cas_type, decomp);
 			}
 		}
 
@@ -229,20 +244,26 @@ function ccAckStatus(msg)
 
 	case 'aggregator':
 		elts = msg.s_instrumentations;
-		console.log('Active inst:   (' + elts.length + ' total)');
+		if (elts.length > 0) {
+			printf('Active instrumentations:   (%d total)\n',
+			    elts.length);
+			printf('    %-6s  %-8s  %-27s  %-27s\n', 'INSTID',
+			    'NSOURCES', 'SINCE', 'LAST');
+		}
+
 		for (ii = 0; ii < elts.length; ii++) {
-			console.log('    ' + elts[ii].s_inst_id + ' from ' +
-			    elts[ii].s_nsources + ' sources since ' +
-			    elts[ii].s_since + ' (last: ' +
-			    new Date(elts[ii].s_last * 1000) + ')');
-			console.log('    ' + mod_sys.inspect(elts[ii].s_data,
-			    false, 4));
+			printf('    %6s  %8d  %27s  %27s\n',
+			    elts[ii].s_inst_id, elts[ii].s_nsources,
+			    mod_ca.caFormatDate(new Date(
+			    Date.parse(elts[ii].s_since))),
+			    mod_ca.caFormatDate(
+			    new Date(elts[ii].s_last * 1000)));
 		}
 
 		break;
 
 	default:
-		console.log('unknown component type');
+		printf('unknown component type\n');
 		break;
 	}
 

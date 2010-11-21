@@ -2,31 +2,40 @@
  * caconfigsvc: Cloud Analytics Configuration Service
  *
  * This service is responsible for directing other components of the cloud
- * analytics service, including instrumenters, aggregators, and retrievers.
+ * analytics service, including instrumenters and aggregators.
  */
 
 var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
 var mod_cahttp = require('./caconfig/http');
+var mod_log = require('ca-log');
 var HTTP = require('http-constants');
 
+var cfg_name = 'configsvc';	/* component name */
+var cfg_vers = '0.0';		/* component version */
 var cfg_http_port = 23181;	/* HTTP port for API endpoint */
-var cfg_http;			/* http interface handle */
-var cfg_cap;			/* camqp CAP wrapper */
+
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
 
+var cfg_http;			/* http interface handle */
+var cfg_cap;			/* camqp CAP wrapper */
+var cfg_log;			/* log handle */
+
 function main()
 {
 	var http_port = cfg_http_port;
 	var broker = mod_ca.ca_amqp_default_broker;
-	var sysinfo = mod_ca.caSysinfo('configsvc', '0.0');
+	var sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
 	var hostname = sysinfo.ca_hostname;
+	var amqp;
 
-	var amqp = new mod_caamqp.caAmqp({
+	cfg_log = new mod_log.caLog({ out: process.stdout });
+
+	amqp = new mod_caamqp.caAmqp({
 		broker: broker,
 		exchange: mod_ca.ca_amqp_exchange,
 		exchange_opts: mod_ca.ca_amqp_exchange_opts,
@@ -34,10 +43,14 @@ function main()
 		hostname: hostname,
 		bindings: [ mod_ca.ca_amqp_key_config ]
 	});
-	amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
-	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
+	amqp.on('amqp-error', mod_caamqp.caAmqpLogError(cfg_log));
+	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
 
-	cfg_cap = new mod_cap.capAmqpCap({ amqp: amqp, sysinfo: sysinfo });
+	cfg_cap = new mod_cap.capAmqpCap({
+	    amqp: amqp,
+	    log: cfg_log,
+	    sysinfo: sysinfo
+	});
 	cfg_cap.on('msg-cmd-ping', cfgCmdPing);
 	cfg_cap.on('msg-cmd-status', cfgCmdStatus);
 	cfg_cap.on('msg-notify-aggregator_online', cfgNotifyAggregatorOnline);
@@ -48,24 +61,26 @@ function main()
 	cfg_cap.on('msg-ack-enable_instrumentation', cfgAckEnable);
 	cfg_cap.on('msg-ack-disable_instrumentation', cfgAckDisable);
 	cfg_cap.on('msg-ack-enable_aggregation', cfgAckEnableAgg);
-	cfg_cap.on('msg-data', cfgGotData);
 
-	cfg_http = new mod_cahttp.caConfigHttp({ port: http_port });
+	cfg_http = new mod_cahttp.caConfigHttp({
+	    log: cfg_log, port: http_port
+	});
 	cfg_http.on('inst-create', cfgCreateInstrumentation);
 	cfg_http.on('inst-delete', cfgDeleteInstrumentation);
 	cfg_http.on('list-metrics', cfgListMetrics);
 
-	console.log('Hostname:    ' + hostname);
-	console.log('AMQP broker: ' + JSON.stringify(broker));
-	console.log('Routing key: ' + amqp.routekey());
-	console.log('HTTP server: Port ' + http_port);
+	cfg_log.info('Config service starting up (%s/%s)', cfg_name, cfg_vers);
+	cfg_log.info('%-12s %s', 'Hostname:', hostname);
+	cfg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
+	cfg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
+	cfg_log.info('%-12s Port %d', 'HTTP server:', http_port);
 
 	amqp.start(function () {
-		console.log('AMQP broker connected.');
+		cfg_log.info('AMQP broker connected.');
 	});
 
 	cfg_http.start(function () {
-		console.log('HTTP server started.');
+		cfg_log.info('HTTP server started.');
 	});
 }
 
@@ -222,7 +237,7 @@ function cfgAckEnableAgg(msg)
 	var id;
 
 	if (!('ag_inst_id' in msg)) {
-		console.log('dropped ack-enable_aggregation message with ' +
+		cfg_log.warn('dropped ack-enable_aggregation message with ' +
 		    'missing id');
 		return;
 	}
@@ -243,8 +258,8 @@ function cfgAckEnable(msg)
 	var id, result;
 
 	if (!('is_inst_id' in msg)) {
-		console.log('dropped ack-enable_instrumentation message with ' +
-		    'missing id');
+		cfg_log.warn('dropped ack-enable_instrumentation message ' +
+		    'with missing id');
 		return;
 	}
 
@@ -257,8 +272,8 @@ function cfgAckEnable(msg)
 		cfg_insts[id].insts_ok++;
 	}
 
-	console.log(msg.ca_hostname + '   instrument id ' + msg.is_inst_id +
-	    ': ' + result);
+	cfg_log.info('host %s instrument %s: %s', msg.ca_hostname,
+	    msg.is_inst_id, result);
 	cfgCheckNewInstrumentation(id);
 }
 
@@ -270,8 +285,8 @@ function cfgAckDisable(msg)
 	if (msg.is_status != 'disabled')
 		result += ' (' + msg.is_error + ')';
 
-	console.log(msg.ca_hostname + ' deinstrument id ' + msg.is_inst_id +
-	    ': ' + result);
+	cfg_log.info('host %s deinstrument %s: %s', msg.ca_hostname,
+	    msg.is_inst_id, result);
 }
 
 function cfgCmdPing(msg)
@@ -324,8 +339,7 @@ function cfgNotifyAggregatorOnline(msg)
 	/* XXX if already exists, it restarted, so need to update its state! */
 	cfg_aggregators[agg.cag_hostname] = agg;
 
-	console.log('NOTICE: ' + msg.ca_hostname + ': ' + new Date() +
-	    ': aggregator started');
+	cfg_log.info('aggregator started: %s', msg.ca_hostname);
 }
 
 function cfgNotifyInstrumenterOnline(msg)
@@ -392,18 +406,17 @@ function cfgNotifyInstrumenterOnline(msg)
 
 	/* XXX if already exists, it restarted, so need to update its state! */
 
-	console.log('NOTICE: ' + msg.ca_hostname + ': ' + new Date() +
-	    ': instrumenter ' + action);
+	cfg_log.info('instrumenter %s: %s', action, msg.ca_hostname);
 }
 
 function cfgNotifyLog(msg)
 {
 	if (!('l_message' in msg)) {
-		console.log('dropped log message with missing message');
+		cfg_log.warn('dropped log message with missing message');
 		return;
 	}
 
-	console.log('WARNING: ' + msg.ca_hostname + ': ' + msg.ca_time + ': ' +
+	cfg_log.warn('from %s: %s %s', msg.ca_hostname, msg.ca_time,
 	    msg.l_message);
 }
 
@@ -412,23 +425,17 @@ function cfgNotifyInstrumenterError(msg)
 	if (!('ins_inst_id' in msg) || !('ins_error' in msg) ||
 	    !('ins_status' in msg) ||
 	    (msg['status'] != 'enabled' && msg['status'] != 'disabled')) {
-		console.log('dropping malformed inst error message');
+		cfg_log.warn('dropping malformed inst error message');
 		return;
 	}
 
 	if (!(msg.ca_hostname in cfg_instrumenters)) {
-		console.log('dropping inst error message for unknown host "' +
-		    msg.ca_hostname + '"');
+		cfg_log.warn('dropping inst error message for unknown host ' +
+		    '"%s"', msg.ca_hostname);
 		return;
 	}
 
 	/* XXX */
-}
-
-function cfgGotData(msg)
-{
-	console.log('data: ' + msg.d_inst_id + ': ' + msg.ca_time + ': ' +
-	    msg.d_value);
 }
 
 main();

@@ -45,6 +45,8 @@ function cfgHttpUriToComponents(uri)
  *
  *	port		Local TCP port on which to serve HTTP
  *
+ *	log		Log handle (for recording debugging messages)
+ *
  * This object emits an event for each received request.  Event listener
  * functions receive two arguments:
  *
@@ -85,6 +87,8 @@ function caConfigHttp(conf)
 	var cfghttp = this;
 
 	mod_events.EventEmitter.call(this);
+
+	this.cah_log = conf.log;
 	this.cah_port = conf.port;
 	this.cah_server = mod_http.createServer(
 	    function (request, response) {
@@ -235,9 +239,8 @@ caConfigHttp.prototype.sendResponse = function (request, response, code, data,
 	else
 		rspdata = JSON.stringify(data);
 
-	/* XXX should move under debug to avoid DOS */
 	if (code >= HTTP.EBADREQUEST)
-		console.log('failed: ' + request.method + ' ' +
+		this.cah_log.dbg('failed: ' + request.method + ' ' +
 		    request.url + ': ' + data);
 
 	response.end(rspdata);

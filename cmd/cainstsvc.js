@@ -5,21 +5,30 @@
 var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
+var mod_log = require('ca-log');
 
-var ins_cap;		/* cap wrapper */
-var ins_insts = {};	/* active instrumentations by id */
-var ins_modules = {};	/* registered stat modules */
-var ins_iid;		/* interval timer id */
+var ins_name = 'instsvc';	/* component name */
+var ins_vers = '0.0';		/* component version */
+
+var ins_insts = {};		/* active instrumentations by id */
+var ins_modules = {};		/* registered stat modules */
+var ins_iid;			/* interval timer id */
+
+var ins_cap;			/* cap wrapper */
+var ins_log;			/* log handle */
 
 var stdout = process.stdout;
 
 function main()
 {
 	var broker = mod_ca.ca_amqp_default_broker;
-	var sysinfo = mod_ca.caSysinfo('instsvc', '0.0');
+	var sysinfo = mod_ca.caSysinfo(ins_name, ins_vers);
 	var hostname = sysinfo.ca_hostname;
+	var amqp;
 
-	var amqp = new mod_caamqp.caAmqp({
+	ins_log = new mod_log.caLog({ out: process.stdout });
+
+	amqp = new mod_caamqp.caAmqp({
 		broker: broker,
 		exchange: mod_ca.ca_amqp_exchange,
 		exchange_opts: mod_ca.ca_amqp_exchange_opts,
@@ -27,18 +36,23 @@ function main()
 		hostname: hostname,
 		bindings: []
 	});
-	amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
-	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
+	amqp.on('amqp-error', mod_caamqp.caAmqpLogError(ins_log));
+	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(ins_log));
 
-	ins_cap = new mod_cap.capAmqpCap({ amqp: amqp, sysinfo: sysinfo });
+	ins_cap = new mod_cap.capAmqpCap({
+	    amqp: amqp,
+	    log: ins_log,
+	    sysinfo: sysinfo
+	});
 	ins_cap.on('msg-cmd-ping', insCmdPing);
 	ins_cap.on('msg-cmd-status', insCmdStatus);
 	ins_cap.on('msg-cmd-enable_instrumentation', insCmdEnable);
 	ins_cap.on('msg-cmd-disable_instrumentation', insCmdDisable);
 
-	console.log('Hostname:    ' + hostname);
-	console.log('AMQP broker: ' + JSON.stringify(broker));
-	console.log('Routing key: ' + amqp.routekey());
+	ins_log.info('Instrumenter starting up (%s/%s)', ins_name, ins_vers);
+	ins_log.info('%-12s %s', 'Hostname:', hostname);
+	ins_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
+	ins_log.info('%-12s %s', 'Routing key:', amqp.routekey());
 
 	insInitBackends();
 
@@ -222,12 +236,15 @@ function insInitBackends()
 	var bemgr = new insBackendInterface();
 	var plugin, ii;
 
+	ins_log.info('Loading modules.');
+
 	for (ii = 0; ii < backends.length; ii++) {
-		stdout.write('Loading module ' + backends[ii] + ' ... ');
 		plugin = require('./cainst/modules/' + backends[ii]);
-		plugin.insinit(bemgr);
-		stdout.write('done.\n');
+		plugin.insinit(bemgr, ins_log);
+		ins_log.info('Loaded module "%s".', backends[ii]);
 	}
+
+	ins_log.info('Finished loading modules.');
 }
 
 function insGetModules()
@@ -282,7 +299,7 @@ function insStarted()
 {
 	var msg;
 
-	console.log('AMQP broker connected.');
+	ins_log.info('AMQP broker connected.');
 
 	msg = {};
 	msg.ca_type = 'notify';
@@ -417,8 +434,8 @@ function insCmdEnable(msg)
 
 		sendmsg.is_status = 'enabled';
 		ins_cap.send(destkey, sendmsg);
-		console.log('  instrumented ' + id + ' (' +
-		    inst.is_module + '.' + inst.is_stat + ')');
+		ins_log.info('instrumented %d (%s.%s)', id,
+		    inst.is_module, inst.is_stat);
 	});
 }
 
@@ -458,7 +475,7 @@ function insCmdDisable(msg)
 		sendmsg.is_status = 'disabled';
 		ins_cap.send(destkey, sendmsg);
 		delete (ins_insts[id]);
-		console.log('deinstrumented ' + id);
+		ins_log.info('deinstrumented %d', id);
 	});
 }
 

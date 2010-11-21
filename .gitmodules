@@ -7,3 +7,12 @@
 [submodule "deps/node-kstat"]
 	path = deps/node-kstat
 	url = https://github.com/bcantrill/node-kstat.git
+[submodule "deps/node"]
+	path = deps/node
+	url = http://github.com/ry/node.git
+[submodule "deps/node-png"]
+	path = deps/node-png
+	url = https://github.com/pkrumins/node-png.git
+[submodule "deps/node-heatmap"]
+	path = deps/node-heatmap
+	url = git@git.joyent.com:node-heatmap.git

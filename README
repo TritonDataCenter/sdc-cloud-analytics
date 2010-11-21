@@ -39,12 +39,20 @@ DEPENDENCIES
 The project depends on the following components that are assumed to be
 installed already on the dev/test machine:
 
-	o node, used by most components
-	o python for jsl only
-	o perl for jsstyle only
+	o python (for jsl only)
+	o perl (for jsstyle only)
+	o libpng
+
+libpng is the only one not installed on a COAL-S zone by default.  You can
+install it with:
+
+	# pkgin install png
 
 The project also depends on the following bundled components:
 
+	o node, in deps/node
+	o node-png, a libpng wrapper in deps/node-png
+	o node-heatmap, a pure-JS node module in deps/node-heatmap
 	o node-amqp, a pure-JS node module in deps/node-amqp
 	o node-kstat, a native node module in deps/node-kstat
 	o node-libdtrace, a native node module in deps/node-libdtrace
@@ -53,18 +61,21 @@ To check these out, use
 
 	# git submodule update --init
 
-Then build the native modules:
+Then build node:
 
-	# cd deps
-	# cd node-kstat
+	# cd deps/node
+	# ./configure
+	# make && make install
+
+Then build the native modules.  For each $DEP of node-png, node-kstat, and
+node-libdtrace:
+
+	# cd deps/$DEP
 	# node-waf configure && node-waf build && node-waf install
-	# cd ..
 
-	# cd node-libdtrace
-	# node-waf configure && node-waf build && node-waf install
-
-These will only build on Solaris, since they require native kstat and dtrace
-libraries.  The native libraries are only used by the instrumenter component.
+Note that node-kstat will only build on Solaris since it requires libkstat.
+node-libdtrace will build on both Solaris and MacOS.  The kstat and libdtrace
+native libraries are only used by the instrumenter component.
 
 
 COMMANDS
@@ -74,38 +85,19 @@ To run commands, you generally use:
 	# tools/ws
 	# node cmd/<source>.js
 
-The "ws" tool takes care of setting NODE_PATH appropriately.
+The "ws" tool takes care of setting NODE_PATH appropriately to include all of
+our dependencies.
 
 
 DEMO
 
 Try the 'basicvis' demo.  Start with COAL-S.
 
-- Create a new zone (I'll call this 'devel') using the MCP API and set
-  it up as usual (add ssh keys for yourself, etc.)
+- Build dependencies as described above.
 
-- Set up port forwarding for three HTTP ports to the new zone.  The easiest way
-  to do this is to modify /root/coal4devs/gzone-ipnat.sh in the global zone to
-  add this:
+- Make sure HOST is set in your environment.  For example:
 
-	echo $0: configuring HTTP pass-through to devel zone "(192.168.2.31)"
-	cat >> /etc/ipf/ipnat.conf <<CONF
-	rdr external0 192.168.3.7/32 port 23181 -> 192.168.2.31 port 23181 tcp
-	map external0 from any to 192.168.2.31/32 port = 23181 -> 192.168.3.7/32
-	rdr external0 192.168.3.7/32 port 23182 -> 192.168.2.31 port 23182 tcp
-	map external0 from any to 192.168.2.31/32 port = 23182 -> 192.168.3.7/32
-	rdr external0 192.168.3.7/32 port 23183 -> 192.168.2.31 port 23183 tcp
-	map external0 from any to 192.168.2.31/32 port = 23183 -> 192.168.3.7/32
-	CONF
-
-  In this case, the zone's IP address is 192.168.2.31.  You'll have to fill in
-  yours.  Then run this script.
-
-- Checkout node (I'm using v0.3.1-pre) into the devel zone.  Build and
-  install.
-
-- Checkout this repo into the devel zone.  Build as described above under
-  "Dependencies".
+	# export HOST=$(hostname)
 
 - Run tools/ws to set up NODE_PATH, then start up instances of the
   configsvc, aggregator, instrumenter, and demo server, in that order:
@@ -115,15 +107,8 @@ Try the 'basicvis' demo.  Start with COAL-S.
 	# node cmd/cainstsvc.js
 	# node demo/basicvis/demo.js
 
-  Note that HOST must be set in the environment.  This should be set to the
-  system's hostname, though it can be any identifier for the machine.  Note
-  too that in production these services would run in a system's global zone
-  and/or the head node but for testing we run them all in a local zone.
-
 - On a machine where you have a web browser (i.e. your laptop), connect to
-  http://<COAL VM>:23183/.  Note that if you used different ports above you'll
-  have to tweak demo/basicvis/caflot.js.  If your COAL VM is not at
-  192.168.3.7, you should have tweaked the above gzone-ipnat.sh fragment.
+  http://<COAL VM>:23183/.
 
 - You should be able to create and delete graphs for the few stats
   already supported.  Enjoy!
@@ -134,8 +119,8 @@ NOTES
 Checked in code should be lint-clean and jsstyle-clean.
 
 The "jsl" implementation here assumes a Solaris environment and several
-Python-related paths.  It should work on a stock COAL-S zone, as of
-November, 2010.
+Python-related paths.  It should work on a stock COAL-S global or local zone
+(as of November, 2010).
 
 
 ADDITIONAL INFORMATION

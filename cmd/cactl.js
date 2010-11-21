@@ -5,6 +5,7 @@
 var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
+var mod_log = require('ca-log');
 var mod_sys = require('sys');
 
 var cc_timeout_msec = 3 * 1000;		/* timeout after 3s */
@@ -40,6 +41,7 @@ function main()
 	var broker = mod_ca.ca_amqp_default_broker;
 	var sysinfo = mod_ca.caSysinfo('cactl', '0.1');
 	var hostname = sysinfo.ca_hostname+ '.' + process.pid;
+	var log = new mod_log.caLog({ out: process.stdout });
 
 	cc_amqp = new mod_caamqp.caAmqp({
 		broker: broker,
@@ -57,7 +59,7 @@ function main()
 	});
 
 	cc_cap = new mod_cap.capAmqpCap({
-	    amqp: cc_amqp, sysinfo: sysinfo
+	    log: log, amqp: cc_amqp, sysinfo: sysinfo
 	});
 	cc_cap.on('msg-ack-ping', ccAckPing);
 	cc_cap.on('msg-ack-status', ccAckStatus);

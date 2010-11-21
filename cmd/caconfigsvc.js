@@ -93,6 +93,7 @@ function cfgCreateInstrumentation(args, callback)
 	var mincount, minkey;
 	var instspec = args['spec'];
 	var statkey, ninsts;
+	var stattype;
 	var check = function (obj, field, type, required) {
 		if (required && !obj[field])
 			throw (new Error('missing required field: ' + field));
@@ -104,17 +105,31 @@ function cfgCreateInstrumentation(args, callback)
 			throw (new Error('wrong type for field: ' + field));
 	};
 
-	check(instspec, 'module', '', true);
-	check(instspec, 'stat', '', true);
-	check(instspec, 'nodes', [], false);
-	check(instspec, 'predicate', [], false);
-	check(instspec, 'decomposition', [], false);
 
-	if (!instspec['predicate'])
-		instspec['predicate'] = [];
+	/*
+	 * Validate the metric and retrieve its type.  We'll send the type
+	 * information to both the client and the aggregator so they know what
+	 * kind of data to expect.
+	 */
+	try {
+		check(instspec, 'module', '', true);
+		check(instspec, 'stat', '', true);
+		check(instspec, 'nodes', [], false);
+		check(instspec, 'predicate', [], false);
+		check(instspec, 'decomposition', [], false);
 
-	if (!instspec['decomposition'])
-		instspec['decomposition'] = [];
+		if (!instspec['predicate'])
+			instspec['predicate'] = [];
+
+		if (!instspec['decomposition'])
+			instspec['decomposition'] = [];
+
+		stattype = cfgStatType(instspec);
+	} catch (ex) {
+		callback(HTTP.EBADREQUEST,
+		    'failed to validate instrumentation: ' + ex.message);
+		return;
+	}
 
 	/*
 	 * Pick *one* aggregator and have it collect data for this.  This
@@ -143,7 +158,8 @@ function cfgCreateInstrumentation(args, callback)
 	    ca_type: 'cmd',
 	    ca_subtype: 'enable_aggregation',
 	    ag_inst_id: id,
-	    ag_key: statkey
+	    ag_key: statkey,
+	    ag_dimension: stattype['dimension']
 	});
 
 	/*
@@ -171,7 +187,8 @@ function cfgCreateInstrumentation(args, callback)
 	    insts_failed: 0,
 	    insts_ok: 0,
 	    insts_total: ninsts,
-	    callback: callback
+	    callback: callback,
+	    stattype: stattype
 	};
 
 	/* XXX timeout HTTP request */
@@ -212,6 +229,7 @@ function cfgCheckNewInstrumentation(id)
 {
 	var inst = cfg_insts[id];
 	var callback = inst.callback;
+	var stattype, dim, type;
 
 	if (inst.agg_done === undefined ||
 	    inst.insts_failed + inst.insts_ok < inst.insts_total)
@@ -229,7 +247,10 @@ function cfgCheckNewInstrumentation(id)
 		return;
 	}
 
-	callback(HTTP.CREATED, { id: id });
+	stattype = inst.stattype;
+	dim = stattype['dimension'];
+ 	type = dim == 1 ? 'scalar' : stattype['type'];
+	callback(HTTP.CREATED, { id: id, dimension: dim, type: type });
 }
 
 function cfgAckEnableAgg(msg)
@@ -436,6 +457,74 @@ function cfgNotifyInstrumenterError(msg)
 	}
 
 	/* XXX */
+}
+
+/*
+ * Given an instrumentation specification (with 'module', 'stat', 'predicate',
+ * and 'decomposition' fields), validate the stat and return the type of one of
+ * the resulting data points.  This is specified as an object with the following
+ * member:
+ *
+ *	dimension	Describes the dimensionality of each datum as an
+ *			integer.  For simple scalar metrics, the dimension is 1.
+ *			The dimensionality increases with each decomposition.
+ *
+ *	type		Describes the datum itself.  If dimension is 1, then
+ *			type is always 'scalar'.  If any decompositions use a
+ *			linear field (e.g., latency), then type is
+ *			'linear-decomposition'.  Otherwise, type is
+ *			'discrete-decomposition'.
+ *
+ * Combined, this information allows clients to know whether to visualize the
+ * result as a simple line graph, a line graph with multiple series, or a
+ * heatmap.  For examples:
+ *
+ *	METRIC				DIM	type		VISUAL
+ *	i/o ops				1	scalar		line
+ *	i/o ops by disk			2	discrete 	multi-line
+ *	i/o ops by latency		2	linear		heatmap
+ *	i/o ops by latency and disk	3	linear		heatmap
+ *
+ * If the given instrumentation does not specify a valid stat, this function
+ * throws an exception whose message describes why.
+ */
+function cfgStatType(inst)
+{
+	var modname = inst.module;
+	var statname = inst.stat;
+	var decomp = inst.decomposition;
+	var sprintf = mod_ca.caSprintf;
+	var mod, stat, fields, field, type, ii;
+
+	if (!(modname in cfg_statmods))
+		throw (new Error('module does not exist: ' + modname));
+
+	mod = cfg_statmods[modname];
+
+	if (!(statname in mod['stats']))
+		throw (new Error(sprintf('stat does not exist in ' +
+		    'module "%s": %s', modname, statname)));
+
+	stat = mod['stats'][statname];
+	fields = stat['fields'];
+
+	type = decomp.length === 0 ? 'scalar' : 'discrete-decomposition';
+
+	for (ii = 0; ii < decomp.length; ii++) {
+		field = decomp[ii];
+
+		if (!(field in fields))
+			throw (new Error(sprintf('field does not exist in ' +
+			    'module %s, stat %s: %s', modname, statname,
+			    field)));
+
+		if (fields[field].type == 'scalar')
+			type = 'linear-decomposition';
+	}
+
+	/* XXX validate predicate */
+
+	return ({ dimension: decomp.length + 1, type: type });
 }
 
 main();

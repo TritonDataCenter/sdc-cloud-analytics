@@ -8,10 +8,12 @@ var mod_cap = require('ca-amqp-cap');
 var mod_cahttp = require('./caconfig/http');
 var mod_log = require('ca-log');
 var HTTP = require('http-constants');
+var ASSERT = require('assert');
 
-var agg_name = 'aggsvc';	/* component name */
-var agg_vers = '0.0';		/* component version */
-var agg_http_port = 23182;	/* http port */
+var agg_name = 'aggsvc';		/* component name */
+var agg_vers = '0.0';			/* component version */
+var agg_http_port = 23182;		/* http port */
+var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
 
 var agg_insts = {};		/* active instrumentations by id */
 
@@ -65,6 +67,7 @@ function main()
 	agg_http.start(function () {
 		agg_log.info('HTTP server started.');
 		amqp.start(aggStarted);
+		setTimeout(aggTick, 1000);
 	});
 }
 
@@ -87,10 +90,12 @@ function aggCmdEnableAggregation(msg)
 	var sendmsg = agg_cap.responseTemplate(msg);
 	var destkey = msg.ca_source;
 	var id, datakey;
+	var dimension;
 
 	sendmsg.ag_inst_id = msg.ag_inst_id;
 
-	if (!('ag_inst_id' in msg) || !('ag_key' in msg)) {
+	if (!('ag_inst_id' in msg) || !('ag_key' in msg) ||
+	    !('ag_dimension' in msg)) {
 		sendmsg.ag_status = 'enable_failed';
 		sendmsg.ag_error = 'missing field';
 		agg_cap.send(destkey, sendmsg);
@@ -99,6 +104,7 @@ function aggCmdEnableAggregation(msg)
 
 	id = msg.ag_inst_id;
 	datakey = msg.ag_key;
+	dimension = msg.ag_dimension;
 
 	/*
 	 * This command is idempotent so if we're currently aggregating this
@@ -113,10 +119,12 @@ function aggCmdEnableAggregation(msg)
 
 	agg_cap.bind(datakey, function () {
 		agg_insts[id] = {
+		    agi_dimension: dimension,
 		    agi_since: new Date(),
 		    agi_sources: { sources: {}, nsources: 0 },
 		    agi_values: {},
-		    agi_last: 0
+		    agi_last: 0,
+		    agi_requests: []
 		};
 		sendmsg.ag_status = 'enabled';
 		agg_cap.send(destkey, sendmsg);
@@ -165,8 +173,7 @@ function aggData(msg)
 	var value = msg.d_value;
 	var time = msg.d_time;
 	var hostname = msg.ca_hostname;
-	var inst;
-	var callbacks, ii;
+	var inst, rq, ii;
 
 	if (id === undefined || value === undefined || time === undefined) {
 		agg_log.warn('dropped data message with missing field');
@@ -192,49 +199,76 @@ function aggData(msg)
 	inst.agi_sources.sources[hostname].ags_last = time;
 
 	if (!(time in inst.agi_values)) {
-		/* First record for this time index. */
-		inst.agi_values[time] =
-		    { value: value, count: 1, callbacks: []};
-		return;
-	}
-
-	inst.agi_values[time].count++;
-
-	if (inst.agi_values[time].value === undefined &&
-	    inst.agi_values[time].count === 0) {
-		inst.agi_values[time].value = value;
+		inst.agi_values[time] = { value: value, count: 1};
 	} else {
+		inst.agi_values[time].count++;
 		aggAggregateValue(inst, time, value);
 	}
 
 	/*
-	 * Wake up waiting HTTP requests.
+	 * If we have all the data we're expecting for this time index, wake up
+	 * HTTP requests which may now be satisfied.  We examine all of the
+	 * requests waiting on data for this instrumentation and we wake up
+	 * those that were waiting for data for this time index as well as those
+	 * waiting for data from earlier times, on the assumption that if we got
+	 * data from all instrumenters for this time, we won't some time later
+	 * get data from any of them for some previous time index.
 	 */
-	if (inst.agi_values[time].count != inst.agi_sources.nsources)
+	ASSERT.ok(inst.agi_values[time].count <= inst.agi_sources.nsources);
+	if (inst.agi_values[time].count != inst.agi_sources.nsources) {
+		agg_log.dbg('waiting for more data (expected %d, have %d)',
+		    inst.agi_sources.nsources, inst.agi_values[time].count);
 		return;
+	}
 
-	callbacks = inst.agi_values[time].callbacks;
-	for (ii = 0; ii < callbacks.length; ii++)
-		callbacks[ii]();
+	for (ii = 0; ii < inst.agi_requests.length; ii++) {
+		rq = inst.agi_requests[ii];
+
+		if (rq.datatime <= time) {
+			inst.agi_requests.splice(ii--, 1);
+			aggHttpValueDone(id, rq.datatime, rq.callback);
+			agg_log.dbg('delay-satisfied request for %d time %d ' +
+			    'processing data for %d', id, rq.datatime, time);
+		}
+	}
 }
 
 function aggAggregateValue(inst, time, newval)
 {
+	var vec, key;
+
 	if (typeof (newval) == 'number') {
 		inst.agi_values[time].value += newval;
 		return;
 	}
 
-	agg_log.error('unsupported aggregation type: %s', typeof (newval));
+	vec = inst.agi_values[time].value;
+
+	for (key in newval) {
+		if (!(key in vec))
+			vec[key] = 0;
+
+		vec[key] += newval[key];
+	}
 }
 
 /*
  * Process the request to retrieve a metric's value.
+ * XXX add start, duration parameters.  When we do, it should be illegal for
+ * 'start' to be before the earliest time for which we have data (approximated
+ * by the s_since field) or more than TIMEOUT seconds in the future (since it
+ * will definitely time out).  Otherwise, client requests could hang/time out,
+ * which also taxes us (since we keep these in memory).
+ * Also, when we add this, we need to make sure that the 'when' that gets stored
+ * in agi_requests is still the current time, not the time we were looking for.
+ * XXX need some way of noticing when instrumenters are gone for a while --
+ * putting them into a "don't wait for me" state.
+ * XXX parameter for "don't wait" or "max time to wait"?
  */
 function aggHttpValue(args, callback)
 {
 	var id = args['instid'];
-	var inst, when, record, complete, delayed;
+	var inst, now, when, record;
 
 	if (!(id in agg_insts)) {
 		callback(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
@@ -242,45 +276,76 @@ function aggHttpValue(args, callback)
 	}
 
 	inst = agg_insts[id];
-	/* XXX add start, duration parameters */
-	when = parseInt(new Date().getTime() / 1000, 10) - 1;
+	now = new Date().getTime();
+	when = parseInt(now / 1000, 10) - 1;
 	record = inst.agi_values[when];
 
-	complete = function () {
-		var ret = {};
-
-		ret.when = when;
-		ret.value = record.value;
-		ret.nreporting = record.count;
-		ret.nsources = inst.agi_sources.nsources;
-
-		if (delayed)
-			ret.delayed = new Date().getTime() - delayed;
-
-		callback(HTTP.OK, ret);
-	};
-
-	/*
-	 * XXX need some way of noticing attrition?
-	 * XXX check for date in the future or way in the past so we don't hang
-	 * requests and we don't autocreate tons of these buckets
-	 */
-	if (record === undefined) {
-		inst.agi_values[when] =
-		    { value: undefined, count: 0, callbacks: [] };
-		record = inst.agi_values[when];
-	}
-
-	if (record.value === undefined ||
-	    record.count < inst.agi_sources.nsources) {
-		delayed = new Date().getTime();
-		record.callbacks.push(complete);
+	if (record && record.count == inst.agi_sources.nsources) {
+		aggHttpValueDone(id, when, callback);
 		return;
 	}
 
-	complete();
+	/*
+	 * We don't have all the data we're expecting for this time index yet,
+	 * but we expect to get it in the near future.  We add a record to this
+	 * instrumentation's list of outstanding requests.  When new data comes
+	 * in, we'll figure out if we should process this request.  There's also
+	 * a timer that periodically times these out.
+	 */
+	agg_log.dbg('client request for %s at %d needs to wait', id, when);
+	inst.agi_requests.push({
+	    rqtime: now,
+	    datatime: when,
+	    callback: callback
+	});
 }
 
-/* XXX add timeout to expire old HTTP requests */
+function aggHttpValueDone(id, when, callback)
+{
+	var inst = agg_insts[id];
+	var record = inst.agi_values[when];
+	var ret;
+
+	ret = {};
+	ret.when = when;
+	ret.nsources = inst.agi_sources.nsources;
+
+	if (record) {
+		ret.value = record.value;
+		ret.nreporting = record.count;
+	} else {
+		ret.value = inst.agi_dimension > 1 ? {} : 0;
+		ret.nreporting = 0;
+	}
+
+	callback(HTTP.OK, ret);
+}
+
+/*
+ * Invoked once/second to time out old HTTP requests.
+ */
+function aggTick()
+{
+	var id, inst, ii, rq;
+	var now = new Date().getTime();
+
+	for (id in agg_insts) {
+		inst = agg_insts[id];
+		for (ii = 0; ii < inst.agi_requests.length; ii++) {
+			rq = inst.agi_requests[ii];
+
+			ASSERT.ok(rq.rqtime <= now);
+
+			if (now - rq.rqtime >= agg_http_req_timeout) {
+				inst.agi_requests.splice(ii--, 1);
+				aggHttpValueDone(id, rq.datatime, rq.callback);
+				agg_log.dbg('timed out request for %d time %d',
+				    id, rq.datatime);
+			}
+		}
+	}
+
+	setTimeout(aggTick, 1000);
+}
 
 main();

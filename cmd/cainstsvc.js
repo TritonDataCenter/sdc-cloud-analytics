@@ -315,11 +315,24 @@ function insStarted()
 /*
  * Invoked once/second to gather and report data.
  */
+var ins_last;
+
 function insTick()
 {
-	var id, when, value;
+	var id, when, value, whentime;
 
 	when = new Date(); /* XXX should this be reported by the subsystem? */
+	whentime = when.getTime();
+
+	/*
+	 * If for some reason we get invoked multiple times within the same
+	 * second, we ignore the subsequent invocations to avoid confusing the
+	 * aggregator.
+	 */
+	if (ins_last &&
+	    Math.floor(whentime / 1000) ==
+	    Math.floor(ins_last.getTime() / 1000))
+		return;
 
 	for (id in ins_insts) {
 		value = ins_insts[id].is_impl.value();
@@ -327,9 +340,11 @@ function insTick()
 		    ca_type: 'data',
 		    d_inst_id: id,
 		    d_value: value,
-		    d_time: when.getTime()
+		    d_time: whentime
 		});
 	}
+
+	ins_last = when;
 }
 
 /*

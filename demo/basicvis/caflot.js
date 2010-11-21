@@ -141,6 +141,10 @@ function gFillData(key)
 	return (function (datum) {
 		var data;
 
+		/*
+		 * XXX we could have received this data out of order.  It's
+		 * probably not worth fixing for this demo.
+		 */
 		gGraphs[key].data.shift();
 		gGraphs[key].data.push(datum);
 		data = gRecomputeData(key);

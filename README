@@ -43,11 +43,6 @@ installed already on the dev/test machine:
 	o perl (for jsstyle only)
 	o libpng
 
-libpng is the only one not installed on a COAL-S zone by default.  You can
-install it with:
-
-	# pkgin install png
-
 The project also depends on the following bundled components:
 
 	o node, in deps/node
@@ -72,6 +67,11 @@ node-libdtrace:
 
 	# cd deps/$DEP
 	# node-waf configure && node-waf build && node-waf install
+
+IMPORTANT: check the output of the "configure" stage to make sure that node-waf
+was able to find all the relevant libraries.  If that step fails, it will
+successfully build the module without the proper library dependencies, leaving
+you with an unloadable module when you try to use the library.
 
 Note that node-kstat will only build on Solaris since it requires libkstat.
 node-libdtrace will build on both Solaris and MacOS.  The kstat and libdtrace

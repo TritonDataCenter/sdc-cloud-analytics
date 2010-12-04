@@ -5,8 +5,9 @@
 var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
-var mod_cahttp = require('./caconfig/http');
+var mod_cahttp = require('ca-http');
 var mod_log = require('ca-log');
+var mod_heatmap = require('heatmap');
 var HTTP = require('http-constants');
 var ASSERT = require('assert');
 
@@ -14,10 +15,11 @@ var agg_name = 'aggsvc';		/* component name */
 var agg_vers = '0.0';			/* component version */
 var agg_http_port = 23182;		/* http port */
 var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
+var agg_http_baseurl = '/metrics/instrumentation/:id';
 
 var agg_insts = {};		/* active instrumentations by id */
 
-var agg_http;			/* http interface handle */
+var agg_http;
 var agg_cap;			/* cap wrapper */
 var agg_log;			/* log handle */
 
@@ -52,17 +54,17 @@ function main()
 	agg_cap.on('msg-cmd-enable_aggregation', aggCmdEnableAggregation);
 	agg_cap.on('msg-data', aggData);
 
-	/* XXX refactor to non-config subdir */
-	agg_http = new mod_cahttp.caConfigHttp({
-	    log: agg_log, port: http_port
-	});
-	agg_http.on('inst-value', aggHttpValue);
-
 	agg_log.info('Aggregator starting up (%s/%s)', agg_name, agg_vers);
 	agg_log.info('%-12s %s', 'Hostname:', hostname);
 	agg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
 	agg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
 	agg_log.info('%-12s Port %d', 'HTTP server:', http_port);
+
+	agg_http = new mod_cahttp.caHttpServer({
+	    log: agg_log,
+	    port: http_port,
+	    router: aggHttpRouter
+	});
 
 	agg_http.start(function () {
 		agg_log.info('HTTP server started.');
@@ -226,7 +228,7 @@ function aggData(msg)
 
 		if (rq.datatime <= time) {
 			inst.agi_requests.splice(ii--, 1);
-			aggHttpValueDone(id, rq.datatime, rq.callback);
+			rq.callback(id, rq.datatime, rq.response);
 			agg_log.dbg('delay-satisfied request for %d time %d ' +
 			    'processing data for %d', id, rq.datatime, time);
 		}
@@ -252,6 +254,12 @@ function aggAggregateValue(inst, time, newval)
 	}
 }
 
+function aggHttpRouter(server)
+{
+	server.get(agg_http_baseurl + '/value/raw', aggHttpValueRaw);
+	server.get(agg_http_baseurl + '/value/heatmap', aggHttpValueHeatmap);
+}
+
 /*
  * Process the request to retrieve a metric's value.
  * XXX add start, duration parameters.  When we do, it should be illegal for
@@ -265,13 +273,13 @@ function aggAggregateValue(inst, time, newval)
  * putting them into a "don't wait for me" state.
  * XXX parameter for "don't wait" or "max time to wait"?
  */
-function aggHttpValue(args, callback)
+function aggHttpValueCommon(request, response, callback)
 {
-	var id = args['instid'];
+	var id = request.params['id'];
 	var inst, now, when, record;
 
 	if (!(id in agg_insts)) {
-		callback(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
 		return;
 	}
 
@@ -281,7 +289,7 @@ function aggHttpValue(args, callback)
 	record = inst.agi_values[when];
 
 	if (record && record.count == inst.agi_sources.nsources) {
-		aggHttpValueDone(id, when, callback);
+		callback(id, when, response);
 		return;
 	}
 
@@ -296,11 +304,17 @@ function aggHttpValue(args, callback)
 	inst.agi_requests.push({
 	    rqtime: now,
 	    datatime: when,
+	    response: response,
 	    callback: callback
 	});
 }
 
-function aggHttpValueDone(id, when, callback)
+function aggHttpValueRaw(request, response)
+{
+	aggHttpValueCommon(request, response, aggHttpValueRawDone);
+}
+
+function aggHttpValueRawDone(id, when, response)
 {
 	var inst = agg_insts[id];
 	var record = inst.agi_values[when];
@@ -318,7 +332,73 @@ function aggHttpValueDone(id, when, callback)
 		ret.nreporting = 0;
 	}
 
-	callback(HTTP.OK, ret);
+	response.send(HTTP.OK, ret);
+}
+
+function aggHttpValueHeatmap(request, response)
+{
+	/* XXX return 404 for non-heatmap stats? */
+	aggHttpValueCommon(request, response, aggHttpValueHeatmapDone);
+}
+
+function aggHttpValueHeatmapDone(id, when, response)
+{
+	/*
+	 * XXX the way this is coded now, 'when' is the last data point, but it
+	 * should really be the first one (but it's the last one we need to make
+	 * sure is present).
+	 */
+	var inst = agg_insts[id];
+	var duration = 60;
+	var ret, data, ii, record;
+	var nreporting;
+	var primary, datasets, png;
+	var conf;
+
+	ret = {};
+	data = {};
+
+	for (ii = when - duration + 1; ii <= when; ii++) {
+		record = inst.agi_values[ii];
+
+		if (!record)
+			continue;
+
+		if (nreporting === undefined || record < nreporting)
+			nreporting = record.count;
+
+		data[ii] = record.value;
+	}
+
+	conf = {
+		height: 300,
+		width: 1000,
+		min: 0,
+		max: 100000,
+		nbuckets: 100,
+		nsamples: duration,
+		base: 0,
+		x: 0,
+		y: 0,
+		base: when - duration + 1,
+		nsamples: duration
+	};
+
+	primary = mod_heatmap.bucketize(data, conf);
+	datasets = [ primary ];
+	mod_heatmap.normalize(datasets);
+
+	conf.hue = [ 21 ];
+	conf.saturation = [ 0, 0.9 ];
+	conf.value = 0.95;
+
+	png = mod_heatmap.generate(datasets, conf);
+
+	ret.minreporting = nreporting;
+	ret.when = when;
+	ret.image = png.encodeSync().toString('base64'); /* XXX sync! */
+
+	response.send(HTTP.OK, ret);
 }
 
 /*
@@ -338,7 +418,7 @@ function aggTick()
 
 			if (now - rq.rqtime >= agg_http_req_timeout) {
 				inst.agi_requests.splice(ii--, 1);
-				aggHttpValueDone(id, rq.datatime, rq.callback);
+				rq.callback(id, rq.datatime, rq.response);
 				agg_log.dbg('timed out request for %d time %d',
 				    id, rq.datatime);
 			}

@@ -24,5 +24,8 @@ for dir in $ws_root/deps/*; do
 	export NODE_PATH="$NODE_PATH:$ws_root/deps/$(basename $dir)"
 done
 
+export NODE_PATH="$NODE_PATH:$ws_root/deps/connect/lib"
+export NODE_PATH="$NODE_PATH:$ws_root/deps/node-heatmap/lib"
+
 echo "NODE_PATH=$NODE_PATH"
 exec $SHELL

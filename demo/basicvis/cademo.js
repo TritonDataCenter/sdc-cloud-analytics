@@ -29,4 +29,6 @@ mod_http.createServer(function (req, res) {
 		res.writeHead(200);
 		res.end(file);
 	});
-}).listen(dd_port);
+}).listen(dd_port, function () {
+	console.log('HTTP server started on port ' + dd_port);
+});

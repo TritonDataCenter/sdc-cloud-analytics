@@ -1,18 +1,21 @@
 [submodule "deps/node-amqp"]
 	path = deps/node-amqp
-	url = https://github.com/ry/node-amqp.git
+	url = git://github.com/ry/node-amqp.git
 [submodule "deps/node-libdtrace"]
 	path = deps/node-libdtrace
-	url = https://github.com/bcantrill/node-libdtrace.git
+	url = git://github.com/bcantrill/node-libdtrace.git
 [submodule "deps/node-kstat"]
 	path = deps/node-kstat
-	url = https://github.com/bcantrill/node-kstat.git
+	url = git://github.com/bcantrill/node-kstat.git
 [submodule "deps/node"]
 	path = deps/node
-	url = http://github.com/ry/node.git
+	url = git://github.com/ry/node.git
 [submodule "deps/node-png"]
 	path = deps/node-png
-	url = https://github.com/pkrumins/node-png.git
+	url = git://github.com/pkrumins/node-png.git
 [submodule "deps/node-heatmap"]
 	path = deps/node-heatmap
 	url = git@git.joyent.com:node-heatmap.git
+[submodule "deps/connect"]
+	path = deps/connect
+	url = git://github.com/senchalabs/connect.git

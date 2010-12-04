@@ -19,7 +19,8 @@ exports.insinit = function (ins, log)
 	    type: 'ops',
 	    fields: {
 		probefunc: { label: 'system call', type: 'string' },
-		execname: { label: 'application name', type: 'string' }
+		execname: { label: 'application name', type: 'string' },
+		latency: { label: 'latency', type: 'linear' }
 	    },
 	    metric: insdSyscalls
 	});
@@ -28,19 +29,53 @@ exports.insinit = function (ins, log)
 function insdSyscalls(metric)
 {
 	var decomps = metric.is_decomposition;
-	var script;
+	var latency = false;
+	var script = '';
+	var ii;
 
 	ASSERT.ok(decomps.length < 2);
 
-	script  = 'syscall:::entry\n';
+	for (ii = 0; ii < decomps.length; ii++) {
+		if (decomps[ii] == 'latency') {
+			latency = true;
+			decomps.splice(ii, 1);
+			break;
+		}
+	}
+
+	if (latency) {
+		script += 'syscall:::entry\n' +
+		    '{\n' +
+		    '\tself->ts = timestamp;\n' +
+		    '}\n\n';
+	}
+
+	script += 'syscall:::return\n';
+
+	if (latency)
+		script += '/self->ts/\n';
+
 	script += '{\n';
-	script += '\t@';
 
-	if (decomps.length > 0)
-		script += '[' + decomps[0] + ']';
+	if (!latency) {
+		script += '\t@';
 
-	script += ' = count();\n';
+		if (decomps.length > 0)
+			script += '[' + decomps[0] + ']';
+
+		script += ' = count();\n';
+	}
+
+	if (latency) {
+		script += '\t@latency = ' +
+		    'lquantize(timestamp - self->ts, 0, 100000, 100);\n';
+		script += '\tself->ts = 0;\n';
+	}
+
 	script += '}\n';
+
+	if (latency)
+		return (new insDTraceLinearDecomp(script));
 
 	if (decomps.length > 0)
 		return (new insDTraceVectorMetric(script));
@@ -113,4 +148,19 @@ insDTraceVectorMetric.prototype.reduce = function (agg)
 		return (agg[aggid]);
 
 	return ({});
+};
+
+function insDTraceLinearDecomp(prog)
+{
+	insDTraceMetric.call(this, prog);
+}
+
+mod_sys.inherits(insDTraceLinearDecomp, insDTraceMetric);
+
+insDTraceLinearDecomp.prototype.reduce = function (agg)
+{
+	var aggid;
+
+	for (aggid in agg)
+		return (agg[aggid]['']);
 };

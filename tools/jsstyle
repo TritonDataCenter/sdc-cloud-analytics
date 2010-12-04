@@ -116,7 +116,7 @@ my $lint_re = qr/\/\*(?:
 	jsl:\w+?|ARGSUSED[0-9]*|NOTREACHED|LINTLIBRARY|VARARGS[0-9]*|
 	CONSTCOND|CONSTANTCOND|CONSTANTCONDITION|EMPTY|
 	FALLTHRU|FALLTHROUGH|LINTED.*?|PRINTFLIKE[0-9]*|
-	PROTOLIB[0-9]*|SCANFLIKE[0-9]*|CSTYLED.*?
+	PROTOLIB[0-9]*|SCANFLIKE[0-9]*|JSSTYLED.*?
     )\*\//x;
 
 my $splint_re = qr/\/\*@.*?@\*\//x;
@@ -138,7 +138,7 @@ if ($#ARGV >= 0) {
 }
 exit $err_stat;
 
-my $no_errs = 0;		# set for CSTYLED-protected lines
+my $no_errs = 0;		# set for JSSTYLED-protected lines
 
 sub err($) {
 	my ($error) = @_;
@@ -239,9 +239,9 @@ line: while (<$filehandle>) {
 	# strip off trailing backslashes, which appear in long macros
 	s/\s*\\$//;
 
-	# an /* END CSTYLED */ comment ends a no-check block.
+	# an /* END JSSTYLED */ comment ends a no-check block.
 	if ($nocheck) {
-		if (/\/\* *END *CSTYLED *\*\//) {
+		if (/\/\* *END *JSSTYLED *\*\//) {
 			$nocheck = 0;
 		} else {
 			reset_indent();
@@ -249,15 +249,15 @@ line: while (<$filehandle>) {
 		}
 	}
 
-	# a /*CSTYLED*/ comment indicates that the next line is ok.
+	# a /*JSSTYLED*/ comment indicates that the next line is ok.
 	if ($nextok) {
 		if ($okmsg) {
 			err($okmsg);
 		}
 		$nextok = 0;
 		$okmsg = 0;
-		if (/\/\* *CSTYLED.*\*\//) {
-			/^.*\/\* *CSTYLED *(.*) *\*\/.*$/;
+		if (/\/\* *JSSTYLED.*\*\//) {
+			/^.*\/\* *JSSTYLED *(.*) *\*\/.*$/;
 			$okmsg = $1;
 			$nextok = 1;
 		}
@@ -286,19 +286,19 @@ line: while (<$filehandle>) {
 		next;
 	}
 
-	# a /* BEGIN CSTYLED */ comment starts a no-check block.
-	if (/\/\* *BEGIN *CSTYLED *\*\//) {
+	# a /* BEGIN JSSTYLED */ comment starts a no-check block.
+	if (/\/\* *BEGIN *JSSTYLED *\*\//) {
 		$nocheck = 1;
 	}
 
-	# a /*CSTYLED*/ comment indicates that the next line is ok.
-	if (/\/\* *CSTYLED.*\*\//) {
-		/^.*\/\* *CSTYLED *(.*) *\*\/.*$/;
+	# a /*JSSTYLED*/ comment indicates that the next line is ok.
+	if (/\/\* *JSSTYLED.*\*\//) {
+		/^.*\/\* *JSSTYLED *(.*) *\*\/.*$/;
 		$okmsg = $1;
 		$nextok = 1;
 	}
-	if (/\/\/ *CSTYLED/) {
-		/^.*\/\/ *CSTYLED *(.*)$/;
+	if (/\/\/ *JSSTYLED/) {
+		/^.*\/\/ *JSSTYLED *(.*)$/;
 		$okmsg = $1;
 		$nextok = 1;
 	}

@@ -3,8 +3,8 @@
  */
 
 var gServer = window.location.hostname;
-var gBaseUrlValue = 'http://' + gServer + ':23182/instrumentation/';
-var gBaseUrlCreate = 'http://' + gServer + ':23181/instrumentation';
+var gBaseUrlValue = 'http://' + gServer + ':23182/metrics/instrumentation/';
+var gBaseUrlCreate = 'http://' + gServer + ':23181/metrics/instrumentation';
 var gBaseUrlMetrics = 'http://' + gServer + ':23181/metrics';
 var gBaseColors = ['#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed'];
 var gColors = [];
@@ -87,10 +87,12 @@ function gInitMetricsFini(metrics)
 		option.appendChild(document.createTextNode(gMetrics[ii].label));
 	}
 
-	gStatSelected();
+	if (gMetrics.length > 0) {
+		gStatSelected();
 
-	elt = document.getElementById('gStatAddButton');
-	elt.disabled = false;
+		elt = document.getElementById('gStatAddButton');
+		elt.disabled = false;
+	}
 }
 
 function gInitColors()
@@ -113,8 +115,12 @@ function gTick()
 {
 	var key;
 
-	for (key in gGraphs)
-		gRetrieveData(key, gFillData(key));
+	for (key in gGraphs) {
+		if (gGraphs[key].subtype == 'raw')
+			gRetrieveData(key, gFillData(key));
+		else
+			gRetrieveData(key, gFillHeatmap(key));
+	}
 
 	setTimeout(gTick, 1000);
 }
@@ -122,6 +128,7 @@ function gTick()
 function gRetrieveData(key, callback)
 {
 	var request;
+	var url = gUrlValue(key);
 
 	request = new XMLHttpRequest();
 	request.onreadystatechange = function () {
@@ -129,16 +136,17 @@ function gRetrieveData(key, callback)
 			return;
 
 		var val = JSON.parse(request.responseText);
-		callback([ new Date(val.when * 1000), val.value ]);
+		callback(val);
 	};
 
-	request.open('GET', gUrlValue(gGraphs[key].inst_id), true);
+	request.open('GET', url, true);
 	request.send(null);
 }
 
 function gFillData(key)
 {
-	return (function (datum) {
+	return (function (val) {
+		var datum = [ new Date(val.when * 1000), val.value ];
 		var data;
 
 		/*
@@ -160,6 +168,21 @@ function gFillData(key)
 			    function (e, p, i) { gPlotClicked(key, p); });
 			gGraphs[key].bound = true;
 		}
+	});
+}
+
+function gFillHeatmap(key)
+{
+	return (function (val) {
+		var div = gGraphs[key].graph;
+		var img;
+
+		img = div.childNodes[0];
+
+		if (!img)
+			img = div.appendChild(document.createElement('img'));
+
+		img.src = 'data:image/png;base64,' + val.image;
 	});
 }
 
@@ -389,7 +412,10 @@ function gRecomputeOne(label, rawdata)
 
 function gUrlValue(id)
 {
-	return (gBaseUrlValue + id + '/value');
+	var graph = gGraphs[id];
+	var instid = graph.inst_id;
+
+	return (gBaseUrlValue + instid + '/value/' + graph.subtype);
 }
 
 function gUrlCreate()
@@ -410,7 +436,7 @@ function gUrlMetrics()
 function gAddStat()
 {
 	var statsel, decompsel, statoption, decompoption, metric, data, type;
-	var id, ii, decomp, body, request;
+	var id, ii, decomp, body, request, subtype, fieldname;
 	var container, div, link, title, elt, text;
 	var table, tr, td;
 
@@ -428,10 +454,18 @@ function gAddStat()
 
 	if (decomp === '') {
 		type = 'scalar';
+		subtype = 'raw';
 	} else {
 		type = 'vector';
 		title += ' decomposed by ' + decompoption.text;
 		body += '&decomposition=' + decomp;
+
+		subtype = 'raw';
+		for (fieldname in metric.fields) {
+			if (decomp == fieldname &&
+			    metric.fields[fieldname].type == 'linear')
+				subtype = 'heatmap';
+		}
 	}
 
 	container = document.getElementById('gContainerDiv');
@@ -484,7 +518,8 @@ function gAddStat()
 				data: data,
 				type: type,
 				text: text,
-				options: gopts
+				options: gopts,
+				subtype: subtype
 			};
 		}, 1000);
 	};
@@ -496,6 +531,7 @@ function gAddStat()
 
 function gRemoveStat(key, div)
 {
+	var url = gUrlDelete(gGraphs[key].inst_id);
 	var request = new XMLHttpRequest();
 	request.onreadystatechange = function () {
 		if (request.readyState != 4)
@@ -509,7 +545,7 @@ function gRemoveStat(key, div)
 		div.parentNode.removeChild(div);
 	};
 
-	request.open('DELETE', gUrlDelete(gGraphs[key].inst_id), true);
+	request.open('DELETE', url, true);
 	request.send(null);
 	delete (gGraphs[key]);
 }

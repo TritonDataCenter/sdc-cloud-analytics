@@ -8,20 +8,23 @@
 var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
-var mod_cahttp = require('./caconfig/http');
+var mod_cahttp = require('ca-http');
 var mod_log = require('ca-log');
 var HTTP = require('http-constants');
 
 var cfg_name = 'configsvc';	/* component name */
 var cfg_vers = '0.0';		/* component version */
 var cfg_http_port = 23181;	/* HTTP port for API endpoint */
+var cfg_http_baseurl = '/metrics';
+var cfg_http_insturl = cfg_http_baseurl + '/instrumentation';
+var cfg_http_instidurl = cfg_http_insturl + '/:id';
 
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
 
-var cfg_http;			/* http interface handle */
+var cfg_http;			/* http server */
 var cfg_cap;			/* camqp CAP wrapper */
 var cfg_log;			/* log handle */
 
@@ -62,12 +65,11 @@ function main()
 	cfg_cap.on('msg-ack-disable_instrumentation', cfgAckDisable);
 	cfg_cap.on('msg-ack-enable_aggregation', cfgAckEnableAgg);
 
-	cfg_http = new mod_cahttp.caConfigHttp({
-	    log: cfg_log, port: http_port
+	cfg_http = new mod_cahttp.caHttpServer({
+	    log: cfg_log,
+	    port: http_port,
+	    router: cfgHttpRouter
 	});
-	cfg_http.on('inst-create', cfgCreateInstrumentation);
-	cfg_http.on('inst-delete', cfgDeleteInstrumentation);
-	cfg_http.on('list-metrics', cfgListMetrics);
 
 	cfg_log.info('Config service starting up (%s/%s)', cfg_name, cfg_vers);
 	cfg_log.info('%-12s %s', 'Hostname:', hostname);
@@ -87,55 +89,59 @@ function main()
 var cfg_inst_id = 1;
 var cfg_insts = {};
 
-function cfgCreateInstrumentation(args, callback)
+function cfgHttpRouter(server)
+{
+	server.get(cfg_http_baseurl, cfgHttpListMetrics);
+	server.post(cfg_http_insturl, cfgHttpCreate);
+	server.del(cfg_http_instidurl, cfgHttpDelete);
+}
+
+function cfgHttpCreate(request, response)
 {
 	var id, key;
+	var modname, statname, decomp;
 	var mincount, minkey;
-	var instspec = args['spec'];
 	var statkey, ninsts;
 	var stattype;
-	var check = function (obj, field, type, required) {
-		if (required && !obj[field])
-			throw (new Error('missing required field: ' + field));
+	var params;
+	var aggregator;
 
-		if (!obj[field])
-			return;
-
-		if (typeof (type) != typeof (obj[field]))
-			throw (new Error('wrong type for field: ' + field));
-	};
-
+	/*
+	 * If the user specified a JSON object, we use that.  Otherwise, we
+	 * assume they specified parameters in form fields.
+	 */
+	params = request.ca_json || request.ca_params;
 
 	/*
 	 * Validate the metric and retrieve its type.  We'll send the type
 	 * information to both the client and the aggregator so they know what
 	 * kind of data to expect.
 	 */
+	var check = function (obj, field, required) {
+		if (required && !obj[field])
+			throw (new Error('missing required field: ' + field));
+
+		return (obj[field] || '');
+	};
+
 	try {
-		check(instspec, 'module', '', true);
-		check(instspec, 'stat', '', true);
-		check(instspec, 'nodes', [], false);
-		check(instspec, 'predicate', [], false);
-		check(instspec, 'decomposition', [], false);
+		modname = check(params, 'module', true);
+		statname = check(params, 'stat', true);
+		decomp = check(params, 'decomposition', false);
+		decomp = decomp.length > 0 ? decomp.split(',') : [];
 
-		if (!instspec['predicate'])
-			instspec['predicate'] = [];
-
-		if (!instspec['decomposition'])
-			instspec['decomposition'] = [];
-
-		stattype = cfgStatType(instspec);
+		stattype = cfgStatType(modname, statname, decomp);
 	} catch (ex) {
-		callback(HTTP.EBADREQUEST,
+		response.send(HTTP.EBADREQUEST,
 		    'failed to validate instrumentation: ' + ex.message);
 		return;
 	}
 
 	/*
-	 * Pick *one* aggregator and have it collect data for this.  This
-	 * algorithm could be smarter.  We currently just compare the number of
-	 * stats an aggregator is already aggregating.  We should also try other
-	 * ones if the one we pick seems down.
+	 * Pick an aggregator and have it collect data for this instrumentation.
+	 * This algorithm could be smarter.  We currently just compare the
+	 * number of stats an aggregator is already aggregating.  We should also
+	 * try other ones if the one we pick seems down.
 	 */
 	for (key in cfg_aggregators) {
 		if (mincount === undefined ||
@@ -146,14 +152,16 @@ function cfgCreateInstrumentation(args, callback)
 	}
 
 	if (mincount === undefined) {
-		callback(HTTP.ESERVER, 'no aggregators available');
+		response.send(HTTP.ESERVER, 'no aggregators available');
 		return;
 	}
 
+	aggregator = cfg_aggregators[minkey];
+	aggregator.cag_ninsts++;
 	id = cfg_inst_id++;  /* XXX should be unique across time. */
 	statkey = mod_ca.caKeyForInst(id);
 
-	cfg_cap.send(cfg_aggregators[minkey].cag_routekey, {
+	cfg_cap.send(aggregator.cag_routekey, {
 	    ca_id: id,
 	    ca_type: 'cmd',
 	    ca_subtype: 'enable_aggregation',
@@ -174,10 +182,10 @@ function cfgCreateInstrumentation(args, callback)
 		    ca_subtype: 'enable_instrumentation',
 		    is_inst_key: statkey,
 		    is_inst_id: id,
-		    is_module: instspec['module'],
-		    is_stat: instspec['stat'],
-		    is_predicate: instspec['predicate'],
-		    is_decomposition: instspec['decomposition']
+		    is_module: modname,
+		    is_stat: statname,
+		    is_predicate: [],
+		    is_decomposition: decomp
 		});
 		cfg_instrumenters[key].ins_ninsts++;
 	}
@@ -187,48 +195,50 @@ function cfgCreateInstrumentation(args, callback)
 	    insts_failed: 0,
 	    insts_ok: 0,
 	    insts_total: ninsts,
-	    callback: callback,
+	    response: response,
 	    stattype: stattype
 	};
 
 	/* XXX timeout HTTP request */
 }
 
-function cfgDeleteInstrumentation(args, callback)
+function cfgHttpDelete(request, response)
 {
+	var id = request.params['id'];
 	var key;
 
-	if (!(args['instid'] in cfg_insts)) {
-		callback(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+	if (!(id in cfg_insts)) {
+		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
 		return;
 	}
 
-	delete (cfg_insts[args['instid']]);
-	callback(HTTP.OK);
+	delete (cfg_insts[id]);
+	response.send(HTTP.OK);
 
 	/*
 	 * XXX filter these based on 'nodes'
+	 * XXX decrement aggregator.agg_ninsts
 	 */
 	for (key in cfg_instrumenters) {
 		cfg_instrumenters[key].ins_ninsts--;
 		cfg_cap.send(cfg_instrumenters[key].ins_routekey, {
 		    ca_type: 'cmd',
 		    ca_subtype: 'disable_instrumentation',
-		    ca_id: args['instid'],
-		    is_inst_id: args['instid']
+		    ca_id: id,
+		    is_inst_id: id
 		});
 	}
 }
 
-function cfgListMetrics(callback)
+function cfgHttpListMetrics(request, response)
 {
-	callback(HTTP.OK, cfg_statmods);
+	response.send(HTTP.OK, cfg_statmods);
 }
 
 function cfgCheckNewInstrumentation(id)
 {
 	var inst = cfg_insts[id];
-	var callback = inst.callback;
+	var response = inst.response;
 	var stattype, dim, type;
 
 	if (inst.agg_done === undefined ||
@@ -237,12 +247,13 @@ function cfgCheckNewInstrumentation(id)
 
 	if (inst.agg_done === false) {
 		/* XXX could try another aggregator. */
-		callback(HTTP.ESERVER, 'error: failed to enable aggregator');
+		response.send(HTTP.ESERVER,
+		    'error: failed to enable aggregator');
 		return;
 	}
 
 	if (inst.insts_failed > 0) {
-		callback(HTTP.ESERVER,
+		response.send(HTTP.ESERVER,
 		    'error: failed to enable some instrumenters');
 		return;
 	}
@@ -250,7 +261,7 @@ function cfgCheckNewInstrumentation(id)
 	stattype = inst.stattype;
 	dim = stattype['dimension'];
  	type = dim == 1 ? 'scalar' : stattype['type'];
-	callback(HTTP.CREATED, { id: id, dimension: dim, type: type });
+	response.send(HTTP.CREATED, { id: id, dimension: dim, type: type });
 }
 
 function cfgAckEnableAgg(msg)
@@ -488,11 +499,8 @@ function cfgNotifyInstrumenterError(msg)
  * If the given instrumentation does not specify a valid stat, this function
  * throws an exception whose message describes why.
  */
-function cfgStatType(inst)
+function cfgStatType(modname, statname, decomp)
 {
-	var modname = inst.module;
-	var statname = inst.stat;
-	var decomp = inst.decomposition;
 	var sprintf = mod_ca.caSprintf;
 	var mod, stat, fields, field, type, ii;
 

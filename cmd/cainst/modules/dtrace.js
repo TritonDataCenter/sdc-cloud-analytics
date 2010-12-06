@@ -2,6 +2,7 @@
  * cmd/cainst/modules/dtrace.js: DTrace Instrumenter backend
  */
 
+var mod_ca = require('ca');
 var mod_dtrace = require('libdtrace');
 var mod_sys = require('sys');
 var ASSERT = require('assert');
@@ -24,6 +25,19 @@ exports.insinit = function (ins, log)
 	    },
 	    metric: insdSyscalls
 	});
+
+	ins.registerModule({ name: 'io', label: 'Disk I/O' });
+	ins.registerMetric({
+	    module: 'io',
+	    stat: 'ops',
+	    label: 'operations',
+	    type: 'ops',
+	    fields: {
+		hosttype: { label: 'host and type', type: 'string' }
+	    },
+	    metric: insdIops
+	});
+
 };
 
 function insdSyscalls(metric)
@@ -76,6 +90,30 @@ function insdSyscalls(metric)
 
 	if (latency)
 		return (new insDTraceLinearDecomp(script));
+
+	if (decomps.length > 0)
+		return (new insDTraceVectorMetric(script));
+
+	return (new insDTraceScalarMetric(script));
+}
+
+function insdIops(metric)
+{
+	var decomps = metric.is_decomposition;
+	var script = '';
+	var host = mod_ca.caSysinfo().ca_hostname;
+
+	script += 'io:::start\n';
+	script += '{\n';
+	script += '\t@';
+
+	if (decomps.length > 0)
+		script += mod_ca.caSprintf('[ strjoin("%s", ' +
+		    'args[0]->b_flags & B_READ ? ": reads" : ": writes") ]',
+		    host);
+
+	script += ' = count();\n';
+	script += '}\n';
 
 	if (decomps.length > 0)
 		return (new insDTraceVectorMetric(script));

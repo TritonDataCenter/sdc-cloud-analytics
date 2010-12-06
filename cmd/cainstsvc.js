@@ -103,7 +103,7 @@ insBackendInterface.prototype.registerModule = function (args)
 	 * we check here to make sure the human-readable names match.  This is
 	 * kinda hokey but should work for the foreseeable future.
 	 */
-	if (ins_modules[name] != label)
+	if (ins_modules[name].label != label)
 		throw (new Error('module "' + name +
 		    '" redeclared with different label'));
 };
@@ -126,8 +126,6 @@ insBackendInterface.prototype.registerModule = function (args)
  *			instrument a metric with multiple implementations, the
  *			Instrumenter uses the one that supports all desired
  *			breakdowns and decompositions that has the lowest cost.
- *
- *	XXX add costs either here or to module
  *
  *	label		Human-readable label for this metric
  *
@@ -232,6 +230,11 @@ insBackendInterface.prototype.registerMetric = function (args)
  */
 function insInitBackends()
 {
+	/*
+	 * Preference between different backends (determined by how expensive
+	 * they are to use) is implicitly defined by the order in which they're
+	 * loaded, not an explicit cost.
+	 */
 	var backends = [ 'kstat', 'dtrace', 'test' ];
 	var bemgr = new insBackendInterface();
 	var plugin, ii;
@@ -390,7 +393,8 @@ function insCmdEnable(msg)
 {
 	var sendmsg = ins_cap.responseTemplate(msg);
 	var destkey = msg.ca_source;
-	var id, metric, inst;
+	var id, metric, metrics, inst;
+	var ii, jj;
 
 	sendmsg.is_inst_id = msg.is_inst_id;
 
@@ -424,10 +428,25 @@ function insCmdEnable(msg)
 		return;
 	}
 
-	/*
-	 * XXX parse predicate, decomposition to check for valid fields only
-	 */
-	metric = ins_modules[msg.is_module]['stats'][msg.is_stat][0];
+	metrics = ins_modules[msg.is_module]['stats'][msg.is_stat];
+
+	for (ii = 0; ii < metrics.length; ii++) {
+		for (jj = 0; jj < msg.is_decomposition.length; jj++) {
+			if (!(msg.is_decomposition[jj] in metrics[ii].fields))
+				break;
+		}
+
+		if (jj == msg.is_decomposition.length)
+			break;
+	}
+
+	if (ii == metrics.length) {
+		sendmsg.is_status = 'enable_failed';
+		sendmsg.is_error = 'unsupported decomposition';
+		ins_cap.send(destkey, sendmsg);
+	}
+
+	metric = ins_modules[msg.is_module]['stats'][msg.is_stat][ii];
 
 	inst = {};
 	inst.is_module = msg.is_module;

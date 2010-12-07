@@ -204,7 +204,7 @@ function aggData(msg)
 		inst.agi_values[time] = { value: value, count: 1};
 	} else {
 		inst.agi_values[time].count++;
-		aggAggregateValue(inst, time, value);
+		aggAggregateValue(inst.agi_values[time], 'value', value);
 	}
 
 	/*
@@ -217,11 +217,8 @@ function aggData(msg)
 	 * get data from any of them for some previous time index.
 	 */
 	ASSERT.ok(inst.agi_values[time].count <= inst.agi_sources.nsources);
-	if (inst.agi_values[time].count != inst.agi_sources.nsources) {
-		agg_log.dbg('waiting for more data (expected %d, have %d)',
-		    inst.agi_sources.nsources, inst.agi_values[time].count);
+	if (inst.agi_values[time].count != inst.agi_sources.nsources)
 		return;
-	}
 
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
 		rq = inst.agi_requests[ii];
@@ -229,8 +226,6 @@ function aggData(msg)
 		if (rq.datatime <= time) {
 			inst.agi_requests.splice(ii--, 1);
 			rq.callback(id, rq.datatime, rq.response);
-			agg_log.dbg('delay-satisfied request for %d time %d ' +
-			    'processing data for %d', id, rq.datatime, time);
 		}
 	}
 }
@@ -289,27 +284,27 @@ function aggAggregateDistribution(map, key, newdist)
 	}
 }
 
-function aggAggregateValue(inst, time, value)
+function aggAggregateValue(map, key, value)
 {
-	var key, record;
-
-	record = inst.agi_values[time];
+	var subkey;
 
 	if (typeof (value) == 'number') {
-		aggAggregateScalar(record, 'value', value);
+		aggAggregateScalar(map, key, value);
 		return;
 	}
 
 	if (value.constructor == Array) {
-		aggAggregateDistribution(record, 'value', value);
+		aggAggregateDistribution(map, key, value);
 		return;
 	}
 
 	ASSERT.ok(value.constructor == Object);
 
-	for (key in value)
-		/* XXX this can't possibly be correct */
-		aggAggregateValue(record.value, key, value[key]);
+	for (subkey in value) {
+		if (!(key in map))
+			map[key] = {};
+		aggAggregateValue(map[key], subkey, value[subkey]);
+	}
 }
 
 function aggHttpRouter(server)
@@ -343,7 +338,7 @@ function aggHttpValueCommon(request, response, callback)
 
 	inst = agg_insts[id];
 	now = new Date().getTime();
-	when = parseInt(now / 1000, 10) - 1;
+	when = parseInt(now / 1000, 10) - 2;
 	record = inst.agi_values[when];
 
 	if (record && record.count == inst.agi_sources.nsources) {
@@ -358,7 +353,6 @@ function aggHttpValueCommon(request, response, callback)
 	 * in, we'll figure out if we should process this request.  There's also
 	 * a timer that periodically times these out.
 	 */
-	agg_log.dbg('client request for %s at %d needs to wait', id, when);
 	inst.agi_requests.push({
 	    rqtime: now,
 	    datatime: when,
@@ -405,7 +399,7 @@ function aggReaggregate(data, selected)
 	var time, key;
 
 	if (mod_ca.caIsEmpty(data))
-		return ([ { data: [ {} ], present: {} } ]);
+		return ({ data: [ {} ], present: {} });
 
 	for (time in data) {
 		if (data[time].constructor == Array) {
@@ -542,8 +536,6 @@ function aggTick()
 			if (now - rq.rqtime >= agg_http_req_timeout) {
 				inst.agi_requests.splice(ii--, 1);
 				rq.callback(id, rq.datatime, rq.response);
-				agg_log.dbg('timed out request for %d time %d',
-				    id, rq.datatime);
 			}
 		}
 	}

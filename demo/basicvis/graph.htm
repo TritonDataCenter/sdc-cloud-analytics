@@ -7,6 +7,7 @@
     <script language="javascript" type="text/javascript" src="flot/jquery.js"></script> 
     <script language="javascript" type="text/javascript" src="flot/jquery.flot.js"></script> 
     <script language="javascript" type="text/javascript" src="flot/jquery.flot.stack.js"></script> 
+    <script language="javascript" type="text/javascript" src="flot/jquery.dataTables.js"></script>
     <script language="javascript" type="text/javascript" src="caflot.js"></script> 
  </head> 
     <body> 
@@ -15,7 +16,9 @@
     <div id="form">
 	<select id='gStatSelector' onchange='javascript:gStatSelected()'>
 	</select> decomposed by 
-	<select id='gDecompositionSelector'>
+	<select id='gDecompositionSelector' onchange='javascript:gDecompSelected()'>
+	</select> and again by
+	<select id='gDecompositionSelector2'>
 	</select>
 	<input type='button' id='gStatAddButton' disabled='true' onclick='javascript:gAddStat();' value="Add" />
     </div>

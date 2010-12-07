@@ -8,7 +8,7 @@ var mod_path = require('path');
 var mod_fs = require('fs');
 
 var dd_index = 'graph.htm';
-var dd_cwd = process.cwd();
+var dd_cwd = __dirname;
 var dd_port = 23183;
 
 mod_http.createServer(function (req, res) {

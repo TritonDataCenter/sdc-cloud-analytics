@@ -38,11 +38,16 @@ window.onload = function ()
 	setTimeout(gTick, 0);
 };
 
+/*
+ * Load the available metrics from the server to populate the UI.
+ */
 function gInitMetrics()
 {
 	var request;
 
 	request = new XMLHttpRequest();
+	request.open('GET', gUrlMetrics(), true);
+	request.send(null);
 	request.onreadystatechange = function () {
 		if (request.readyState != 4)
 			return;
@@ -52,16 +57,16 @@ function gInitMetrics()
 			return;
 		}
 
-		var val = JSON.parse(request.responseText);
-		gInitMetricsFini(val);
+		gInitMetricsFini(JSON.parse(request.responseText));
 	};
-	request.open('GET', gUrlMetrics(), true);
-	request.send(null);
 }
 
+/*
+ * Finish loading the available metrics from the server.
+ */
 function gInitMetricsFini(metrics)
 {
-	var modname, module, statname, stat, optname;
+	var modname, statname, optname, module, stat;
 	var elt, ii, option;
 
 	for (modname in metrics) {
@@ -95,15 +100,18 @@ function gInitMetricsFini(metrics)
 	}
 }
 
+/*
+ * Expand the base set of colors using simple variations.
+ */
 function gInitColors()
 {
 	var ii, jj, color;
 	var variations = [ 0, -1 ];
 
-	for (jj = 0; jj < variations.length; jj++) {
-		for (ii = 0; ii < gBaseColors.length; ii++) {
-			color = $.color.parse(gBaseColors[ii]);
-			color.scale('rgb', 1 + variations[jj] * 0.2);
+	for (ii = 0; ii < variations.length; ii++) {
+		for (jj = 0; jj < gBaseColors.length; jj++) {
+			color = $.color.parse(gBaseColors[jj]);
+			color.scale('rgb', 1 + variations[ii] * 0.2);
 			gColors.push(color);
 		}
 	}
@@ -111,87 +119,112 @@ function gInitColors()
 	gMaxSeries = gColors.length - 1;
 }
 
+/*
+ * Invoked once/second to update all of our graphs.
+ */
 function gTick()
 {
-	var key;
+	var id;
 
-	for (key in gGraphs) {
-		if (gGraphs[key].subtype == 'raw')
-			gRetrieveData(key, gFillData(key));
-		else
-			gRetrieveData(key, gFillHeatmap(key));
-	}
+	for (id in gGraphs)
+		gRetrieveData(id, gGraphs[id].fillcb);
 
 	setTimeout(gTick, 1000);
 }
 
-function gRetrieveData(key, callback)
+/*
+ * Retrieve the latest value for the specified instrumentation.
+ */
+function gRetrieveData(id, callback)
 {
+	var url = gUrlValue(id);
 	var request;
-	var url = gUrlValue(key);
 
 	request = new XMLHttpRequest();
+	request.open('GET', url, true);
+	request.send(null);
 	request.onreadystatechange = function () {
 		if (request.readyState != 4)
 			return;
 
-		var val = JSON.parse(request.responseText);
-		callback(val);
+		callback(JSON.parse(request.responseText));
 	};
-
-	request.open('GET', url, true);
-	request.send(null);
 }
 
-function gFillData(key)
+/*
+ * Given an instrumentation id, returns a function that given a new datum,
+ * updates and redraws the instrumentation's flot-based (non-heatmap) plot.
+ */
+function gFillData(id)
 {
-	return (function (val) {
-		var datum = [ new Date(val.when * 1000), val.value ];
-		var data;
+	return (function (value) {
+		var graph, datum, data;
 
 		/*
 		 * XXX we could have received this data out of order.  It's
 		 * probably not worth fixing for this demo.
 		 */
-		gGraphs[key].data.shift();
-		gGraphs[key].data.push(datum);
-		data = gRecomputeData(key);
-		gGraphs[key].plot =
-		    $.plot(gGraphs[key].graph, data, gGraphs[key].options);
+		if (!(id in gGraphs))
+			return;
 
-		if (gGraphs[key].highlighted)
-			gUpdateHighlighting(gGraphs[key],
-			    gGraphs[key].highlighted - 1);
+		datum = [ new Date(value.when * 1000), value.value ];
+		graph = gGraphs[id];
+		graph.data.shift();
+		graph.data.push(datum);
+		data = gRecomputeData(id);
+		graph.plot = $.plot(graph.graph, data, graph.options);
 
-		if (!gGraphs[key].bound) {
-			$(gGraphs[key].graph).bind('plotclick',
-			    function (e, p, i) { gPlotClicked(key, p); });
-			gGraphs[key].bound = true;
+		if (graph.highlighted)
+			gUpdateHighlighting(graph, graph.highlighted - 1);
+
+		if (!graph.bound) {
+			$(graph.graph).bind('plotclick',
+			    function (e, p, i) { gPlotClicked(id, p); });
+			graph.bound = true;
 		}
 	});
 }
 
-function gFillHeatmap(key)
+/*
+ * Given an instrumentation id, returns a function that given a new heatmap
+ * datum (including a new PNG), updates and redraws the instrumentation's plot.
+ */
+function gFillHeatmap(id)
 {
-	return (function (val) {
-		var div = gGraphs[key].graph;
-		var img;
+	return (function (value) {
+		var div, img, present, key;
 
+		if (!(id in gGraphs))
+			return;
+
+		div = gGraphs[id].graph;
 		img = div.childNodes[0];
 
 		if (!img)
 			img = div.appendChild(document.createElement('img'));
 
-		img.src = 'data:image/png;base64,' + val.image;
+		img.src = 'data:image/png;base64,' + value.image;
+
+		present = [];
+		for (key in value.present)
+			present.push(key);
+		present.sort();
+
+		gPlotShow(id, present.map(function (elt) {
+			return ({ key: elt, val: [ elt ] });
+		}));
 	});
 }
 
+/*
+ * Invoked when a flot plot is clicked.  Highlights the nearest data point and
+ * updates the graph's side-legend with additional details about that point.
+ */
 function gPlotClicked(id, pos)
 {
 	var graph = gGraphs[id];
 	var when = Math.round(pos.x / 1000) * 1000;
-	var text = '';
-	var ii, jj, key, keys;
+	var ii, jj, key, keys, legend;
 
 	for (ii = 0; ii < graph.data.length; ii++) {
 		if (graph.data[ii] !== null &&
@@ -203,7 +236,7 @@ function gPlotClicked(id, pos)
 		return;
 
 	if (graph.type == 'scalar') {
-		text += 'Value: ' + graph.data[ii][1];
+		legend = [ { key: graph.data[ii][1], val: graph.data[ii][1] } ];
 	} else {
 		keys = [];
 		for (key in graph.data[ii][1])
@@ -212,16 +245,20 @@ function gPlotClicked(id, pos)
 			return (graph.data[ii][1][k2] - graph.data[ii][1][k1]);
 		});
 
+		legend = [];
 		for (jj = 0; jj < keys.length; jj++) {
-			text += keys[jj] + ': ' +
-			    graph.data[ii][1][keys[jj]] + '<br />';
+			legend.push({ key: keys[jj],
+			    val: [ keys[jj], graph.data[ii][1][keys[jj]] ] });
 		}
 	}
 
-	gPlotShow(id, text);
+	gPlotShow(id, legend, true);
 	gUpdateHighlighting(graph, ii);
 }
 
+/*
+ * Highlights the specified point on a flot-based plot.
+ */
 function gUpdateHighlighting(graph, yy)
 {
 	var ii, data;
@@ -236,11 +273,39 @@ function gUpdateHighlighting(graph, yy)
 	}
 }
 
-function gPlotShow(id, text)
+/*
+ * Populate the specified graph's side legend with additional details.
+ * 'entries' is an array of objects with the following members:
+ *
+ *	value	Value to add to side legend (jquery data table)
+ *
+ *	key	Identifier.  An entry's value will only be added to the legend
+ *		when no other entry with the same key has ever been added.
+ */
+function gPlotShow(id, entries, clear)
 {
-	gGraphs[id].text.innerHTML = text;
+	var graph = gGraphs[id];
+	var rows, ii;
+
+	if (clear)
+		graph.legend.fnClearTable();
+
+	if (clear || !graph.legend_rows)
+		graph.legend_rows = {};
+
+	rows = graph.legend_rows;
+
+	for (ii = 0; ii < entries.length; ii++) {
+		if (!(entries[ii].key in rows))
+			rows[entries[ii].key] =
+			    graph.legend.fnAddData([ entries[ii].val ]);
+	}
 }
 
+/*
+ * Given a graph id for a flot-based plot, recompute the complete set of data
+ * that we need to hand to flot in order to redraw the graph.
+ */
 function gRecomputeData(id)
 {
 	var graph = gGraphs[id];
@@ -388,6 +453,9 @@ function gRecomputeData(id)
 	return (series);
 }
 
+/*
+ * See gRecomputeData -- this recomputes a single row.
+ */
 function gRecomputeOne(label, rawdata)
 {
 	var points = [];
@@ -410,6 +478,9 @@ function gRecomputeOne(label, rawdata)
 	return ({ label: label, data: points });
 }
 
+/*
+ * Returns the URL for getting the value of the specified instrumentation.
+ */
 function gUrlValue(id)
 {
 	var graph = gGraphs[id];
@@ -418,56 +489,114 @@ function gUrlValue(id)
 	return (gBaseUrlValue + instid + '/value/' + graph.subtype);
 }
 
+/*
+ * Returns the URL for creating a new instrumentation.
+ */
 function gUrlCreate()
 {
 	return (gBaseUrlCreate);
 }
 
+/*
+ * Returns the URL for deleting the specified instrumentation.
+ */
 function gUrlDelete(id)
 {
 	return (gBaseUrlCreate + '/' + id);
 }
 
+/*
+ * Returns the URL for listing available metrics.
+ */
 function gUrlMetrics()
 {
 	return (gBaseUrlMetrics);
 }
 
+/*
+ * Instruments a new metric as specified by the UI fields.
+ */
 function gAddStat()
 {
-	var statsel, decompsel, statoption, decompoption, metric, data, type;
-	var id, ii, decomp, body, request, subtype, fieldname;
-	var container, div, link, title, elt, text;
-	var table, tr, td;
+	var statsel, decompsel, decomp2sel;
+	var statoption, decompoption, decomp2option;
+	var metric, data, type, decomps, discrete_decomp;
+	var id, ii, body, request, subtype, fieldname, fillcb;
+	var container, div, link, title, elt;
+	var table, tr, td, columns, legend;
 
+	/*
+	 * Identify which metric and decomposition(s) are selected.
+	 */
 	statsel = document.getElementById('gStatSelector');
 	statoption = statsel.options[statsel.selectedIndex];
 	decompsel = document.getElementById('gDecompositionSelector');
 	decompoption = decompsel.options[decompsel.selectedIndex];
+	decomp2sel = document.getElementById('gDecompositionSelector2');
+	decomp2option = decomp2sel.options[decomp2sel.selectedIndex];
 
 	metric = gMetrics[statoption.value];
-	decomp = decompoption.value;
+	decomps = [];
 
+	if (decompoption.value !== '')
+		decomps.push(decompoption);
+
+	if (decomp2option.value !== '')
+		decomps.push(decomp2option);
+
+	/*
+	 * Based on the selected decompositions, generate the title for the
+	 * graph, the actual HTTP request to create the instrumentation, and
+	 * other fields used later to update the graphs.
+	 */
 	id = gId++;
 	title = statoption.text;
 	body = 'module=' + metric.module + '&stat=' + metric.stat;
 
-	if (decomp === '') {
+	if (decomps.length === 0) {
 		type = 'scalar';
 		subtype = 'raw';
+		columns =  [ { sTitle: 'Selected value' } ];
+		fillcb = gFillData;
 	} else {
 		type = 'vector';
-		title += ' decomposed by ' + decompoption.text;
-		body += '&decomposition=' + decomp;
-
 		subtype = 'raw';
-		for (fieldname in metric.fields) {
-			if (decomp == fieldname &&
-			    metric.fields[fieldname].type == 'linear')
-				subtype = 'heatmap';
+		fillcb = gFillData;
+
+		title += ' decomposed by ' + decomps.map(
+		    function (opt) { return (opt.text); }).join(' and ');
+
+		columns = [];
+		for (ii = 0; ii < decomps.length; ii++) {
+			body += '&decomposition=' + decomps[ii].value;
+
+			for (fieldname in metric.fields) {
+				if (decomps[ii].value != fieldname)
+					continue;
+
+				if (metric.fields[fieldname].type == 'linear') {
+					subtype = 'heatmap';
+					fillcb = gFillHeatmap;
+					continue;
+				}
+
+				discrete_decomp = decomps[ii].text;
+			}
+		}
+
+		if (discrete_decomp) {
+			columns.push({ sTitle: discrete_decomp });
+
+			if (subtype != 'heatmap')
+				columns.push({ sTitle: 'value' });
+		} else {
+			columns.push({ sTitle: 'value' });
 		}
 	}
 
+	/*
+	 * Generate the skeleton DOM hierarchy for this graph.
+	 */
 	container = document.getElementById('gContainerDiv');
 	div = container.appendChild(document.createElement('div'));
 	div.className = 'GraphContainer';
@@ -489,67 +618,103 @@ function gAddStat()
 	elt.style.width = '600px';
 	elt.style.height = '300px';
 
-	text = td = tr.appendChild(document.createElement('td'));
-	td.className = 'GraphText';
+	td = tr.appendChild(document.createElement('td'));
+	td.className = 'GraphLegend';
+	legend = td.appendChild(document.createElement('table'));
+	legend.id = 'legend' + id;
+	legend = $('#legend' + id).dataTable({
+		aaData: [],
+		bFilter: false,
+		bJQueryUI: true,
+		bAutoWidth: true,
+		sScrollY: '300px',
+		bPaginate: false,
+		bScrollInfinite: true,
+		aoColumns: columns
+	});
 
 	data = [];
 	for (ii = 0; ii < gnDataPoints; ii++)
 		data.push(null);
 
+	/*
+	 * Ask the server to begin instrumenting this metric.
+	 */
 	request = new XMLHttpRequest();
+	request.open('POST', gUrlCreate(), true);
+	request.setRequestHeader('Content-Type',
+	    'application/x-www-form-urlencoded');
+	request.send(body);
 	request.onreadystatechange = function () {
+		var value, gopts, errmsg;
+
 		if (request.readyState != 4)
 			return;
 
 		if (request.status != 201) {
-			link.parentNode.removeChild(link);
-			alert('failed to create stat: ' + request.statusText);
+			container.removeChild(div);
+
+			try {
+				/*
+				 * In Firefox, accessing this field can generate
+				 * an exception.
+				 */
+				errmsg = request.statusText;
+			} catch (ex) {
+				errmsg = '<unknown error: ' +
+				    request.status + '>';
+			}
+
+			alert('failed to create stat: ' + errmsg);
 			return;
 		}
 
-		var val = JSON.parse(request.responseText);
-		var gopts = type == 'scalar' ? gScalarOptions : gVectorOptions;
+		value = JSON.parse(request.responseText);
+		gopts = type == 'scalar' ? gScalarOptions : gVectorOptions;
 		setTimeout(function () {
 			gGraphs[id] = {
-				inst_id: val.id,
+				inst_id: value.id,
 				label: title,
 				div: div,
 				graph: elt,
 				data: data,
 				type: type,
-				text: text,
+				legend: legend,
 				options: gopts,
-				subtype: subtype
+				subtype: subtype,
+				fillcb: fillcb(id)
 			};
 		}, 1000);
 	};
-	request.open('POST', gUrlCreate(), true);
-	request.setRequestHeader('Content-Type',
-	    'application/x-www-form-urlencoded');
-	request.send(body);
 }
 
-function gRemoveStat(key, div)
+/*
+ * Delete the instrumentation for this graph and remove it from the page.
+ */
+function gRemoveStat(id, div)
 {
-	var url = gUrlDelete(gGraphs[key].inst_id);
-	var request = new XMLHttpRequest();
+	var url, request;
+
+	url = gUrlDelete(gGraphs[id].inst_id);
+	div.parentNode.removeChild(div);
+	delete (gGraphs[id]);
+
+	request = new XMLHttpRequest();
+	request.open('DELETE', url, true);
+	request.send(null);
 	request.onreadystatechange = function () {
 		if (request.readyState != 4)
 			return;
 
-		if (request.status != 200) {
+		if (request.status != 200)
 			alert('failed to delete stat: ' + request.statusText);
-			return;
-		}
-
-		div.parentNode.removeChild(div);
 	};
-
-	request.open('DELETE', url, true);
-	request.send(null);
-	delete (gGraphs[key]);
 }
 
+/*
+ * Invoked when the user selects a particular module/stat so we can populate the
+ * decomposition selectors with the appropriate options.
+ */
 function gStatSelected()
 {
 	var statsel, decompsel, metric, option;
@@ -580,4 +745,57 @@ function gStatSelected()
 
 	if (decompsel.options.length == 1)
 		decompsel.disabled = true;
+
+	gDecompSelected();
+}
+
+/*
+ * Invoked when the user selects a particular decomposition so we can populate
+ * the secondary decomposition selector.  We don't allow the user to decompose
+ * by two fields with the same type.
+ */
+function gDecompSelected()
+{
+	var statsel, decompsel, decompsel2, metric;
+	var statoption, firstoption, option;
+	var field;
+
+	decompsel = document.getElementById('gDecompositionSelector');
+	firstoption = decompsel.options[decompsel.selectedIndex];
+
+	decompsel2 = document.getElementById('gDecompositionSelector2');
+	while (decompsel2.options.length > 0)
+		decompsel2.remove(decompsel.options[0]);
+
+	option = document.createElement('option');
+	option.value = '';
+	option.appendChild(document.createTextNode('<none>'));
+	decompsel2.appendChild(option);
+
+	statsel = document.getElementById('gStatSelector');
+	statoption = statsel.options[statsel.selectedIndex];
+	metric = gMetrics[statoption.value];
+
+	for (field in metric.fields) {
+		if (field == firstoption.value)
+			continue;
+
+		if (firstoption.value !== '' &&
+		    metric.fields[field].type ==
+		    metric.fields[firstoption.value].type)
+			continue;
+
+		option = document.createElement('option');
+		option.value = field;
+		option.appendChild(
+		    document.createTextNode(metric.fields[field].label));
+		decompsel2.appendChild(option);
+	}
+
+	decompsel2.selectedIndex = 0;
+
+	if (firstoption.value === '' || decompsel2.options.length == 1)
+		decompsel2.disabled = true;
+	else
+		decompsel2.disabled = false;
 }

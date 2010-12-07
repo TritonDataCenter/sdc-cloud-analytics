@@ -5,6 +5,8 @@
  * analytics service, including instrumenters and aggregators.
  */
 
+var mod_sys = require('sys');
+
 var mod_ca = require('ca');
 var mod_caamqp = require('ca-amqp');
 var mod_cap = require('ca-amqp-cap');
@@ -112,6 +114,9 @@ function cfgHttpCreate(request, response)
 	 */
 	params = request.ca_json || request.ca_params;
 
+	cfg_log.dbg('request to instrument: \n%s',
+	    mod_sys.inspect(params, false, 10));
+
 	/*
 	 * Validate the metric and retrieve its type.  We'll send the type
 	 * information to both the client and the aggregator so they know what
@@ -128,7 +133,9 @@ function cfgHttpCreate(request, response)
 		modname = check(params, 'module', true);
 		statname = check(params, 'stat', true);
 		decomp = check(params, 'decomposition', false);
-		decomp = decomp.length > 0 ? decomp.split(',') : [];
+
+		if (typeof (decomp) == typeof (''))
+			decomp = decomp.length > 0 ? decomp.split(',') : [];
 
 		stattype = cfgStatType(modname, statname, decomp);
 	} catch (ex) {

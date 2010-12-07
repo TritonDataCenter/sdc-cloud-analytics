@@ -2,17 +2,21 @@ body {
 	font-family: sans-serif;
 }
 
-Graph {
+td.Graph {
 	width: 600px;
 	height: 300px;
 }
 
-GraphContainer {
+td.GraphContainer {
 	padding-top: 15px;
 }
 
-GraphText {
-	float: right;
+td.GraphLegend {
+	padding-left: 10px;
+}
+
+td.GraphLegend {
+	font-size: 12px;
 }
 
 tr {

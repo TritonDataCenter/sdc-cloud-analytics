@@ -235,23 +235,81 @@ function aggData(msg)
 	}
 }
 
-function aggAggregateValue(inst, time, newval)
+function aggAggregateScalar(map, key, value)
 {
-	var vec, key;
+	if (!(key in map))
+		map[key] = 0;
 
-	if (typeof (newval) == 'number') {
-		inst.agi_values[time].value += newval;
+	map[key] += value;
+}
+
+function aggAggregateDistribution(map, key, newdist)
+{
+	var olddist, oo, nn;
+
+	if (!(key in map))
+		map[key] = [];
+
+	olddist = map[key];
+
+	/*
+	 * We assume here that the ranges from both distributions exactly align
+	 * (which is currently true since we use fixed lquantize() parameters on
+	 * the backend) and that the ranges are sorted in both distributions.
+	 */
+	for (oo = 0, nn = 0; nn < newdist.length; nn++) {
+		/*
+		 * Scan the old distribution until we find a range not before
+		 * the current range from the new distribution.
+		 */
+		while (oo < olddist.length &&
+		    olddist[oo][0][0] < newdist[nn][0][0]) {
+			ASSERT.ok(olddist[oo][0][1] < newdist[nn][0][1]);
+			oo++;
+		}
+
+		/*
+		 * If we found a range that matched exactly, just add the
+		 * values. XXX should this be aggAggregateValue instead?
+		 */
+		if (oo < olddist.length &&
+		    olddist[oo][0][0] == newdist[nn][0][0]) {
+			ASSERT.ok(olddist[oo][0][1] == newdist[nn][0][1]);
+			olddist[oo][1] += newdist[nn][1];
+			continue;
+		}
+
+		/*
+		 * The current range in the new distribution doesn't match any
+		 * existing range in the old distribution, so just insert the
+		 * new data point wherever we are (which may be the end of the
+		 * old distribution).
+		 */
+		olddist.splice(oo - 1, 0, newdist[nn]);
+	}
+}
+
+function aggAggregateValue(inst, time, value)
+{
+	var key, record;
+
+	record = inst.agi_values[time];
+
+	if (typeof (value) == 'number') {
+		aggAggregateScalar(record, 'value', value);
 		return;
 	}
 
-	vec = inst.agi_values[time].value;
-
-	for (key in newval) {
-		if (!(key in vec))
-			vec[key] = 0;
-
-		vec[key] += newval[key];
+	if (value.constructor == Array) {
+		aggAggregateDistribution(record, 'value', value);
+		return;
 	}
+
+	ASSERT.ok(value.constructor == Object);
+
+	for (key in value)
+		/* XXX this can't possibly be correct */
+		aggAggregateValue(record.value, key, value[key]);
 }
 
 function aggHttpRouter(server)
@@ -341,6 +399,54 @@ function aggHttpValueHeatmap(request, response)
 	aggHttpValueCommon(request, response, aggHttpValueHeatmapDone);
 }
 
+function aggReaggregate(data, selected)
+{
+	var totals, decomposed;
+	var time, key;
+
+	if (mod_ca.caIsEmpty(data))
+		return ([ { data: [ {} ], present: {} } ]);
+
+	for (time in data) {
+		if (data[time].constructor == Array) {
+			/*
+			 * Easy case: there is no additional decomposition.
+			 */
+			ASSERT.ok(mod_ca.caIsEmpty(selected));
+			return ({ data: [ data ], present: {}});
+		}
+	}
+
+	/*
+	 * Harder case: there's a decomposition, but the user is not viewing it
+	 * right now.  We need to sum up the distributions for all keys at each
+	 * time index.
+	 */
+	if (mod_ca.caIsEmpty(selected)) {
+		totals = {};
+		decomposed = {};
+
+		for (time in data) {
+			totals[time] = [];
+
+			for (key in data[time]) {
+				decomposed[key] = true;
+				aggAggregateDistribution(totals, time,
+				    data[time][key]);
+			}
+		}
+
+		return ({ data: [ totals ], present: decomposed });
+	}
+
+	/*
+	 * Hardest case: there's a decomposition based on some fields, and the
+	 * user has selected some other fields. XXX fill me in
+	 */
+	ASSERT.fail('not yet implemented');
+	return (undefined);
+}
+
 function aggHttpValueHeatmapDone(id, when, response)
 {
 	/*
@@ -350,13 +456,11 @@ function aggHttpValueHeatmapDone(id, when, response)
 	 */
 	var inst = agg_insts[id];
 	var duration = 60;
-	var ret, data, ii, record;
-	var nreporting;
-	var primary, datasets, png;
-	var conf;
+	var record, rawdata, agg, nreporting;
+	var datasets, png, conf, range;
+	var ii, ret;
 
-	ret = {};
-	data = {};
+	rawdata = {};
 
 	for (ii = when - duration + 1; ii <= when; ii++) {
 		record = inst.agi_values[ii];
@@ -367,25 +471,28 @@ function aggHttpValueHeatmapDone(id, when, response)
 		if (nreporting === undefined || record < nreporting)
 			nreporting = record.count;
 
-		data[ii] = record.value;
+		/* XXX only need to copy if mod_heatmap changes data in place */
+		rawdata[ii] = mod_ca.caDeepCopy(record.value);
 	}
 
 	conf = {
 		height: 300,
-		width: 1000,
+		width: 600,
 		min: 0,
 		max: 100000,
 		nbuckets: 100,
 		nsamples: duration,
-		base: 0,
 		x: 0,
 		y: 0,
 		base: when - duration + 1,
 		nsamples: duration
 	};
 
-	primary = mod_heatmap.bucketize(data, conf);
-	datasets = [ primary ];
+	agg = aggReaggregate(rawdata, {});
+	datasets = [];
+	for (ii = 0; ii < agg.data.length; ii++)
+		datasets.push(mod_heatmap.bucketize(agg.data[ii], conf));
+
 	mod_heatmap.normalize(datasets);
 
 	conf.hue = [ 21 ];
@@ -393,12 +500,28 @@ function aggHttpValueHeatmapDone(id, when, response)
 	conf.value = 0.95;
 
 	png = mod_heatmap.generate(datasets, conf);
+	range = mod_heatmap.samplerange(conf.x, conf.y, conf);
 
+	conf = {
+		base: range[0],
+		min: range[1][0],
+		max: range[1][1],
+		nbuckets: 1,
+		nsamples: 1
+	};
+
+	ret = {};
+	ret.sample = conf.base;
+	ret.min = conf.min;
+	ret.max = conf.max;
+	ret.total = Math.round(mod_heatmap.bucketize(agg.data[0], conf)[0][0]);
 	ret.minreporting = nreporting;
 	ret.when = when;
-	ret.image = png.encodeSync().toString('base64'); /* XXX sync! */
-
-	response.send(HTTP.OK, ret);
+	ret.present = agg.present;
+	png.encode(function (png_data) {
+		ret.image = png_data.toString('base64');
+		response.send(HTTP.OK, ret);
+	});
 }
 
 /*

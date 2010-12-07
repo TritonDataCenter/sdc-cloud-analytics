@@ -20,8 +20,10 @@ JSSTYLE=$(TOOLSDIR)/jsstyle
 #
 JSL_CONF_MAIN = tools/jsl_support/jsl.conf
 JSL_CONF_WEB = tools/jsl_support/jsl.web.conf
-JS_FILES = `find $(JS_SUBDIRS) -name '*.js'` demo/basicvis/cademo.js
-WEBJS_FILES = demo/basicvis/caflot.js
+DEMO_JSFILES=demo/basicvis/cademo.js
+DEMO_WEBJSFILES=demo/basicvis/caflot.js
+JS_FILES = `find $(JS_SUBDIRS) -name '*.js'` $(DEMO_JSFILES)
+WEBJS_FILES = $(DEMO_WEBJSFILES)
 
 #
 # Targets
@@ -44,8 +46,9 @@ check: check-jsstyle check-jsl
 	@echo check okay
 
 cscope.files:
-	find deps $(JS_SUBDIRS) -name '*.js' -o -name '*.c' -o -name '*.cpp' \
-	    -o -name '*.cc' -o -name '*.h' > cscope.files
+	find deps $(JS_SUBDIRS) $(DEMO_JSFILES) $(DEMO_WEBJSFILES) \
+	    -type f -name '*.js' -o -name '*.c' -o \
+	    -name '*.cpp' -o -name '*.cc' -o -name '*.h' > cscope.files
 
 xref: cscope.files
 	$(CSCOPE) -bqR

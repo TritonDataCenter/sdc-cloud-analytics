@@ -105,7 +105,7 @@ Try the 'basicvis' demo.  Start with COAL-S.
 	# node cmd/caconfigsvc.js
 	# node cmd/caaggsvc.js
 	# node cmd/cainstsvc.js
-	# node demo/basicvis/demo.js
+	# node demo/basicvis/cademo.js
 
 - On a machine where you have a web browser (i.e. your laptop), connect to
   http://<COAL VM>:23183/.

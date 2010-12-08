@@ -401,8 +401,8 @@ function aggHttpValueHeatmap(request, response)
 
 function aggReaggregate(data, selected)
 {
-	var totals, decomposed;
-	var time, key;
+	var totals, decomposed, present;
+	var retdata, time, ii, key;
 
 	if (mod_ca.caIsEmpty(data))
 		return ({ data: [ {} ], present: {} });
@@ -412,53 +412,114 @@ function aggReaggregate(data, selected)
 			/*
 			 * Easy case: there is no additional decomposition.
 			 */
-			ASSERT.ok(mod_ca.caIsEmpty(selected));
+			ASSERT.ok(selected.length === 0); /* XXX from client */
 			return ({ data: [ data ], present: {}});
 		}
 	}
 
 	/*
-	 * Harder case: there's a decomposition, but the user is not viewing it
-	 * right now.  We need to sum up the distributions for all keys at each
-	 * time index.
+	 * In this case, there's a decomposition but the user may or may not be
+	 * viewing it right now.  At the very least we should come up with the
+	 * totals and present values.
 	 */
-	if (mod_ca.caIsEmpty(selected)) {
-		totals = {};
-		decomposed = {};
+	totals = {};
+	present = {};
+	retdata = [];
 
-		for (time in data) {
-			totals[time] = [];
+	for (time in data) {
+		totals[time] = [];
 
-			for (key in data[time]) {
-				decomposed[key] = true;
-				aggAggregateDistribution(totals, time,
-				    data[time][key]);
-			}
+		for (key in data[time]) {
+			present[key] = true;
+			aggAggregateDistribution(totals, time,
+			    data[time][key]);
 		}
-
-		return ({ data: [ totals ], present: decomposed });
 	}
 
+	retdata.push(totals);
+
+	if (selected.length === 0)
+		return ({ data: retdata, present: present });
+
 	/*
-	 * Hardest case: there's a decomposition based on some fields, and the
-	 * user has selected some other fields. XXX fill me in
+	 * Hardest case: the user has also selected some particular values.
 	 */
-	ASSERT.fail('not yet implemented');
-	return (undefined);
+	decomposed = {};
+	for (ii = 0; ii < selected.length; ii++)
+		decomposed[selected[ii]] = {};
+
+	for (time in data) {
+		for (key in decomposed) {
+			if (key in data[time])
+				decomposed[key][time] = data[time][key];
+		}
+	}
+
+	for (ii = 0; ii < selected.length; ii++) {
+		key = selected[ii];
+		if (key in decomposed) {
+			retdata.push(decomposed[key]);
+			delete (decomposed[key]);
+		}
+	}
+
+	return ({ data: retdata, present: present });
 }
 
 var aggHeatmapParams = {
-	height:		{ default: 300,		min: 10,	max: 1000 },
-	width:		{ default: 600,		min: 10,	max: 1000 },
-	ymin:		{ default: 0,		min: 0,		max: 100000 },
-	ymax:		{ default: 100000,	min: 0,		max: 100000 },
-	nbuckets:	{ default: 100,		min: 1,		max: 100 },
-	duration:	{ default: 60,		min: 1,		max: 600 }
+	height: {
+	    type: 'number',
+	    default: 300,
+	    min: 10,
+	    max: 1000
+	},
+	width: {
+	    type: 'number',
+	    default: 600,
+	    min: 10,
+	    max: 1000
+	},
+	ymin: {
+	    type: 'number',
+	    default: 0,
+	    min: 0,
+	    max: 100000
+	},
+	ymax: {
+	    type: 'number',
+	    default: 100000,
+	    min: 0,
+	    max: 100000
+	},
+	nbuckets: {
+	    type: 'number',
+	    default: 100,
+	    min: 1,
+	    max: 100
+	},
+	duration: {
+	    type: 'number',
+	    default: 60,
+	    min: 1,
+	    max: 600
+	},
+	selected: {
+	    type: 'array',
+	    default: []
+	},
+	isolate: {
+	    type: 'boolean',
+	    default: false
+	},
+	hues: {
+	    type: 'array',
+	    default: undefined
+	}
 };
 
 function aggHeatmapParam(request, param)
 {
-	var decl, value;
+	var decl, value, errtail;
 
 	ASSERT.ok(param in aggHeatmapParams);
 	decl = aggHeatmapParams[param];
@@ -466,16 +527,51 @@ function aggHeatmapParam(request, param)
 	if (!(param in request.ca_params))
 		return (decl.default);
 
-	value = parseInt(request.ca_params[param], 10);
+	errtail = ' for param "' + param + '"';
 
-	if (isNaN(value))
-		throw (new Error('illegal value for param: ' + param));
+	switch (decl.type) {
+	case 'number':
+		value = parseInt(request.ca_params[param], 10);
 
-	if (value < decl.min)
-		throw (new Error('value for param too small: ' + param));
+		if (isNaN(value))
+			throw (new Error('illegal value' + errtail));
 
-	if (value > decl.max)
-		throw (new Error('value for param too large: ' + param));
+		if (value < decl.min)
+			throw (new Error('value too small' + errtail));
+
+		if (value > decl.max)
+			throw (new Error('value too large' + errtail));
+
+		break;
+
+	case 'boolean':
+		value = request.ca_params[param];
+		switch (value) {
+		case 'true':
+			value = true;
+			break;
+		case 'false':
+			value = false;
+			break;
+		default:
+			throw (new Error('invalid boolean' + errtail));
+		}
+
+		break;
+
+	case 'array':
+		value = request.ca_params[param];
+
+		if (typeof (value) == 'string')
+			value = value.split(',');
+		else
+			ASSERT.ok(value.constructor == Array);
+
+		break;
+
+	default:
+		throw (new Error('invalid type: ' + decl.type));
+	}
 
 	return (value);
 }
@@ -490,7 +586,8 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 	var inst = agg_insts[id];
 	var record, rawdata, agg, nreporting;
 	var datasets, png, conf, range;
-	var height, width, ymin, ymax, nbuckets, duration;
+	var height, width, ymin, ymax, nbuckets, duration, selected, isolate;
+	var nhues, hues, hue;
 	var ii, ret;
 
 	try {
@@ -500,9 +597,33 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 		ymax = aggHeatmapParam(request, 'ymax');
 		nbuckets = aggHeatmapParam(request, 'nbuckets');
 		duration = aggHeatmapParam(request, 'duration');
+		selected = aggHeatmapParam(request, 'selected');
+		isolate = aggHeatmapParam(request, 'isolate');
+		hues = aggHeatmapParam(request, 'hues');
 
 		if (ymin >= ymax)
 			throw (new Error('"max" must be greater than "min"'));
+
+		nhues = selected.length + (isolate ? 0 : 1);
+
+		if (hues !== undefined) {
+			if (nhues > hues.length)
+				throw (new Error('need ' + nhues + ' hues'));
+
+			for (ii = 0; ii < hues.length; ii++) {
+				hue = hues[ii] = parseInt(hues[ii], 10);
+
+				if (isNaN(hue) || hue < 0 || hue >= 360)
+					throw (new Error('invalid hue'));
+			}
+		} else {
+			hues = [ 21 ];
+			for (ii = 1; ii < selected.length; ii++)
+				hues.push((hues[hues.length - 1] + 91) % 360);
+
+			if (isolate)
+				hues.shift();
+		}
 	} catch (ex) {
 		agg_log.exception(ex);
 		response.send(HTTP.EBADREQUEST, ex.message);
@@ -534,14 +655,27 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 		nsamples: duration
 	};
 
-	agg = aggReaggregate(rawdata, {});
+	agg = aggReaggregate(rawdata, selected);
 	datasets = [];
 	for (ii = 0; ii < agg.data.length; ii++)
 		datasets.push(mod_heatmap.bucketize(agg.data[ii], conf));
 
+	if (isolate) {
+		datasets.shift();
+
+		if (datasets.length === 0) {
+			datasets = [ mod_heatmap.bucketize({}, conf) ];
+			hues = [ 0 ];
+		}
+	} else {
+		for (ii = 1; ii < datasets.length; ii++)
+			mod_heatmap.deduct(datasets[0], datasets[ii]);
+	}
+
+	ASSERT.ok(hues.length == datasets.length);
 	mod_heatmap.normalize(datasets);
 
-	conf.hue = [ 21 ];
+	conf.hue = hues;
 	conf.saturation = [ 0, 0.9 ];
 	conf.value = 0.95;
 

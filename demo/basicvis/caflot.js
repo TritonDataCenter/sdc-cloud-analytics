@@ -6,7 +6,7 @@ var gServer = window.location.hostname;
 var gBaseUrlValue = 'http://' + gServer + ':23182/metrics/instrumentation/';
 var gBaseUrlCreate = 'http://' + gServer + ':23181/metrics/instrumentation';
 var gBaseUrlMetrics = 'http://' + gServer + ':23181/metrics';
-var gBaseColors = ['#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed'];
+var gBaseColors = [ '#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed' ];
 var gColors = [];
 var gMaxSeries;
 
@@ -104,17 +104,205 @@ function gInitMetricsFini(metrics)
 }
 
 /*
+ * Represents a color.  You'd think that a library for this would already exist
+ * -- and you'd be right.  There's a jQuery library for dealing with colors that
+ * can convert between HSV and RGB and parse CSS color names.  Unfortunately, it
+ * uses the same jQuery field ($.color) as a different implementation with an
+ * incompatible interface that flot bundles and uses, so we can't use it here.
+ * Thanks for nothing, client-side Javascript, jQuery, and flot, whose namespace
+ * decisions have brought us here.
+ *
+ * The HSV <-> RGB conversion routines are ported from the implementations by
+ * Eugene Vishnevsky:
+ *
+ *   http://www.cs.rit.edu/~ncs/color/t_convert.html
+ */
+function gColor()
+{
+	var rgb, space;
+
+	if (arguments.length === 1) {
+		this.css = arguments[0];
+		rgb = $.color.parse(this.css);
+		this.rgb = [ rgb.r, rgb.g, rgb.b ];
+		return;
+	}
+
+	switch (arguments[1]) {
+	case 'rgb':
+	case 'hsv':
+		space = arguments[1];
+		break;
+	default:
+		throw ('unsupported color space: ' + arguments[1]);
+	}
+
+	this[space] = arguments[0];
+}
+
+gColor.prototype.hue = function ()
+{
+	if (!this.hsv)
+		this.rgbToHsv();
+
+	return (this.hsv[0]);
+};
+
+gColor.prototype.saturation = function ()
+{
+	if (!this.hsv)
+		this.rgbToHsv();
+
+	return (this.hsv[1]);
+};
+
+gColor.prototype.value = function ()
+{
+	if (!this.hsv)
+		this.rgbToHsv();
+
+	return (this.hsv[2]);
+};
+
+gColor.prototype.rgbToHsv = function ()
+{
+	var r = this.rgb[0], g = this.rgb[1], b = this.rgb[2];
+	var min, max, delta;
+	var h, s, v;
+
+	r /= 255;
+	g /= 255;
+	b /= 255;
+
+	min = Math.min(r, g, b);
+	max = Math.max(r, g, b);
+	v = max;
+
+	delta = max - min;
+
+	if (max === 0) {
+		s = 0;
+		h = 0;
+	} else {
+		s = delta / max;
+
+		if (r == max)
+			h = (g - b) / delta;
+		else if (g == max)
+			h = 2 + (b - r) / delta;
+		else
+			h = 4 + (r - g) / delta;
+
+		h *= 60;
+
+		if (h < 0)
+			h += 360;
+	}
+
+	this.hsv = [ h, s, v ];
+};
+
+gColor.prototype.hsvToRgb = function ()
+{
+	/*
+	 * Convert from HSV to RGB.  Ported from the Java implementation by
+	 * Eugene Vishnevsky:
+	 *
+	 *   http://www.cs.rit.edu/~ncs/color/t_convert.html
+	 */
+	var h = this.hsv[0], s = this.hsv[1], v = this.hsv[2];
+	var r, g, b;
+	var i;
+	var f, p, q, t;
+
+	if (s === 0) {
+		/*
+		 * A saturation of 0.0 is achromatic (grey).
+		 */
+		r = g = b = v;
+
+		this.rgb = [ Math.round(r * 255), Math.round(g * 255),
+		    Math.round(b * 255) ];
+		return;
+	}
+
+	h /= 60; // sector 0 to 5
+
+	i = Math.floor(h);
+	f = h - i; // fractional part of h
+	p = v * (1 - s);
+	q = v * (1 - s * f);
+	t = v * (1 - s * (1 - f));
+
+	switch (i) {
+		case 0:
+			r = v;
+			g = t;
+			b = p;
+			break;
+
+		case 1:
+			r = q;
+			g = v;
+			b = p;
+			break;
+
+		case 2:
+			r = p;
+			g = v;
+			b = t;
+			break;
+
+		case 3:
+			r = p;
+			g = q;
+			b = v;
+			break;
+
+		case 4:
+			r = t;
+			g = p;
+			b = v;
+			break;
+
+		default: // case 5:
+			r = v;
+			g = p;
+			b = q;
+			break;
+	}
+
+	this.rgb = [ Math.round(r * 255),
+	    Math.round(g * 255), Math.round(b * 255)];
+};
+
+gColor.prototype.css = function ()
+{
+	if (!this.rgb)
+		this.hsvToRgb();
+
+	return ('rgb(' + this.rgb.join(', ') + ')');
+};
+
+gColor.prototype.toString = function ()
+{
+	return (this.css());
+};
+
+/*
  * Expand the base set of colors using simple variations.
  */
 function gInitColors()
 {
-	var ii, jj, color;
-	var variations = [ 0, -1 ];
+	var ii, jj, base, color, saturation;
+	var saturations = [ 1.0, 0.5 ];
 
-	for (ii = 0; ii < variations.length; ii++) {
+	for (ii = 0; ii < saturations.length; ii++) {
 		for (jj = 0; jj < gBaseColors.length; jj++) {
-			color = $.color.parse(gBaseColors[jj]);
-			color.scale('rgb', 1 + variations[ii] * 0.2);
+			base = new gColor(gBaseColors[jj]);
+			saturation = base.saturation() * saturations[ii];
+			color = new gColor(
+			    [ base.hue(), saturation, base.value() ], 'hsv');
 			gColors.push(color);
 		}
 	}
@@ -144,7 +332,7 @@ function gRetrieveData(id)
 	var callback = graph.fillcb;
 	var url = gUrlValue(id);
 	var body = null;
-	var request;
+	var request, value;
 
 	request = new XMLHttpRequest();
 
@@ -153,6 +341,16 @@ function gRetrieveData(id)
 		url += 'height=' + gPlotHeight + '&';
 		url += 'duration=' + gnDataPoints + '&';
 		url += 'nbuckets=' + gnBuckets;
+
+		if (graph.isolate)
+			url += '&isolate=true';
+		else
+			url += '&hues=21';
+
+		for (value in graph.selected) {
+			url += '&selected=' + value;
+			url += '&hues=' + graph.selected[value];
+		}
 	}
 
 	request.open('GET', url, true);
@@ -300,6 +498,7 @@ function gPlotShow(id, entries, clear)
 {
 	var graph = gGraphs[id];
 	var rows, ii;
+	var focused = document.activeElement;
 
 	if (clear)
 		graph.legend.fnClearTable();
@@ -314,6 +513,8 @@ function gPlotShow(id, entries, clear)
 			rows[entries[ii].key] =
 			    graph.legend.fnAddData([ entries[ii].val ]);
 	}
+
+	focused.focus();
 }
 
 /*
@@ -430,7 +631,7 @@ function gRecomputeData(id)
 
 		row = gRecomputeOne(key, points);
 		row.stack = true;
-		row.color = gColors[ii].toString();
+		row.color = gColors[ii].css();
 		series.push(row);
 	}
 
@@ -460,7 +661,7 @@ function gRecomputeData(id)
 	if (showother) {
 		row = gRecomputeOne('&lt;other&gt;', points);
 		row.stack = true;
-		row.color = gColors[gColors.length - 1].toString();
+		row.color = gColors[gColors.length - 1].css();
 		series.push(row);
 	}
 
@@ -528,6 +729,151 @@ function gUrlMetrics()
 }
 
 /*
+ * Creates the toolbar for a new graph.
+ */
+function gCreateToolbar(div, subtype, id)
+{
+	var subdiv, button, key;
+
+	subdiv = document.createElement('div');
+	subdiv.className = 'gToolbar ui-widget-header ui-corner-all';
+
+	button = subdiv.appendChild(document.createElement('button'));
+	button.id = 'delete' + id;
+	button.appendChild(document.createTextNode('delete'));
+	$(button).button({
+		text: false,
+		label: 'delete',
+		icons: { primary: 'ui-icon-trash' }
+	}).click(function () { gRemoveStat(id, div); });
+
+	if (subtype != 'heatmap')
+		return (subdiv);
+
+	button = subdiv.appendChild(document.createElement('button'));
+	button.id = 'isolate' + id;
+	button.appendChild(document.createTextNode('isolate'));
+	$(button).button({
+		text: false,
+		label: key,
+		icons: { primary: 'ui-icon-radio-on' }
+	}).click(function () { gIsolateToggle(button, id); });
+
+	return (subdiv);
+}
+
+/*
+ * Invoked when the user toggles the "isolate" property for this graph.
+ */
+function gIsolateToggle(button, id)
+{
+	var options = {};
+	var graph = gGraphs[id];
+
+	if ($(button).text() == 'isolate') {
+		options.label = 'integrate';
+		options.icons = { primary: 'ui-icon-radio-off' };
+	} else {
+		options.label = 'isolate';
+		options.icons = { primary: 'ui-icon-radio-on' };
+	}
+
+	options.text = false;
+	$(button).button('option', options);
+
+	graph.isolate = !graph.isolate;
+	gRetrieveData(id);
+}
+
+function gAllocateHue(graph)
+{
+	var which;
+
+	if (graph.hues.length > 0)
+		return (graph.hues.pop());
+
+	which = graph.ncreated++ % gColors.length;
+
+	return (gColors[which].hue());
+}
+
+function gDeallocateHue(graph, hue)
+{
+	graph.hues.push(hue);
+}
+
+function gHeatmapRowSelect(id, target, shift)
+{
+	var graph = gGraphs[id];
+	var table = graph.legend;
+	var hue, value, already;
+
+	value = table.fnGetData(target.parentNode)[0];
+	already = value in graph.selected;
+
+	if (!shift) {
+		$(table.fnSettings().aoData).each(function () {
+			$(this.nTr).removeClass('row_selected');
+			this.nTr.style.backgroundColor = '#ffffff';
+		});
+
+		graph.selected = {};
+		graph.ncreated = 0;
+		graph.hues = [];
+	}
+
+	if (!already) {
+		$(target.parentNode).addClass('row_selected');
+		hue = gAllocateHue(graph);
+		graph.selected[value] = hue;
+		target.parentNode.style.backgroundColor =
+		    new gColor([ hue, 0.9, 0.95 ], 'hsv').css();
+	} else if (shift) {
+		target.parentNode.style.backgroundColor = '#ffffff';
+		gDeallocateHue(graph, graph.selected[value]);
+		$(target.parentNode).removeClass('row_selected');
+		delete (graph.selected[value]);
+	}
+
+	target.focus();
+	gRetrieveData(id);
+}
+
+/*
+ * Invoked when the user clicks a row in the table.
+ */
+function gHeatmapRowClicked(id, event)
+{
+	return (gHeatmapRowSelect(id, event.target, event.shiftKey));
+}
+
+/*
+ * Invoked when the user presses a key on a row.
+ */
+function gHeatmapKeyPressed(id, event)
+{
+	var sibling;
+
+	switch (event.which) {
+	case 38: /* up arrow */
+		/* jsl:fall-thru */
+	case 75: /* 'k' key */
+		sibling = event.target.parentNode.previousSibling;
+		break;
+	case 40: /* down arrow */
+		/* jsl:fall-thru */
+	case 74: /* 'j' key */
+		sibling = event.target.parentNode.nextSibling;
+		break;
+	}
+
+	if (!sibling)
+		return;
+
+	gHeatmapRowSelect(id, sibling.firstChild, event.shiftKey);
+}
+
+/*
  * Instruments a new metric as specified by the UI fields.
  */
 function gAddStat()
@@ -536,8 +882,8 @@ function gAddStat()
 	var statoption, decompoption, decomp2option;
 	var metric, data, type, decomps, discrete_decomp;
 	var id, ii, body, request, subtype, fieldname, fillcb;
-	var container, div, link, title, elt;
-	var table, tr, td, columns, legend;
+	var container, div, title, elt;
+	var table, tr, td, columns, legend, tbody;
 
 	/*
 	 * Identify which metric and decomposition(s) are selected.
@@ -616,11 +962,10 @@ function gAddStat()
 	div.className = 'GraphContainer';
 
 	elt = div.appendChild(document.createElement('h3'));
-	link = elt.appendChild(document.createElement('a'));
-	link.appendChild(document.createTextNode('x'));
-	link.onclick = function () { gRemoveStat(id, div); };
 	elt.appendChild(document.createTextNode(title));
 	elt.title = body;
+
+	div.appendChild(gCreateToolbar(div, subtype, id));
 
 	table = div.appendChild(document.createElement('table'));
 	tr = table.appendChild(document.createElement('tr'));
@@ -635,6 +980,8 @@ function gAddStat()
 	td = tr.appendChild(document.createElement('td'));
 	td.className = 'GraphLegend';
 	legend = td.appendChild(document.createElement('table'));
+	legend.appendChild(document.createElement('thead'));
+	tbody = legend.appendChild(document.createElement('tbody'));
 	legend.id = 'legend' + id;
 	legend = $('#legend' + id).dataTable({
 		aaData: [],
@@ -644,8 +991,20 @@ function gAddStat()
 		sScrollY: '300px',
 		bPaginate: false,
 		bScrollInfinite: true,
-		aoColumns: columns
+		aoColumns: columns,
+		fnRowCallback: function (node) {
+			if (node.firstChild.tabIndex === 0)
+				return (node);
+
+			node.firstChild.tabIndex = 0;
+			$(node.firstChild).keydown(function (event) {
+				gHeatmapKeyPressed(id, event);
+			});
+
+			return (node);
+		}
 	});
+	$(tbody).click(function (event) { gHeatmapRowClicked(id, event); });
 
 	data = [];
 	for (ii = 0; ii < gnDataPoints; ii++)
@@ -696,7 +1055,11 @@ function gAddStat()
 				legend: legend,
 				options: gopts,
 				subtype: subtype,
-				fillcb: fillcb(id)
+				fillcb: fillcb(id),
+				selected: {},
+				hues: [],
+				ncreated: 0,
+				isolate: false
 			};
 		}, 1000);
 	};

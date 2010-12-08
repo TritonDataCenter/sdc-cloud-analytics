@@ -1,5 +1,6 @@
 body {
 	font-family: sans-serif;
+	margin: 50px;
 }
 
 td.Graph {
@@ -21,13 +22,14 @@ tr {
 	vertical-align: top;
 }
 
-a {
-	cursor: pointer;
-	color: gray;
-	margin-right: 5px;
-	padding-left: 5px;
-	padding-right: 5px;
-	padding-bottom: 2px;
-	border: 1px solid gray;
-	text-align: center;
+.gToolbar {
+	padding: 4px 4px;
+	height: 20px;
+	width: 90px;
+}
+
+.gToolbar button {
+	margin: 0px;
+	width: 14px;
+	height: 20px;
 }

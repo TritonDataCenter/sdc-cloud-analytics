@@ -225,7 +225,7 @@ function aggData(msg)
 
 		if (rq.datatime <= time) {
 			inst.agi_requests.splice(ii--, 1);
-			rq.callback(id, rq.datatime, rq.response);
+			rq.callback(id, rq.datatime, rq.request, rq.response);
 		}
 	}
 }
@@ -236,16 +236,21 @@ function aggAggregateScalar(map, key, value)
 		map[key] = 0;
 
 	map[key] += value;
+	ASSERT.ok(typeof (map[key]) == 'number');
+	ASSERT.ok(typeof (value) == 'number');
 }
 
 function aggAggregateDistribution(map, key, newdist)
 {
 	var olddist, oo, nn;
 
+	ASSERT.ok(newdist.constructor == Array);
+
 	if (!(key in map))
 		map[key] = [];
 
 	olddist = map[key];
+	ASSERT.ok(olddist.constructor == Array);
 
 	/*
 	 * We assume here that the ranges from both distributions exactly align
@@ -342,7 +347,7 @@ function aggHttpValueCommon(request, response, callback)
 	record = inst.agi_values[when];
 
 	if (record && record.count == inst.agi_sources.nsources) {
-		callback(id, when, response);
+		callback(id, when, request, response);
 		return;
 	}
 
@@ -356,6 +361,7 @@ function aggHttpValueCommon(request, response, callback)
 	inst.agi_requests.push({
 	    rqtime: now,
 	    datatime: when,
+	    request: request,
 	    response: response,
 	    callback: callback
 	});
@@ -366,7 +372,7 @@ function aggHttpValueRaw(request, response)
 	aggHttpValueCommon(request, response, aggHttpValueRawDone);
 }
 
-function aggHttpValueRawDone(id, when, response)
+function aggHttpValueRawDone(id, when, request, response)
 {
 	var inst = agg_insts[id];
 	var record = inst.agi_values[when];
@@ -441,7 +447,40 @@ function aggReaggregate(data, selected)
 	return (undefined);
 }
 
-function aggHttpValueHeatmapDone(id, when, response)
+var aggHeatmapParams = {
+	height:		{ default: 300,		min: 10,	max: 1000 },
+	width:		{ default: 600,		min: 10,	max: 1000 },
+	ymin:		{ default: 0,		min: 0,		max: 100000 },
+	ymax:		{ default: 100000,	min: 0,		max: 100000 },
+	nbuckets:	{ default: 100,		min: 1,		max: 100 },
+	duration:	{ default: 60,		min: 1,		max: 600 }
+};
+
+function aggHeatmapParam(request, param)
+{
+	var decl, value;
+
+	ASSERT.ok(param in aggHeatmapParams);
+	decl = aggHeatmapParams[param];
+
+	if (!(param in request.ca_params))
+		return (decl.default);
+
+	value = parseInt(request.ca_params[param], 10);
+
+	if (isNaN(value))
+		throw (new Error('illegal value for param: ' + param));
+
+	if (value < decl.min)
+		throw (new Error('value for param too small: ' + param));
+
+	if (value > decl.max)
+		throw (new Error('value for param too large: ' + param));
+
+	return (value);
+}
+
+function aggHttpValueHeatmapDone(id, when, request, response)
 {
 	/*
 	 * XXX the way this is coded now, 'when' is the last data point, but it
@@ -449,10 +488,26 @@ function aggHttpValueHeatmapDone(id, when, response)
 	 * sure is present).
 	 */
 	var inst = agg_insts[id];
-	var duration = 60;
 	var record, rawdata, agg, nreporting;
 	var datasets, png, conf, range;
+	var height, width, ymin, ymax, nbuckets, duration;
 	var ii, ret;
+
+	try {
+		height = aggHeatmapParam(request, 'height');
+		width = aggHeatmapParam(request, 'width');
+		ymin = aggHeatmapParam(request, 'ymin');
+		ymax = aggHeatmapParam(request, 'ymax');
+		nbuckets = aggHeatmapParam(request, 'nbuckets');
+		duration = aggHeatmapParam(request, 'duration');
+
+		if (ymin >= ymax)
+			throw (new Error('"max" must be greater than "min"'));
+	} catch (ex) {
+		agg_log.exception(ex);
+		response.send(HTTP.EBADREQUEST, ex.message);
+		return;
+	}
 
 	rawdata = {};
 
@@ -470,15 +525,12 @@ function aggHttpValueHeatmapDone(id, when, response)
 	}
 
 	conf = {
-		height: 300,
-		width: 600,
-		min: 0,
-		max: 100000,
-		nbuckets: 100,
-		nsamples: duration,
-		x: 0,
-		y: 0,
-		base: when - duration + 1,
+		min: ymin,
+		max: ymax,
+		width: width,
+		height: height,
+		nbuckets: nbuckets,
+		base: when - duration,
 		nsamples: duration
 	};
 
@@ -494,13 +546,13 @@ function aggHttpValueHeatmapDone(id, when, response)
 	conf.value = 0.95;
 
 	png = mod_heatmap.generate(datasets, conf);
-	range = mod_heatmap.samplerange(conf.x, conf.y, conf);
+	range = mod_heatmap.samplerange(0, 0, conf);
 
 	conf = {
-		base: range[0],
 		min: range[1][0],
 		max: range[1][1],
 		nbuckets: 1,
+		base: range[0],
 		nsamples: 1
 	};
 
@@ -535,7 +587,8 @@ function aggTick()
 
 			if (now - rq.rqtime >= agg_http_req_timeout) {
 				inst.agi_requests.splice(ii--, 1);
-				rq.callback(id, rq.datatime, rq.response);
+				rq.callback(id, rq.datatime, rq.request,
+				    rq.response);
 			}
 		}
 	}

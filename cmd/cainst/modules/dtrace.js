@@ -45,7 +45,7 @@ function insdSyscalls(metric)
 	var decomps = metric.is_decomposition;
 	var latency = false;
 	var script = '';
-	var action, predicate, indexes, index, ii;
+	var action, predicate, indexes, index, zero, ii;
 
 	indexes = [];
 	for (ii = 0; ii < decomps.length; ii++) {
@@ -58,7 +58,14 @@ function insdSyscalls(metric)
 	}
 
 	ASSERT.ok(indexes.length < 2); /* could actually support more */
-	index = indexes.length === 0 ? '' : '[' + indexes.join(',') + ']';
+
+	if (indexes.length > 0) {
+		index = '[' + indexes.join(',') + ']';
+		zero = {};
+	} else {
+		index = '';
+		zero = latency ? [] : 0;
+	}
 
 	if (latency) {
 		action = 'lquantize(timestamp - self->ts, 0, 100000, 100);';
@@ -82,7 +89,7 @@ function insdSyscalls(metric)
 
 	script += '}\n';
 
-	return (new insDTraceVectorMetric(script, indexes.length > 0));
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
 }
 
 function insdIops(metric)
@@ -141,9 +148,10 @@ insDTraceMetric.prototype.value = function ()
 	return (this.reduce(agg));
 };
 
-function insDTraceVectorMetric(prog, hasdecomps)
+function insDTraceVectorMetric(prog, hasdecomps, zero)
 {
 	this.cadv_decomps = hasdecomps;
+	this.cadv_zero = zero;
 	insDTraceMetric.call(this, prog);
 }
 
@@ -160,5 +168,5 @@ insDTraceVectorMetric.prototype.reduce = function (agg)
 		return (agg[aggid]);
 	}
 
-	return (this.cadv_decomps ? {} : 0);
+	return (this.cadv_zero);
 };

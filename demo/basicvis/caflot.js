@@ -10,6 +10,9 @@ var gBaseColors = ['#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed'];
 var gColors = [];
 var gMaxSeries;
 
+var gPlotWidth = 600;		/* pixels */
+var gPlotHeight = 300;		/* pixels */
+var gnBuckets = 50;		/* buckets */
 var gnDataPoints = 30;		/* number of data points to show */
 var gMetrics = [];		/* all available metrics */
 var gGraphs = {};		/* currently active graphs */
@@ -127,7 +130,7 @@ function gTick()
 	var id;
 
 	for (id in gGraphs)
-		gRetrieveData(id, gGraphs[id].fillcb);
+		gRetrieveData(id);
 
 	setTimeout(gTick, 1000);
 }
@@ -135,14 +138,25 @@ function gTick()
 /*
  * Retrieve the latest value for the specified instrumentation.
  */
-function gRetrieveData(id, callback)
+function gRetrieveData(id)
 {
+	var graph = gGraphs[id];
+	var callback = graph.fillcb;
 	var url = gUrlValue(id);
+	var body = null;
 	var request;
 
 	request = new XMLHttpRequest();
+
+	if (graph.subtype == 'heatmap') {
+		url += '?width=' + gPlotWidth + '&';
+		url += 'height=' + gPlotHeight + '&';
+		url += 'duration=' + gnDataPoints + '&';
+		url += 'nbuckets=' + gnBuckets;
+	}
+
 	request.open('GET', url, true);
-	request.send(null);
+	request.send(body);
 	request.onreadystatechange = function () {
 		if (request.readyState != 4)
 			return;
@@ -615,8 +629,8 @@ function gAddStat()
 	elt = td.appendChild(document.createElement('div'));
 	elt.className = 'Graph';
 	elt.id = 'graph' + id;
-	elt.style.width = '600px';
-	elt.style.height = '300px';
+	elt.style.width = gPlotWidth + 'px';
+	elt.style.height = gPlotHeight + 'px';
 
 	td = tr.appendChild(document.createElement('td'));
 	td.className = 'GraphLegend';

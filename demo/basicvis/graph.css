@@ -1,21 +1,15 @@
 body {
 	font-family: sans-serif;
 	margin: 50px;
+	font-size: x-small;
 }
 
-td.Graph {
-}
-
-td.GraphContainer {
-	padding-top: 15px;
+.gGraphContainer {
+	margin-top: 15px;
 }
 
 td.GraphLegend {
 	padding-left: 10px;
-}
-
-td.GraphLegend {
-	font-size: 12px;
 }
 
 tr {
@@ -23,13 +17,20 @@ tr {
 }
 
 .gToolbar {
-	padding: 4px 4px;
-	height: 20px;
-	width: 90px;
+	padding-bottom: 14px;
+	padding-left: 4px;
+	padding-right: 4px;
+	width: 810px;
+	height: 15px;
+	margin-bottom: 10px;
 }
 
-.gToolbar button {
-	margin: 0px;
-	width: 14px;
-	height: 20px;
+.gToolbar > * {
+	float: left;
+	padding-right: 4px;
+}
+
+.gToolbar > h3 {
+	padding-left: 10px;
+	color: #666666;
 }

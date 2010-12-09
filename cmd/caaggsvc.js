@@ -514,6 +514,16 @@ var aggHeatmapParams = {
 	hues: {
 	    type: 'array',
 	    default: undefined
+	},
+	weights: {
+	    type: 'enum',
+	    default: 'weights',
+	    choices: { count: true, weight: true }
+	},
+	coloring: {
+	    type: 'enum',
+	    default: 'rank',
+	    choices: { rank: true, linear: true }
 	}
 };
 
@@ -569,6 +579,14 @@ function aggHeatmapParam(request, param)
 
 		break;
 
+	case 'enum':
+		value = request.ca_params[param];
+
+		if (!(value in decl.choices))
+			throw (new Error('invalid choice' + errtail));
+
+		break;
+
 	default:
 		throw (new Error('invalid type: ' + decl.type));
 	}
@@ -587,6 +605,7 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 	var record, rawdata, agg, nreporting;
 	var datasets, png, conf, range;
 	var height, width, ymin, ymax, nbuckets, duration, selected, isolate;
+	var weights, coloring;
 	var nhues, hues, hue;
 	var ii, ret;
 
@@ -600,6 +619,8 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 		selected = aggHeatmapParam(request, 'selected');
 		isolate = aggHeatmapParam(request, 'isolate');
 		hues = aggHeatmapParam(request, 'hues');
+		weights = aggHeatmapParam(request, 'weights');
+		coloring = aggHeatmapParam(request, 'coloring');
 
 		if (ymin >= ymax)
 			throw (new Error('"max" must be greater than "min"'));
@@ -646,6 +667,8 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 	}
 
 	conf = {
+		weighbyrange: weights == 'weight',
+		linear: coloring == 'linear',
 		min: ymin,
 		max: ymax,
 		width: width,
@@ -673,7 +696,7 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 	}
 
 	ASSERT.ok(hues.length == datasets.length);
-	mod_heatmap.normalize(datasets);
+	mod_heatmap.normalize(datasets, conf);
 
 	conf.hue = hues;
 	conf.saturation = [ 0, 0.9 ];

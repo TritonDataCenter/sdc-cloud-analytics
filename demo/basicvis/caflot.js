@@ -340,7 +340,9 @@ function gRetrieveData(id)
 		url += '?width=' + gPlotWidth + '&';
 		url += 'height=' + gPlotHeight + '&';
 		url += 'duration=' + gnDataPoints + '&';
-		url += 'nbuckets=' + gnBuckets;
+		url += 'nbuckets=' + gnBuckets + '&';
+		url += 'coloring=' + graph.coloring + '&';
+		url += 'weights=' + graph.weights;
 
 		if (graph.isolate)
 			url += '&isolate=true';
@@ -731,15 +733,14 @@ function gUrlMetrics()
 /*
  * Creates the toolbar for a new graph.
  */
-function gCreateToolbar(div, subtype, id)
+function gCreateToolbar(div, subtype, id, elt)
 {
-	var subdiv, button, key;
+	var subdiv, button;
 
 	subdiv = document.createElement('div');
 	subdiv.className = 'gToolbar ui-widget-header ui-corner-all';
 
 	button = subdiv.appendChild(document.createElement('button'));
-	button.id = 'delete' + id;
 	button.appendChild(document.createTextNode('delete'));
 	$(button).button({
 		text: false,
@@ -747,41 +748,57 @@ function gCreateToolbar(div, subtype, id)
 		icons: { primary: 'ui-icon-trash' }
 	}).click(function () { gRemoveStat(id, div); });
 
-	if (subtype != 'heatmap')
+	if (subtype != 'heatmap') {
+		subdiv.appendChild(elt);
 		return (subdiv);
+	}
 
-	button = subdiv.appendChild(document.createElement('button'));
-	button.id = 'isolate' + id;
-	button.appendChild(document.createTextNode('isolate'));
-	$(button).button({
-		text: false,
-		label: key,
-		icons: { primary: 'ui-icon-radio-on' }
-	}).click(function () { gIsolateToggle(button, id); });
+	subdiv.appendChild(gCreateButton(id, 'isolate', [
+	    { label: 'isolate', value: true },
+	    { label: 'integrate', value: false }
+	]));
 
+	subdiv.appendChild(gCreateButton(id, 'weights', [
+	    { label: 'weight', value: 'weight' },
+	    { label: 'count', value: 'count' }
+	]));
+
+	subdiv.appendChild(gCreateButton(id, 'coloring', [
+	    { label: 'linear', value: 'linear' },
+	    { label: 'rank', value: 'rank' }
+	]));
+
+	subdiv.appendChild(elt);
 	return (subdiv);
+}
+
+function gCreateButton(id, field, choices)
+{
+	var button = document.createElement('button');
+	button.appendChild(document.createTextNode(choices[0]['label']));
+	$(button).button({
+		label: choices[0]['label']
+	}).click(function () { gToggle(button, field, choices, id); });
+	return (button);
 }
 
 /*
  * Invoked when the user toggles the "isolate" property for this graph.
  */
-function gIsolateToggle(button, id)
+function gToggle(button, field, choices, id)
 {
 	var options = {};
 	var graph = gGraphs[id];
 
-	if ($(button).text() == 'isolate') {
-		options.label = 'integrate';
-		options.icons = { primary: 'ui-icon-radio-off' };
+	if ($(button).text() == choices[0]['label']) {
+		options.label = choices[1]['label'];
+		graph[field] = choices[0]['value'];
 	} else {
-		options.label = 'isolate';
-		options.icons = { primary: 'ui-icon-radio-on' };
+		options.label = choices[0]['label'];
+		graph[field] = choices[1]['value'];
 	}
 
-	options.text = false;
 	$(button).button('option', options);
-
-	graph.isolate = !graph.isolate;
 	gRetrieveData(id);
 }
 
@@ -959,13 +976,13 @@ function gAddStat()
 	 */
 	container = document.getElementById('gContainerDiv');
 	div = container.appendChild(document.createElement('div'));
-	div.className = 'GraphContainer';
+	div.className = 'gGraphContainer';
 
-	elt = div.appendChild(document.createElement('h3'));
+	elt = document.createElement('h3');
 	elt.appendChild(document.createTextNode(title));
 	elt.title = body;
 
-	div.appendChild(gCreateToolbar(div, subtype, id));
+	div.appendChild(gCreateToolbar(div, subtype, id, elt));
 
 	table = div.appendChild(document.createElement('table'));
 	tr = table.appendChild(document.createElement('tr'));
@@ -1059,7 +1076,9 @@ function gAddStat()
 				selected: {},
 				hues: [],
 				ncreated: 0,
-				isolate: false
+				isolate: false,
+				coloring: 'rank',
+				weights: 'count'
 			};
 		}, 1000);
 	};

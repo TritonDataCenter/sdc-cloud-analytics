@@ -1,0 +1,75 @@
+#!/bin/bash
+
+#
+# smf(5) start method for node-based CA services
+#
+. /lib/svc/share/smf_include.sh
+
+function fail
+{
+	echo "$ns_arg0: $@"
+	exit $SMF_EXIT_ERR_FATAL
+}
+
+function getprop
+{
+	local prop=$1
+	svcprop -p com.joyent.ca,$prop $SMF_FMRI
+}
+
+ns_arg0=$(basename $0)
+ns_hostname=$(hostname)
+ns_root="$(getprop caconfig/path-dist)"
+ns_node="$(getprop caconfig/path-node)"
+ns_logbase="$(getprop caconfig/path-logs)"
+ns_name=
+ns_args=
+
+#
+# Figure out which service to start.
+#
+case $SMF_FMRI in
+	*caconfigsvc*)
+		ns_name=caconfigsvc
+		ns_port=$(getprop caconfigsvc/http-port)
+		ns_args="$ns_port"
+		;;
+	*caaggsvc*)
+		ns_name=caaggsvc
+		ns_port=$(getprop caaggsvc/http-port)
+		ns_args="$ns_port"
+		;;
+	*cainstsvc*)
+		ns_name=cainstsvc
+		;;
+	*)
+		fail "don't know how to start $SMF_FMRI"
+		;;
+esac
+
+cd "$ns_root" || fail "failed to cd"
+ns_root=$(pwd)
+ns_exec=cmd/$ns_name.js
+[[ -f $ns_exec ]] || fail "couldn't find $ns_exec"
+[[ -x $ns_node ]] || fail "couldn't find executable node"
+
+#
+# Set up NODE_PATH properly for our dependencies.
+#
+NODE_PATH=
+for subdir in lib/* deps/*; do
+	[[ -d $subdir ]] || continue
+	NODE_PATH="$NODE_PATH:$ns_root/$subdir"
+done
+
+echo "using NODE_PATH = $NODE_PATH"
+export NODE_PATH
+
+#
+# Launch the daemon.
+#
+mkdir -p "$ns_logbase/$ns_name" || fail "failed to create log directory"
+ns_logfile="$ns_logbase/$ns_name/$(date +%F.%T)"
+smf_clear_env
+HOST=$ns_hostname $ns_node $ns_exec $ns_logfile $ns_args &
+exit $SMF_EXIT_OK

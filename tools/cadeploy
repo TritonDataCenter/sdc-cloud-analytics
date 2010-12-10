@@ -1,0 +1,126 @@
+#!/bin/bash
+
+#
+# deploy: deploys services to a specified system
+#
+shopt -s xpg_echo
+
+function fail
+{
+	echo "$*" >&2
+	exit 1
+}
+
+function usage
+{
+	echo "$d_arg0: $*" >&2
+	cat <<-USAGE >&2
+Usage: $d_arg0 [-r] -h host -s svc [-s svc ...] -f filename.tar.gz
+
+Deploy the named service(s) to the specified host.
+
+    -f  File name to deploy (built with "gmake dist")
+    -r	Remove old contents first
+    -h	Hostname to deploy to
+    -s	Service to deploy; one or more of
+    	    agg (aggregator service)
+    	    cfg (configuration service)
+    	    inst (instrumenter service)
+USAGE
+	exit 2
+}
+
+d_arg0=$(basename $0)
+d_svcs=
+d_tmpbase=/var/tmp/$d_arg0.$$
+d_wsroot=
+
+while getopts ":s:h:f:r" c; do
+	case "$c" in
+	r)	eval opt_$c=true				;;
+	h|f)	eval opt_$c="$OPTARG"				;;
+	s)	d_svcs="$d_svcs $OPTARG"			;;
+	:)	usage "option requires an argument -- $OPTARG"	;;
+	*)	usage "illegal option -- $OPTARG"		;;
+	esac
+done
+
+[[ -n $d_svcs ]] || usage "-s is required"
+[[ -n $opt_h ]] || usage "-h is required"
+[[ -n $opt_f ]] || usage "-f is required"
+
+d_fmris=
+for svc in $d_svcs; do
+	case $svc in
+	agg|caaggsvc)
+		d_fmris="$d_fmris caaggsvc"
+		;;
+	cfg|config|caconfig|caconfigsvc)
+		d_fmris="$d_fmris caconfigsvc"
+		;;
+	inst|cainst|cainstsvc)
+		d_fmris="$d_fmris cainstsvc"
+		;;
+	*)
+		usage "illegal service: $svc"
+		;;
+	esac
+done
+
+d_rdeploy=${d_tmpbase}_deploy.sh
+
+cat > $d_rdeploy << REMOTE_DEPLOY
+#!/bin/bash
+
+shopt -s xpg_echo
+
+function fail
+{
+	echo "\$*" >&2
+	exit 1
+}
+
+r_svcs=\$(svcs -H -ofmri '*/ca/*')
+for svc in \$r_svcs; do
+	echo "Disabling \$svc ... \c"
+	svcadm disable -s \$svc || fail "failed"
+	echo "done."
+done
+
+REMOTE_DEPLOY
+
+#
+# XXX should use versioning to avoid changing live stuff
+#
+if [[ $opt_r = true ]]; then
+cat >> $d_rdeploy << REMOTE_DEPLOY
+echo "Removing old contents from /opt/smartdc/ca ... \c"
+rm -rf /opt/smartdc/ca || fail "failed"
+echo "done."
+REMOTE_DEPLOY
+fi
+
+cat >> $d_rdeploy << REMOTE_DEPLOY
+cd /
+echo "Extracting new tarball ... \c"
+gzcat $d_tmpbase.tar.gz | tar xf - || fail "fail"
+echo "done."
+
+/opt/smartdc/ca/tools/cadeploy-local $d_fmris || \
+    fail "failed to execute second stage"
+
+echo "Removing tarball and script ... \c"
+rm -f $d_tmpbase.tar.gz $d_rdeploy
+echo "done."
+REMOTE_DEPLOY
+
+echo "Copying script and $opt_f to root@$opt_h via scp (may prompt for root password twice)"
+scp $opt_f root@$opt_h:$d_tmpbase.tar.gz || fail "failed"
+scp $d_rdeploy root@$opt_h:$d_rdeploy || fail "failed"
+
+echo "Invoking remote script (may prompt again)."
+ssh root@$opt_h bash $d_rdeploy || fail "failed"
+
+echo "Removing local tarball and script ... \c"
+rm -f $d_rdeploy $d_tmpbase.tar.gz
+echo "done."

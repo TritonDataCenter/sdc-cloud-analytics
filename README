@@ -108,7 +108,9 @@ NOTES
 All of the interfaces here including command names, arguments, tools, services,
 paths, ports, and properties are Unstable and subject to change.
 
-Checked in code should be lint-clean and jsstyle-clean.
+Checked in code should be lint-clean, jsstyle-clean, and code reviewed.  Each
+line on a commit comment should contain a JIRA ticket number and description
+and nothing else.
 
 The "jsl" implementation here assumes a Solaris environment and several
 Python-related paths.  It should work on a stock COAL-S global or local zone and

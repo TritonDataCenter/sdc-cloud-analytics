@@ -14,21 +14,42 @@ var mod_cahttp = require('ca-http');
 var mod_log = require('ca-log');
 var HTTP = require('http-constants');
 
+var cfg_http;			/* http server */
+var cfg_cap;			/* camqp CAP wrapper */
+var cfg_log;			/* log handle */
+
 var cfg_name = 'configsvc';	/* component name */
 var cfg_vers = '0.0';		/* component version */
 var cfg_http_port = 23181;	/* HTTP port for API endpoint */
-var cfg_http_baseurl = '/metrics';
-var cfg_http_insturl = cfg_http_baseurl + '/instrumentation';
-var cfg_http_instidurl = cfg_http_insturl + '/:id';
+var cfg_http_baseuri = '/ca';
 
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
 
-var cfg_http;			/* http server */
-var cfg_cap;			/* camqp CAP wrapper */
-var cfg_log;			/* log handle */
+/*
+ * The following constants and data structures manage active instrumentations.
+ * Each instrumentation is either global or associated with a particular
+ * customer.  For internal use, each instrumentation has a qualified identifier
+ * with one of the following forms:
+ *
+ *	global;<instid>			For global instrumentations
+ *	cust:<custid>;<instid>		For per-customer instrumentations
+ *
+ * In both of these forms, <instid> is a positive integer.  These qualified
+ * identifiers are only used by this implementation; they are not exposed
+ * through any public interface.
+ *
+ * All instrumentation objects are stored in cfg_insts indexed by this fully
+ * qualified identifier.  Additionally, the set of per-customer instrumentations
+ * is stored in cfg_customers[customer_id]['instrumentations'], and the set of
+ * global instrumentations is stored in cfg_global_insts.
+ */
+var cfg_inst_id = 1;		/* next available global id */
+var cfg_insts = {};		/* all instrumentations, by inst id */
+var cfg_customers = {};		/* all customers, by cust id */
+var cfg_global_insts = {};	/* global (non-customer) insts */
 
 function main()
 {
@@ -88,7 +109,6 @@ function main()
 			cfgStarted();
 		});
 	});
-
 }
 
 function cfgStarted()
@@ -99,14 +119,162 @@ function cfgStarted()
 	cfg_cap.send(mod_ca.ca_amqp_key_all, msg);
 }
 
-var cfg_inst_id = 1;
-var cfg_insts = {};
-
+/*
+ * Defines the available HTTP URIs.  See the Public HTTP API doc for details.
+ */
 function cfgHttpRouter(server)
 {
-	server.get(cfg_http_baseurl, cfgHttpListMetrics);
-	server.post(cfg_http_insturl, cfgHttpCreate);
-	server.del(cfg_http_instidurl, cfgHttpDelete);
+	var metrics = '/metrics';
+	var instrumentations = '/instrumentations';
+	var instrumentations_id = instrumentations + '/:instid';
+	var infixes = [ '', '/customers/:custid' ];
+	var ii, base;
+
+	for (ii = 0; ii < infixes.length; ii++) {
+		base = cfg_http_baseuri + infixes[ii];
+		cfg_log.dbg('base = "%s"', base);
+		server.get(base + metrics, cfgHttpMetricsList);
+		server.get(base + instrumentations,
+		    cfgHttpInstrumentationsList);
+		server.post(base + instrumentations, cfgHttpInstCreate);
+		server.del(base + instrumentations_id, cfgHttpInstDelete);
+		server.get(base + instrumentations_id, cfgHttpInstGetOptions);
+		server.put(base + instrumentations_id, cfgHttpInstSetOptions);
+	}
+}
+
+/*
+ * Given a customer identifier, return the set of instrumentations.  If custid
+ * is undefined, returns the set of global instrumentations.  This function
+ * always returns a valid object even if we've never seen this customer
+ * before.
+ */
+function cfgInstrumentations(custid)
+{
+	if (custid === undefined)
+		return (cfg_global_insts);
+
+	if (!(custid in cfg_customers))
+		return ({});
+
+	return (cfg_customers[custid].instrumentations);
+}
+
+function cfgHttpMetricsList(request, response)
+{
+	response.send(HTTP.OK, cfg_statmods);
+}
+
+function cfgHttpInstrumentationsList(request, response)
+{
+	var custid = request.params['custid'];
+	var rv = [];
+
+	cfgInstrumentationsListCustomer(
+	    rv, cfgInstrumentations(custid), custid);
+
+	if (custid === undefined) {
+		for (custid in cfg_customers)
+			cfgInstrumentationsListCustomer(rv,
+			    cfgInstrumentations(custid), custid);
+	}
+
+	response.send(HTTP.OK, rv);
+}
+
+function cfgInstrumentationsListCustomer(rv, insts, custid)
+{
+	var instid, inst;
+
+	for (instid in insts) {
+		inst = mod_ca.caDeepCopy(cfg_insts[instid]['spec']);
+		inst['inst_id'] = instid.substring(instid.lastIndexOf(';') + 1);
+
+		if (custid !== undefined)
+			inst['customer_id'] = custid;
+
+		rv.push(inst);
+	}
+}
+
+function cfgHttpInstCreate(request, response)
+{
+	var custid = request.params['custid'];
+	var params, spec, instid, fqid;
+	var hosts, aggregator, instrumenter;
+	var hostid, ii;
+
+	/*
+	 * If the user specified a JSON object, we use that.  Otherwise, we
+	 * assume they specified parameters in form fields.
+	 */
+	params = request.ca_json || request.ca_params;
+
+	cfg_log.dbg('request to instrument:\n%j', params);
+
+	try {
+		spec = cfgValidateMetric(params);
+	} catch (ex) {
+		response.send(HTTP.EBADREQUEST,
+		    'failed to validate instrumentation: ' + ex.message);
+		return;
+	}
+
+	aggregator = cfgPickAggregator();
+
+	if (!aggregator) {
+		response.send(HTTP.ESERVER, 'no aggregators available');
+		return;
+	}
+
+	if (custid === undefined) {
+		instid = cfg_inst_id++;  /* XXX should be unique across time. */
+		hosts = [];
+		for (hostid in cfg_instrumenters)
+			hosts.push(hostid);
+	} else {
+		if (!(custid in cfg_customers)) {
+			cfg_customers[custid] = {
+				next_id: 1,
+				instrumentations: {}
+			};
+		}
+
+		instid = cfg_customers[custid].next_id++;
+		hosts = [];	/* XXX should look up hosts */
+		for (hostid in cfg_instrumenters)
+			hosts.push(hostid);
+	}
+
+	fqid = mod_ca.caQualifiedId(custid, instid);
+	cfgInstrumentations(custid)[fqid] = true;
+	aggregator.cag_insts[fqid] = true;
+	aggregator.cag_ninsts++;
+
+	cfg_insts[fqid] = {
+		agg_result: undefined,
+		insts_failed: 0,
+		insts_ok: 0,
+		insts_total: 0,
+		response: response,
+		spec: spec,
+		aggregator: aggregator
+	};
+
+	cfgAggEnable(aggregator, fqid);
+
+	/*
+	 * XXX wait for agg to complete
+	 */
+	for (ii = 0; ii < hosts.length; ii++) {
+		cfg_insts[fqid].insts_total++;
+		instrumenter = cfg_instrumenters[hosts[ii]];
+		instrumenter.ins_insts[fqid] = true;
+		instrumenter.ins_ninsts++;
+		cfgInstEnable(instrumenter, fqid);
+	}
+
+	/* XXX timeout HTTP request */
 }
 
 /*
@@ -134,9 +302,8 @@ function cfgPickAggregator()
 }
 
 /*
- * Validate the metric and retrieve its type.  We'll send the type information
- * to both the client and the aggregator so they know what kind of data to
- * expect.
+ * Validate the metric and retrieve its type.  We send the type information to
+ * both the client and the aggregator so they know what kind of data to expect.
  */
 function cfgValidateMetric(params)
 {
@@ -161,106 +328,83 @@ function cfgValidateMetric(params)
 	return (spec);
 }
 
-function cfgHttpCreate(request, response)
+function cfgHttpInstDelete(request, response)
 {
-	var id, key, params, spec;
-	var aggregator, instrumenter;
+	var custid = request.params['custid'];
+	var instid = request.params['instid'];
+	var fqid = mod_ca.caQualifiedId(custid, instid);
+	var instrumenter, aggregator, hostid;
 
-	/*
-	 * If the user specified a JSON object, we use that.  Otherwise, we
-	 * assume they specified parameters in form fields.
-	 */
-	params = request.ca_json || request.ca_params;
-
-	cfg_log.dbg('request to instrument:\n%j', params);
-
-	try {
-		spec = cfgValidateMetric(params);
-	} catch (ex) {
-		response.send(HTTP.EBADREQUEST,
-		    'failed to validate instrumentation: ' + ex.message);
-		return;
-	}
-
-	aggregator = cfgPickAggregator();
-
-	if (!aggregator) {
-		response.send(HTTP.EBADREQUEST, 'no aggregators available');
-		return;
-	}
-
-	id = cfg_inst_id++;  /* XXX should be unique across time. */
-	aggregator.cag_insts[id] = true;
-	aggregator.cag_ninsts++;
-
-	cfg_insts[id] = {
-		agg_result: undefined,
-		insts_failed: 0,
-		insts_ok: 0,
-		insts_total: 0,
-		response: response,
-		spec: spec,
-		aggregator: aggregator
-	};
-
-	cfgAggEnable(aggregator, id);
-
-	/*
-	 * XXX wait for agg to complete
-	 * XXX filter these based on 'nodes'
-	 */
-	for (key in cfg_instrumenters) {
-		cfg_insts[id].insts_total++;
-		instrumenter = cfg_instrumenters[key];
-		instrumenter.ins_insts[id] = true;
-		instrumenter.ins_ninsts++;
-		cfgInstEnable(instrumenter, id);
-	}
-
-	/* XXX timeout HTTP request */
-}
-
-function cfgHttpDelete(request, response)
-{
-	var id = request.params['id'];
-	var instrumenter, aggregator;
-	var key;
-
-	if (!(id in cfg_insts)) {
+	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
 		return;
 	}
 
-	aggregator = cfg_insts[id].aggregator;
+	aggregator = cfg_insts[fqid].aggregator;
 	aggregator.cag_ninsts--;
-	delete (aggregator.cag_insts[id]);
+	delete (aggregator.cag_insts[fqid]);
 
-	/*
-	 * XXX filter these based on 'nodes'
-	 */
-	for (key in cfg_instrumenters) {
-		instrumenter = cfg_instrumenters[key];
+	for (hostid in cfg_instrumenters) {
+		instrumenter = cfg_instrumenters[hostid];
 
-		if (!(id in instrumenter.ins_insts))
+		if (!(fqid in instrumenter.ins_insts))
 			continue;
 
 		instrumenter.ins_ninsts--;
-		delete (instrumenter.ins_insts[id]);
+		delete (instrumenter.ins_insts[fqid]);
 		cfg_cap.send(instrumenter.ins_routekey, {
 		    ca_type: 'cmd',
 		    ca_subtype: 'disable_instrumentation',
-		    ca_id: id,
-		    is_inst_id: id
+		    ca_id: fqid,
+		    is_inst_id: fqid
 		});
 	}
 
-	delete (cfg_insts[id]);
+	delete (cfgInstrumentations(custid)[fqid]);
+	delete (cfg_insts[fqid]);
 	response.send(HTTP.OK);
 }
 
-function cfgHttpListMetrics(request, response)
+function cfgHttpInstSetOptions(request, response)
 {
-	response.send(HTTP.OK, cfg_statmods);
+	var custid = request.params['custid'];
+	var instid = request.params['instid'];
+	var fqid = mod_ca.caQualifiedId(custid, instid);
+	var options;
+
+	if (!(fqid in cfg_insts)) {
+		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+		return;
+	}
+
+	if (response.ca_json === undefined) {
+		response.send(HTTP.EBADREQUEST, 'no JSON specified');
+		return;
+	}
+
+	/* Validate and apply options, if we supported any. */
+	options = response.ca_json;
+	if (options.enabled !== undefined) {
+		if (options.enabled !== true)
+			response.send(HTTP.EBADREQUEST,
+			    'unsupported value for "enabled"');
+	}
+
+	cfgHttpInstGetOptions(request, response);
+}
+
+function cfgHttpInstGetOptions(request, response)
+{
+	var custid = request.params['custid'];
+	var instid = request.params['instid'];
+	var fqid = mod_ca.caQualifiedId(custid, instid);
+
+	if (!(fqid in cfg_insts)) {
+		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+		return;
+	}
+
+	response.send(HTTP.OK, { enabled: true });
 }
 
 function cfgAggEnable(aggregator, id)
@@ -299,6 +443,7 @@ function cfgInstEnable(instrumenter, id)
 function cfgCheckNewInstrumentation(id)
 {
 	var inst = cfg_insts[id];
+	var instid = id.substring(id.lastIndexOf(';') + 1);
 	var response, stattype, dim, type;
 
 	if (!('response' in inst))
@@ -332,7 +477,7 @@ function cfgCheckNewInstrumentation(id)
 	stattype = inst.spec.stattype;
 	dim = stattype['dimension'];
  	type = dim == 1 ? 'scalar' : stattype['type'];
-	response.send(HTTP.CREATED, { id: id, dimension: dim, type: type });
+	response.send(HTTP.CREATED, { id: instid, dimension: dim, type: type });
 }
 
 function cfgAckEnableAgg(msg)

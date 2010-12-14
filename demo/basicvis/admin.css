@@ -1,0 +1,18 @@
+body {
+	font-family: sans-serif;
+	margin: 50px;
+	font-size: small;
+}
+
+th {
+	text-align: left;
+}
+
+table {
+	width: 100%;
+}
+
+th,td {
+	padding: 4px;
+	text-wrap: suppress;
+}

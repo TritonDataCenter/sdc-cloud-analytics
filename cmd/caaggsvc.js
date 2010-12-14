@@ -15,7 +15,7 @@ var agg_name = 'aggsvc';		/* component name */
 var agg_vers = '0.0';			/* component version */
 var agg_http_port = 23182;		/* http port */
 var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
-var agg_http_baseurl = '/metrics/instrumentation/:id';
+var agg_http_baseuri = '/ca/';
 
 var agg_insts = {};		/* active instrumentations by id */
 
@@ -327,8 +327,15 @@ function aggNotifyConfigRestarted()
 
 function aggHttpRouter(server)
 {
-	server.get(agg_http_baseurl + '/value/raw', aggHttpValueRaw);
-	server.get(agg_http_baseurl + '/value/heatmap', aggHttpValueHeatmap);
+	var infixes = [ '', 'customers/:custid/' ];
+	var ii, base;
+
+	for (ii = 0; ii < infixes.length; ii++) {
+		base = agg_http_baseuri + infixes[ii] +
+		    'instrumentations/:instid/value/';
+		server.get(base + 'raw', aggHttpValueRaw);
+		server.get(base + 'heatmap', aggHttpValueHeatmap);
+	}
 }
 
 /*
@@ -346,21 +353,23 @@ function aggHttpRouter(server)
  */
 function aggHttpValueCommon(request, response, callback)
 {
-	var id = request.params['id'];
+	var custid = request.params['custid'];
+	var instid = request.params['instid'];
+	var fqid = mod_ca.caQualifiedId(custid, instid);
 	var inst, now, when, record;
 
-	if (!(id in agg_insts)) {
+	if (!(fqid in agg_insts)) {
 		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
 		return;
 	}
 
-	inst = agg_insts[id];
+	inst = agg_insts[fqid];
 	now = new Date().getTime();
 	when = parseInt(now / 1000, 10) - 2;
 	record = inst.agi_values[when];
 
 	if (record && record.count == inst.agi_sources.nsources) {
-		callback(id, when, request, response);
+		callback(fqid, when, request, response);
 		return;
 	}
 

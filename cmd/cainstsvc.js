@@ -478,7 +478,7 @@ function insCmdEnable(msg)
 
 		sendmsg.is_status = 'enabled';
 		ins_cap.send(destkey, sendmsg);
-		ins_log.info('instrumented %d (%s.%s)', id,
+		ins_log.info('instrumented %s (%s.%s)', id,
 		    inst.is_module, inst.is_stat);
 	});
 }
@@ -519,7 +519,7 @@ function insCmdDisable(msg)
 		sendmsg.is_status = 'disabled';
 		ins_cap.send(destkey, sendmsg);
 		delete (ins_insts[id]);
-		ins_log.info('deinstrumented %d', id);
+		ins_log.info('deinstrumented %s', id);
 	});
 }
 

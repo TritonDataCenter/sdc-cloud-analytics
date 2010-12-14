@@ -19,7 +19,9 @@ exports.insinit = function (ins, log)
 	    label: 'syscalls',
 	    type: 'ops',
 	    fields: {
-		probefunc: { label: 'system call', type: 'string' },
+		hostname: { label: 'hostname', type: 'string' },
+		zonename: { label: 'zone name', type: 'string' },
+		syscall: { label: 'system call', type: 'string' },
 		execname: { label: 'application name', type: 'string' },
 		latency: { label: 'latency', type: 'linear' }
 	    },
@@ -33,11 +35,23 @@ exports.insinit = function (ins, log)
 	    label: 'operations',
 	    type: 'ops',
 	    fields: {
-		hosttype: { label: 'host and type', type: 'string' }
+		hostname: { label: 'hostname', type: 'string' },
+		zonename: { label: 'zone name', type: 'string' },
+		optype: { label: 'type', type: 'string' },
+		execname: { label: 'application name', type: 'string' },
+		latency: { label: 'latency', type: 'linear' }
 	    },
 	    metric: insdIops
 	});
 
+};
+
+var insdFields = {
+	hostname: '"' + mod_ca.caSysinfo().ca_hostname + '"',
+	zonename: 'zonename',
+	syscall: 'probefunc',
+	execname: 'execname',
+	optype: '(args[0]->b_flags & B_READ ? "read" : "write")'
 };
 
 function insdSyscalls(metric)
@@ -54,7 +68,8 @@ function insdSyscalls(metric)
 			continue;
 		}
 
-		indexes.push(decomps[ii]);
+		ASSERT.ok(decomps[ii] in insdFields);
+		indexes.push(insdFields[decomps[ii]]);
 	}
 
 	ASSERT.ok(indexes.length < 2); /* could actually support more */
@@ -95,22 +110,74 @@ function insdSyscalls(metric)
 function insdIops(metric)
 {
 	var decomps = metric.is_decomposition;
+	var latency = false;
 	var script = '';
-	var host = mod_ca.caSysinfo().ca_hostname;
+	var action, predicate, indexes, index, zero, ii;
 
-	script += 'io:::start\n';
+	indexes = [];
+	for (ii = 0; ii < decomps.length; ii++) {
+		if (decomps[ii] == 'latency') {
+			latency = true;
+			decomps.splice(ii--, 1);
+			continue;
+		}
+
+		ASSERT.ok(decomps[ii] in insdFields);
+		indexes.push(insdFields[decomps[ii]]);
+	}
+
+	ASSERT.ok(indexes.length < 2); /* could actually support more */
+
+	if (indexes.length > 0) {
+		index = '[' + decomps.map(function (elt) {
+			return (elt + 's[arg0]');
+		}).join(',') + ']';
+		zero = {};
+	} else {
+		index = '';
+		zero = latency ? [] : 0;
+	}
+
+	if (latency || indexes.length > 0) {
+		script += 'io:::start\n' + '{\n';
+
+		if (latency)
+		    script += '\tstarts[arg0] = timestamp;\n';
+
+		for (ii = 0; ii < indexes.length; ii++)
+			script += mod_ca.caSprintf('\t%ss[arg0] = %s;\n',
+			    decomps[ii], indexes[ii]);
+
+		script += '}\n\n';
+
+		if (latency) {
+			action = 'lquantize(timestamp - starts[arg0]' +
+			    ', 0, 100000, 100);';
+			predicate = '/starts[arg0]/\n';
+		} else {
+			action = 'count();';
+			predicate = mod_ca.caSprintf('/%ss[arg0] != NULL/\n',
+			    decomps[0]);
+		}
+	} else {
+		action = 'count();';
+		predicate = '';
+	}
+
+	script += 'io:::done\n';
+	script += predicate;
 	script += '{\n';
-	script += '\t@';
+	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
 
-	if (decomps.length > 0)
-		script += mod_ca.caSprintf('[ strjoin("%s", ' +
-		    'args[0]->b_flags & B_READ ? ": reads" : ": writes") ]',
-		    host);
+	if (latency)
+		script += '\tstarts[arg0] = 0;\n';
 
-	script += ' = count();\n';
+	for (ii = 0; ii < indexes.length; ii++)
+		script += mod_ca.caSprintf('\t%ss[arg0] = 0\n', decomps[ii]);
+
 	script += '}\n';
 
-	return (new insDTraceVectorMetric(script, decomps.length > 0));
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
 }
 
 function insDTraceMetric(prog)

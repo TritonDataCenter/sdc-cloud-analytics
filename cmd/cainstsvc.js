@@ -236,7 +236,7 @@ function insInitBackends()
 	 * they are to use) is implicitly defined by the order in which they're
 	 * loaded, not an explicit cost.
 	 */
-	var backends = [ 'kstat', 'dtrace', 'test' ];
+	var backends = [ 'kstat', 'dtrace' ];
 	var bemgr = new insBackendInterface();
 	var plugin, ii;
 

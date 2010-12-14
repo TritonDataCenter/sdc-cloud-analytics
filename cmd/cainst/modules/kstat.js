@@ -2,8 +2,13 @@
  * cmd/cainst/modules/kstat.js: kstat Instrumenter backend
  */
 
-var mod_kstat = require('kstat');
 var ASSERT = require('assert');
+
+var mod_kstat = require('kstat');
+
+var mod_ca = require('ca');
+
+var inskHostname;
 
 exports.insinit = function (ins)
 {
@@ -23,7 +28,9 @@ exports.insinit = function (ins)
 	    stat: 'bytes',
 	    label: 'bytes read/written',
 	    type: 'size',
-	    fields: [],
+	    fields: {
+		hostname: { label: 'hostname', type: 'string' }
+	    },
 	    metric: inskMetric
 	});
 	ins.registerMetric({
@@ -31,7 +38,9 @@ exports.insinit = function (ins)
 	    stat: 'ops',
 	    label: 'operations',
 	    type: 'ops',
-	    fields: [],
+	    fields: {
+		hostname: { label: 'hostname', type: 'string' }
+	    },
 	    metric: inskMetric
 	});
 
@@ -41,9 +50,13 @@ exports.insinit = function (ins)
 	    stat: 'bytes',
 	    label: 'bytes sent/received',
 	    type: 'size',
-	    fields: [],
+	    fields: {
+		hostname: { label: 'hostname', type: 'string' }
+	    },
 	    metric: inskMetric
 	});
+
+	inskHostname = mod_ca.caSysinfo().ca_hostname;
 };
 
 function inskMetric(metric)
@@ -126,13 +139,17 @@ function insKstatMetric(metric)
 	var key;
 
 	ASSERT.equal(metric.is_predicate.length, 0);
-	ASSERT.equal(metric.is_decomposition.length, 0);
+	ASSERT.ok(metric.is_decomposition.length <= 1);
+	ASSERT.ok(metric.is_decomposition.length === 0 ||
+	    (metric.is_decomposition.length == 1 &&
+	    metric.is_decomposition[0] == 'hostname'));
 
 	for (key in conf) {
 		if (key != 'map' && key != 'reduce')
 			kstatconf[key] = conf[key];
 	}
 
+	this.ikm_byhostname = metric.is_decomposition.length > 0;
 	this.ikm_reader = new mod_kstat.Reader(kstatconf);
 	this.ikm_map = conf['map'];
 	this.ikm_reduce = conf['reduce'];
@@ -143,8 +160,8 @@ insKstatMetric.prototype.deinstrument = function (callback) { callback(); };
 
 insKstatMetric.prototype.value = function ()
 {
-	var kstats, curval, deltas, interval, values;
-	var ii, key;
+	var kstats, curval, deltas, interval, values, reduced;
+	var ii, key, rv;
 
 	kstats = this.ikm_reader.read();
 	values = [];
@@ -169,5 +186,12 @@ insKstatMetric.prototype.value = function ()
 	}
 
 	this.ikm_prev = kstats;
-	return (this.ikm_reduce(values));
+	reduced = this.ikm_reduce(values);
+
+	if (!this.ikm_byhostname)
+		return (reduced);
+
+	rv = {};
+	rv[inskHostname] = reduced;
+	return (rv);
 };

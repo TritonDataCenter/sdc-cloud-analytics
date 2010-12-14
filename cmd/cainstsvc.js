@@ -34,7 +34,7 @@ function main()
 		exchange_opts: mod_ca.ca_amqp_exchange_opts,
 		basename: mod_ca.ca_amqp_key_base_instrumenter,
 		hostname: hostname,
-		bindings: []
+		bindings: [ 'ca.broadcast' ]
 	});
 	amqp.on('amqp-error', mod_caamqp.caAmqpLogError(ins_log));
 	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(ins_log));
@@ -48,6 +48,7 @@ function main()
 	ins_cap.on('msg-cmd-status', insCmdStatus);
 	ins_cap.on('msg-cmd-enable_instrumentation', insCmdEnable);
 	ins_cap.on('msg-cmd-disable_instrumentation', insCmdDisable);
+	ins_cap.on('msg-notify-configsvc_online', insNotifyConfigRestarted);
 
 	ins_log.info('Instrumenter starting up (%s/%s)', ins_name, ins_vers);
 	ins_log.info('%-12s %s', 'Hostname:', hostname);
@@ -298,20 +299,21 @@ function insGetModules()
 	return (ret);
 }
 
-function insStarted()
+function insNotifyConfig()
 {
-	var msg;
-
-	ins_log.info('AMQP broker connected.');
-
-	msg = {};
+	var msg = {};
 	msg.ca_type = 'notify';
 	msg.ca_subtype = 'instrumenter_online';
 	msg.ca_modules = insGetModules();
+	ins_cap.send(mod_ca.ca_amqp_key_config, msg);
+}
+
+function insStarted()
+{
+	ins_log.info('AMQP broker connected.');
 
 	/* XXX should we send this periodically too?  every 5 min or whatever */
-	ins_cap.send(mod_ca.ca_amqp_key_config, msg);
-
+	insNotifyConfig();
 	ins_iid = setInterval(insTick, 1000);
 }
 
@@ -511,6 +513,31 @@ function insCmdDisable(msg)
 		delete (ins_insts[id]);
 		ins_log.info('deinstrumented %d', id);
 	});
+}
+
+/*
+ * Invoked when the configuration service restarts.  Because instrumentations
+ * are not yet persistent, we drop all the data we have and start again.
+ */
+function insNotifyConfigRestarted()
+{
+	var id;
+
+	ins_log.info('config service restarted');
+
+	if (mod_ca.caIsEmpty(ins_insts)) {
+		insNotifyConfig();
+		return;
+	}
+
+	for (id in ins_insts) {
+		ins_insts[id].is_impl.deinstrument(function (err) {
+			delete (ins_insts[id]);
+
+			if (mod_ca.caIsEmpty(ins_insts))
+				insNotifyConfig();
+		});
+	}
 }
 
 main();

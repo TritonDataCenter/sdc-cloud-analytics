@@ -39,7 +39,7 @@ function main()
 		exchange_opts: mod_ca.ca_amqp_exchange_opts,
 		basename: mod_ca.ca_amqp_key_base_aggregator,
 		hostname: hostname,
-		bindings: []
+		bindings: [ 'ca.broadcast' ]
 	});
 	amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
 	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
@@ -53,6 +53,7 @@ function main()
 	agg_cap.on('msg-cmd-status', aggCmdStatus);
 	agg_cap.on('msg-cmd-enable_aggregation', aggCmdEnableAggregation);
 	agg_cap.on('msg-data', aggData);
+	agg_cap.on('msg-notify-configsvc_online', aggNotifyConfigRestarted);
 
 	agg_log.info('Aggregator starting up (%s/%s)', agg_name, agg_vers);
 	agg_log.info('%-12s %s', 'Hostname:', hostname);
@@ -73,18 +74,19 @@ function main()
 	});
 }
 
-function aggStarted()
+function aggNotifyConfig()
 {
-	var msg;
-
-	agg_log.info('AMQP broker connected.');
-
-	msg = {};
+	var msg = {};
 	msg.ca_type = 'notify';
 	msg.ca_subtype = 'aggregator_online';
-
-	/* XXX should we send this periodically too?  every 5 min or whatever */
 	agg_cap.send(mod_ca.ca_amqp_key_config, msg);
+}
+
+function aggStarted()
+{
+	agg_log.info('AMQP broker connected.');
+	/* XXX should we send this periodically too?  every 5 min or whatever */
+	aggNotifyConfig();
 }
 
 function aggCmdEnableAggregation(msg)
@@ -310,6 +312,17 @@ function aggAggregateValue(map, key, value)
 			map[key] = {};
 		aggAggregateValue(map[key], subkey, value[subkey]);
 	}
+}
+
+/*
+ * Invoked when the configuration service restarts.  Because instrumentations
+ * are not yet persistent, we drop all the data we have and start again.
+ */
+function aggNotifyConfigRestarted()
+{
+	agg_insts = {};
+	agg_log.info('config service restarted');
+	aggNotifyConfig();
 }
 
 function aggHttpRouter(server)

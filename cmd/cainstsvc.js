@@ -243,10 +243,18 @@ function insInitBackends()
 	ins_log.info('Loading modules.');
 
 	for (ii = 0; ii < backends.length; ii++) {
-		plugin = require('./cainst/modules/' + backends[ii]);
-		plugin.insinit(bemgr, ins_log);
-		ins_log.info('Loaded module "%s".', backends[ii]);
+		try {
+			plugin = require('./cainst/modules/' + backends[ii]);
+			plugin.insinit(bemgr, ins_log);
+			ins_log.info('Loaded module "%s".', backends[ii]);
+		} catch (ex) {
+			ins_log.warn('FAILED to load module "%s": %s',
+			    backends[ii], ex.toString());
+		}
 	}
+
+	if (mod_ca.caIsEmpty(ins_modules))
+		throw (new Error('No modules.  Bailing out.'));
 
 	ins_log.info('Finished loading modules.');
 }

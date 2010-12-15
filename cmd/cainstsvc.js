@@ -29,12 +29,12 @@ function main()
 	ins_log = new mod_log.caLog({ out: process.stdout });
 
 	amqp = new mod_caamqp.caAmqp({
-		broker: broker,
-		exchange: mod_ca.ca_amqp_exchange,
-		exchange_opts: mod_ca.ca_amqp_exchange_opts,
-		basename: mod_ca.ca_amqp_key_base_instrumenter,
-		hostname: hostname,
-		bindings: [ 'ca.broadcast' ]
+	    broker: broker,
+	    exchange: mod_ca.ca_amqp_exchange,
+	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
+	    basename: mod_ca.ca_amqp_key_base_instrumenter,
+	    hostname: hostname,
+	    bindings: [ 'ca.broadcast' ]
 	});
 	amqp.on('amqp-error', mod_caamqp.caAmqpLogError(ins_log));
 	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(ins_log));
@@ -309,11 +309,8 @@ function insGetModules()
 
 function insNotifyConfig()
 {
-	var msg = {};
-	msg.ca_type = 'notify';
-	msg.ca_subtype = 'instrumenter_online';
-	msg.ca_modules = insGetModules();
-	ins_cap.send(mod_ca.ca_amqp_key_config, msg);
+	var mods = insGetModules();
+	ins_cap.sendNotifyInstOnline(mod_ca.ca_amqp_key_config, mods);
 }
 
 function insStarted()
@@ -349,12 +346,8 @@ function insTick()
 
 	for (id in ins_insts) {
 		value = ins_insts[id].is_impl.value();
-		ins_cap.send(ins_insts[id].is_inst_key, {
-		    ca_type: 'data',
-		    d_inst_id: id,
-		    d_value: value,
-		    d_time: whentime
-		});
+		ins_cap.sendData(ins_insts[id].is_inst_key, id, value,
+			whentime);
 	}
 
 	ins_last = when;
@@ -365,7 +358,7 @@ function insTick()
  */
 function insCmdPing(msg)
 {
-	ins_cap.send(msg.ca_source, ins_cap.responseTemplate(msg));
+	ins_cap.sendCmdAckPing(msg.ca_source, msg.ca_id);
 }
 
 /*
@@ -373,7 +366,7 @@ function insCmdPing(msg)
  */
 function insCmdStatus(msg)
 {
-	var sendmsg = ins_cap.responseTemplate(msg);
+	var sendmsg = {};
 	var id, inst;
 
 	sendmsg.s_component = 'instrumenter';
@@ -393,7 +386,7 @@ function insCmdStatus(msg)
 
 	sendmsg.s_modules = insGetModules();
 
-	ins_cap.send(msg.ca_source, sendmsg);
+	ins_cap.sendCmdAckStatus(msg.ca_source, msg.ca_id, sendmsg);
 }
 
 /*
@@ -401,19 +394,15 @@ function insCmdStatus(msg)
  */
 function insCmdEnable(msg)
 {
-	var sendmsg = ins_cap.responseTemplate(msg);
 	var destkey = msg.ca_source;
 	var id, metric, metrics, inst;
 	var ii, jj;
 
-	sendmsg.is_inst_id = msg.is_inst_id;
-
 	if (!('is_inst_id' in msg) || !('is_module' in msg) ||
 	    !('is_stat' in msg) || !('is_predicate' in msg) ||
 	    !('is_decomposition' in msg) || !('is_inst_key' in msg)) {
-		sendmsg.is_status = 'enable_failed';
-		sendmsg.is_error = 'missing field';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
+		    'missing field', id);
 		return;
 	}
 
@@ -425,16 +414,14 @@ function insCmdEnable(msg)
 	 */
 	if (id in ins_insts) {
 		/* XXX check that it matches */
-		sendmsg.is_status = 'enabled';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckEnableInstSuc(destkey, msg.ca_id, id);
 		return;
 	}
 
 	if (!(msg.is_module in ins_modules) ||
 	    !(msg.is_stat in ins_modules[msg.is_module]['stats'])) {
-		sendmsg.is_status = 'enable_failed';
-		sendmsg.is_error = 'unknown module or stat';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
+		    'unknown module or stat', id);
 		return;
 	}
 
@@ -451,9 +438,9 @@ function insCmdEnable(msg)
 	}
 
 	if (ii == metrics.length) {
-		sendmsg.is_status = 'enable_failed';
-		sendmsg.is_error = 'unsupported decomposition';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
+		    'unsupported decomposition', id);
+		return;
 	}
 
 	metric = ins_modules[msg.is_module]['stats'][msg.is_stat][ii];
@@ -470,14 +457,12 @@ function insCmdEnable(msg)
 	ins_insts[id] = inst;
 	inst.is_impl.instrument(function (err) {
 		if (err) {
-			sendmsg.is_status = 'enable_failed';
-			sendmsg.is_error = 'instrumenter error: ' + err.message;
-			ins_cap.send(destkey, sendmsg);
+			ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
+			    'instrumenter error: ' + err.message, id);
 			return;
 		}
 
-		sendmsg.is_status = 'enabled';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckEnableInstSuc(destkey, msg.ca_id, id);
 		ins_log.info('instrumented %s (%s.%s)', id,
 		    inst.is_module, inst.is_stat);
 	});
@@ -488,36 +473,30 @@ function insCmdEnable(msg)
  */
 function insCmdDisable(msg)
 {
-	var sendmsg = ins_cap.responseTemplate(msg);
 	var destkey = msg.ca_source;
 	var id;
 
 	if (!('is_inst_id' in msg)) {
-		sendmsg.is_status = 'disable_failed';
-		sendmsg.is_error = 'missing field';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckDisableInstFail(destkey, msg.ca_id,
+		    'missing field');
 		return;
 	}
 
 	id = msg.is_inst_id;
-	sendmsg.is_inst_id = id;
 
 	if (!(id in ins_insts)) {
-		sendmsg.is_status = 'disabled';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckDisableInstSuc(destkey, msg.ca_id, id);
 		return;
 	}
 
 	ins_insts[id].is_impl.deinstrument(function (err) {
 		if (err) {
-			sendmsg.is_status = 'disable_failed';
-			sendmsg.is_error = 'instrumenter error: ' + err.message;
-			ins_cap.send(destkey, sendmsg);
+			ins_cap.sendCmdAckDisableInstFail(destkey, msg.ca_id,
+			    'instrumenter error: ' + err.message, id);
 			return;
 		}
 
-		sendmsg.is_status = 'disabled';
-		ins_cap.send(destkey, sendmsg);
+		ins_cap.sendCmdAckDisableInstSuc(destkey, msg.ca_id, id);
 		delete (ins_insts[id]);
 		ins_log.info('deinstrumented %s', id);
 	});
@@ -540,10 +519,10 @@ function insNotifyConfigRestarted()
 
 	for (id in ins_insts) {
 		ins_insts[id].is_impl.deinstrument(function (err) {
-			delete (ins_insts[id]);
+		    delete (ins_insts[id]);
 
-			if (mod_ca.caIsEmpty(ins_insts))
-				insNotifyConfig();
+		    if (mod_ca.caIsEmpty(ins_insts))
+			insNotifyConfig();
 		});
 	}
 }

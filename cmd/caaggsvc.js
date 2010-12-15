@@ -34,12 +34,12 @@ function main()
 	agg_log = new mod_log.caLog({ out: process.stdout });
 
 	amqp = new mod_caamqp.caAmqp({
-		broker: broker,
-		exchange: mod_ca.ca_amqp_exchange,
-		exchange_opts: mod_ca.ca_amqp_exchange_opts,
-		basename: mod_ca.ca_amqp_key_base_aggregator,
-		hostname: hostname,
-		bindings: [ 'ca.broadcast' ]
+	    broker: broker,
+	    exchange: mod_ca.ca_amqp_exchange,
+	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
+	    basename: mod_ca.ca_amqp_key_base_aggregator,
+	    hostname: hostname,
+	    bindings: [ 'ca.broadcast' ]
 	});
 	amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
 	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
@@ -68,18 +68,15 @@ function main()
 	});
 
 	agg_http.start(function () {
-		agg_log.info('HTTP server started.');
-		amqp.start(aggStarted);
-		setTimeout(aggTick, 1000);
+	    agg_log.info('HTTP server started.');
+	    amqp.start(aggStarted);
+	    setTimeout(aggTick, 1000);
 	});
 }
 
 function aggNotifyConfig()
 {
-	var msg = {};
-	msg.ca_type = 'notify';
-	msg.ca_subtype = 'aggregator_online';
-	agg_cap.send(mod_ca.ca_amqp_key_config, msg);
+	agg_cap.sendNotifyAggOnline(mod_ca.ca_amqp_key_config);
 }
 
 function aggStarted()
@@ -91,18 +88,14 @@ function aggStarted()
 
 function aggCmdEnableAggregation(msg)
 {
-	var sendmsg = agg_cap.responseTemplate(msg);
 	var destkey = msg.ca_source;
 	var id, datakey;
 	var dimension;
 
-	sendmsg.ag_inst_id = msg.ag_inst_id;
-
 	if (!('ag_inst_id' in msg) || !('ag_key' in msg) ||
 	    !('ag_dimension' in msg)) {
-		sendmsg.ag_status = 'enable_failed';
-		sendmsg.ag_error = 'missing field';
-		agg_cap.send(destkey, sendmsg);
+		agg_cap.sendCmdAckEnableAggFail(destkey, msg.ca_id,
+		    'missing field');
 		return;
 	}
 
@@ -116,22 +109,20 @@ function aggCmdEnableAggregation(msg)
 	 */
 	if (id in agg_insts) {
 		/* XXX check against key */
-		sendmsg.ag_status = 'enabled';
-		agg_cap.send(destkey, sendmsg);
+		agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 		return;
 	}
 
 	agg_cap.bind(datakey, function () {
-		agg_insts[id] = {
-		    agi_dimension: dimension,
-		    agi_since: new Date(),
-		    agi_sources: { sources: {}, nsources: 0 },
-		    agi_values: {},
-		    agi_last: 0,
-		    agi_requests: []
-		};
-		sendmsg.ag_status = 'enabled';
-		agg_cap.send(destkey, sendmsg);
+	    agg_insts[id] = {
+		agi_dimension: dimension,
+		agi_since: new Date(),
+		agi_sources: { sources: {}, nsources: 0 },
+		agi_values: {},
+		agi_last: 0,
+		agi_requests: []
+	    };
+	    agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 	});
 }
 
@@ -140,7 +131,7 @@ function aggCmdEnableAggregation(msg)
  */
 function aggCmdPing(msg)
 {
-	agg_cap.send(msg.ca_source, agg_cap.responseTemplate(msg));
+	agg_cap.sendCmdAckPing(msg.ca_source, msg.ca_id);
 }
 
 /*
@@ -148,7 +139,7 @@ function aggCmdPing(msg)
  */
 function aggCmdStatus(msg)
 {
-	var sendmsg = agg_cap.responseTemplate(msg);
+	var sendmsg = {};
 	var id, inst;
 
 	sendmsg.s_component = 'aggregator';
@@ -165,7 +156,7 @@ function aggCmdStatus(msg)
 		});
 	}
 
-	agg_cap.send(msg.ca_source, sendmsg);
+	agg_cap.sendCmdAckStatus(msg.ca_source, msg.ca_id, sendmsg);
 }
 
 /*
@@ -356,7 +347,7 @@ function aggHttpValueCommon(request, response, callback)
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst, now, when, record;
+	var inst, now, record, start, since, err;
 
 	if (!(fqid in agg_insts)) {
 		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
@@ -365,11 +356,36 @@ function aggHttpValueCommon(request, response, callback)
 
 	inst = agg_insts[fqid];
 	now = new Date().getTime();
-	when = parseInt(now / 1000, 10) - 2;
-	record = inst.agi_values[when];
+	if ('start_time' in request.ca_params) {
+		start = parseInt(request.ca_params['start_time'], 10);
+		since = parseInt(inst.agi_since.getTime() / 1000, 10);
+		err = {};
+		err.found = false;
+		if (isNaN(start)) {
+			err.found = true;
+			err.msg = 'start_time must be an integer';
+		} else if (start < since) {
+			err.found = true;
+			err.msg = 'start_time must be after instrumentation ' +
+			'began';
+		} else if (start > parseInt(now/1000, 10) +
+				agg_http_req_timeout) {
+			err.found = true;
+			err.msg = 'start_time is too far in the future';
+		}
+
+		if (err.found) {
+			response.send(HTTP.EBADREQUEST, err.msg);
+			return;
+		}
+	} else {
+		start = parseInt(now / 1000, 10) - 2;
+	}
+
+	record = inst.agi_values[start];
 
 	if (record && record.count == inst.agi_sources.nsources) {
-		callback(fqid, when, request, response);
+		callback(fqid, start, request, response);
 		return;
 	}
 
@@ -382,7 +398,7 @@ function aggHttpValueCommon(request, response, callback)
 	 */
 	inst.agi_requests.push({
 	    rqtime: now,
-	    datatime: when,
+	    datatime: start,
 	    request: request,
 	    response: response,
 	    callback: callback

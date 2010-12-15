@@ -62,12 +62,12 @@ function main()
 	cfg_log = new mod_log.caLog({ out: process.stdout });
 
 	amqp = new mod_caamqp.caAmqp({
-		broker: broker,
-		exchange: mod_ca.ca_amqp_exchange,
-		exchange_opts: mod_ca.ca_amqp_exchange_opts,
-		basename: mod_ca.ca_amqp_key_base_config,
-		hostname: hostname,
-		bindings: [ mod_ca.ca_amqp_key_config, 'ca.broadcast' ]
+	    broker: broker,
+	    exchange: mod_ca.ca_amqp_exchange,
+	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
+	    basename: mod_ca.ca_amqp_key_base_config,
+	    hostname: hostname,
+	    bindings: [ mod_ca.ca_amqp_key_config, 'ca.broadcast' ]
 	});
 	amqp.on('amqp-error', mod_caamqp.caAmqpLogError(cfg_log));
 	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
@@ -113,10 +113,7 @@ function main()
 
 function cfgStarted()
 {
-	var msg = {};
-	msg.ca_type = 'notify';
-	msg.ca_subtype = 'configsvc_online';
-	cfg_cap.send(mod_ca.ca_amqp_key_all, msg);
+	cfg_cap.sendNotifyCfgOnline(mod_ca.ca_amqp_key_all);
 }
 
 /*
@@ -352,12 +349,8 @@ function cfgHttpInstDelete(request, response)
 
 		instrumenter.ins_ninsts--;
 		delete (instrumenter.ins_insts[fqid]);
-		cfg_cap.send(instrumenter.ins_routekey, {
-		    ca_type: 'cmd',
-		    ca_subtype: 'disable_instrumentation',
-		    ca_id: fqid,
-		    is_inst_id: fqid
-		});
+		cfg_cap.sendCmdDisableInst(instrumenter.ins_routekey, fqid,
+			fqid);
 	}
 
 	delete (cfgInstrumentations(custid)[fqid]);
@@ -411,33 +404,16 @@ function cfgAggEnable(aggregator, id)
 {
 	var statkey = mod_ca.caKeyForInst(id);
 	var stattype = cfg_insts[id]['spec']['stattype'];
-	var msg = {};
-
-	msg.ca_id = id;
-	msg.ca_type = 'cmd';
-	msg.ca_subtype = 'enable_aggregation';
-	msg.ag_inst_id = id;
-	msg.ag_key = statkey;
-	msg.ag_dimension = stattype['dimension'];
-	cfg_cap.send(aggregator.cag_routekey, msg);
+	cfg_cap.sendCmdEnableAgg(aggregator.cag_routekey, id, id, statkey,
+	    stattype['dimension']);
 }
 
 function cfgInstEnable(instrumenter, id)
 {
 	var statkey = mod_ca.caKeyForInst(id);
 	var spec = cfg_insts[id]['spec'];
-	var msg = {};
-
-	msg.ca_id = id;
-	msg.ca_type = 'cmd';
-	msg.ca_subtype = 'enable_instrumentation';
-	msg.is_inst_key = statkey;
-	msg.is_inst_id = id;
-	msg.is_module = spec.modname;
-	msg.is_stat = spec.statname;
-	msg.is_predicate = [];
-	msg.is_decomposition = spec.decomp;
-	cfg_cap.send(instrumenter.ins_routekey, msg);
+	cfg_cap.sendCmdEnableInst(instrumenter.ins_routekey, id, id, statkey,
+	    spec);
 }
 
 function cfgCheckNewInstrumentation(id)
@@ -540,13 +516,13 @@ function cfgAckDisable(msg)
 
 function cfgCmdPing(msg)
 {
-	cfg_cap.send(msg.ca_source, cfg_cap.responseTemplate(msg));
+	cfg_cap.sendCmdAckPing(msg.ca_source, msg.ca_id);
 }
 
 function cfgCmdStatus(msg)
 {
 	var key, inst, agg;
-	var sendmsg = cfg_cap.responseTemplate(msg);
+	var sendmsg = {};
 
 	sendmsg.s_component = 'config';
 
@@ -569,7 +545,7 @@ function cfgCmdStatus(msg)
 		});
 	}
 
-	cfg_cap.send(msg.ca_source, sendmsg);
+	cfg_cap.sendCmdAckStatus(msg.ca_source, msg.ca_id, sendmsg);
 }
 
 function cfgNotifyAggregatorOnline(msg)

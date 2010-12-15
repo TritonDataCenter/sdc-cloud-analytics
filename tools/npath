@@ -1,0 +1,31 @@
+#!/bin/bash
+
+#
+# npath: determine NODE_PATH and print it out for use by different utilities
+#
+
+#
+# Find the root of the workspace assuming a fixed relative path to this script.
+#
+ws_arg0="$(dirname $0)"
+cd "$ws_arg0/.."
+ws_root=$(pwd)
+cd - > /dev/null
+
+#
+# For each subdir under 'lib' and 'deps', add it to NODE_PATH.  This isn't
+# pretty but it gets the job done.
+#
+for dir in $ws_root/lib/*; do
+	export NODE_PATH="$NODE_PATH:$ws_root/lib/$(basename $dir)"
+done
+
+for dir in $ws_root/deps/*; do
+	export NODE_PATH="$NODE_PATH:$ws_root/deps/$(basename $dir)"
+	export NODE_PATH="$NODE_PATH:$ws_root/deps/$(basename $dir)build/default"
+done
+
+export NODE_PATH="$NODE_PATH:$ws_root/deps/connect/lib"
+export NODE_PATH="$NODE_PATH:$ws_root/deps/node-heatmap/lib"
+
+echo "NODE_PATH=$NODE_PATH"

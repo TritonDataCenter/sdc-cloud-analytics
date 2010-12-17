@@ -278,7 +278,7 @@ function aggAggregateDistribution(map, key, newdist)
 		 * new data point wherever we are (which may be the end of the
 		 * old distribution).
 		 */
-		olddist.splice(oo - 1, 0, newdist[nn]);
+		olddist.splice(oo, 0, newdist[nn]);
 	}
 }
 

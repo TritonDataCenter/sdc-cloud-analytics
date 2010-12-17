@@ -1,0 +1,226 @@
+/*
+ * In this test we throw lots of bad HTTP requets/parameters to the Config
+ * service and expect to get back failures.
+ */
+var mod_assert = require('assert');
+var mod_tl = require('../../lib/tst/ca-test');
+var mod_ca = require('../../lib/ca/ca-common');
+
+var CFGSVC_PORT = 23181;
+
+var httpFail = function (errno, path)
+{
+	return (function (response) {
+		mod_assert.equal(response.statusCode, errno,
+		    mod_ca.caSprintf('Tried to access path: %s.\nExpected ' +
+			'return code %d, got %d.',
+			path, errno, response.statusCode));
+	});
+};
+
+function runRequest(obj, errno)
+{
+	var func = httpFail(errno, obj.path);
+	mod_tl.ctHttpRequest(obj, func);
+}
+
+/* Bad Paths */
+
+runRequest({
+    method: 'GET',
+    path: '/foobar/baz/blah',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/metric',
+    port: CFGSVC_PORT
+}, 404);
+
+/* Using missing customer ids */
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers//metrics',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers//instrumentations',
+    port: CFGSVC_PORT
+}, 404);
+
+/* Use paths we know that it shouldn't support */
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers/1/instrumentation/1/value',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers/1/instrumentation/1/value/raw',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers/1/instrumentation/1/value/heatmap',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentation/1/value',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentation/1/value/raw',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentation/1/value/heatmap',
+    port: CFGSVC_PORT
+}, 404);
+
+/* Specify non-existant instrumentation ids */
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentations/foobar',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentations/bmc',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentations/dap',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers/rm/instrumentations/23',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers/brendan/instrumentations/42',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentations/foobar',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentations/bmc',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/instrumentations/dap',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers/rm/instrumentations/23',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'GET',
+    path: '/ca/customers/brendan/instrumentations/42',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'DELETE',
+    path: '/ca/instrumentations/foobar',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'DELETE',
+    path: '/ca/instrumentations/bmc',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'DELETE',
+    path: '/ca/instrumentations/dap',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'DELETE',
+    path: '/ca/customers/rm/instrumentations/23',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'DELETE',
+    path: '/ca/customers/brendan/instrumentations/42',
+    port: CFGSVC_PORT
+}, 404);
+
+
+runRequest({
+    method: 'PUT',
+    path: '/ca/instrumentations/foobar',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'PUT',
+    path: '/ca/instrumentations/bmc',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'PUT',
+    path: '/ca/instrumentations/dap',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'PUT',
+    path: '/ca/customers/rm/instrumentations/23',
+    port: CFGSVC_PORT
+}, 404);
+
+runRequest({
+    method: 'PUT',
+    path: '/ca/customers/brendan/instrumentations/42',
+    port: CFGSVC_PORT
+}, 404);

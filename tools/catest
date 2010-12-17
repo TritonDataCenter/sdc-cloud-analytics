@@ -1,0 +1,356 @@
+#!/usr/bin/bash
+
+#
+# catest: a tool and framework for testing cloud analytics.
+#
+
+#
+# Test name format:
+# Tests can be in any language and should be of the format
+# tst.<testname>.<language ext>. Language extension tells us which interpreter
+# we will end up firing up to test this, i.e. shell, node, etc. Tests can be in
+# an arbitrary directory hierarchy 
+#
+
+#
+# Per test actions:
+# - Make a directory for that test
+# - cd into that directory and exec the test
+# - Redirect standard output and standard error to files
+# - Tests return 0 to indicate success, non-zero to indicate failure
+#
+
+#
+# Canoncial name
+#
+PNAME=$(basename $0)
+
+#
+# Should we keep the output of successful tests?
+#
+OPT_KEEP_SUCCESS=0
+
+#
+# Should we run all tests
+#
+OPT_RUN_ALL=0
+
+#
+# Output directory
+#
+OPT_OUTPUT_DIR=""
+
+#
+# Name for our restults directory
+#
+OUTPUT_DIR_NAME="catest.$$"
+
+#
+# Name of the top level directory containts tests
+#
+TST_DIR_NAME="tst"
+
+#
+# Tests that ran, but failed
+#
+CURRENT_FAILURES=0
+
+#
+#Tests that passed
+#
+CURRENT_PASSES=0
+
+#
+#Tests that could not run for some reason
+#
+CURRENT_ERRORS=0
+#
+# Total number of tests run
+#
+TESTS_RUN=0
+
+#
+# node relative path
+#
+NODE_REL="deps/node/node"
+
+#
+# Absolute path to the node executable
+# This is exported to the environment
+#
+NODE_EXEC=""
+
+#
+# Absolute path to the bash executable
+#
+BASH_EXEC="/usr/bin/bash"
+
+#
+# Populated via input arguments, is an absolute path
+#
+OUTPUT_BASE_DIR=""
+
+#
+# Populated via setup-output, is an absolute path
+#
+OUTPUT_DIR=""
+
+#
+# Populated via get-tests, is a series of absolute paths
+#
+TESTS=""
+
+#
+# Keep track of the hostname and export that env variable for these tests as a
+# fallback for those who don't set it themselves.
+#
+HOSTNAME=$(/usr/bin/hostname)
+export HOST=$HOSTNAME
+
+function fail
+{
+	echo "$@" >&2
+	exit 1
+}
+
+function usage
+{
+	if [[ $# -ne 0 ]]; then
+		echo "$PNAME: $@"
+	fi
+	cat <<USAGE >&2
+Usage: $PNAME -o dir [opts] tests
+
+Runs specified tests for cloud analytics.
+
+	-o directory	Specifies the output directory for tests
+	-a 		Runs all tests, ignores tests passed in
+	-h		Output this message
+	-k		Keep output from all tests, not just failures
+
+USAGE
+	exit 2
+}
+
+
+function setup
+{
+	base=$1
+	pushd "$base/../" >/dev/null
+	if [[ ! -f $NODE_REL || ! -x $NODE_REL ]]; then
+		fail "Node executable not at deps/node/node"
+	fi
+	NODE_EXEC="$(pwd)/$NODE_REL"
+	export NODE_EXEC=$NODE_EXEC
+	popd >/dev/null
+	pushd $base >/dev/null
+	export $(./npath)
+	popd >/dev/null
+	if [[ ! -f $BASH_EXEC || ! -x $BASH_EXEC ]]; then
+		fail "Missing bash executable at $BASH"
+	fi
+}
+
+function get-output-base
+{
+	pushd $1 >/dev/null
+	OUTPUT_BASE_DIR=$(pwd)
+	popd >/dev/null
+}
+
+#
+# Finds all of the tests that we are going to run
+#
+function get-all-tests
+{
+	base=$1
+	tst_root="$base/../$TST_DIR_NAME"
+	[[ -d $tst_root ]] || fail "Cannot find test directory"
+	pushd $tst_root >/dev/null
+	tst_root=$(pwd)
+	TESTS=$(find . -name 'tst.*.*')
+	[[ "TESTS" != "" ]] || fail "Found no tests to run"
+	popd >/dev/null
+
+	tmp=""
+	# Convert to absolute paths
+	for t in $TESTS; do
+		tmp="$tst_root/$t $tmp"
+	done;
+	TESTS=$tmp
+}
+
+function welcome
+{
+	sleeps=2
+	NUM_TESTS=$(echo $TESTS | wc -w)
+	printf "Welcome to catest\n"
+	printf "Configuration:\n"
+	printf "\tOutput Directory: $OUTPUT_BASE_DIR\n"
+	printf "\tNode executable: $NODE_EXEC\n"
+	printf "\tKeep non-failure output: $OPT_KEEP_SUCCESS\n"
+	printf "\tFound %d test(s) to run\n" $NUM_TESTS
+	printf "\n"
+	printf "Waiting %d seconds to begin testing, now is your chance to abort...\n" $sleeps
+	sleep $sleeps
+	printf "\n===================================================\n\n"
+}
+
+#
+# Make our output directory
+#
+function setup-output
+{
+	pushd $OUTPUT_BASE_DIR >/dev/null
+	mkdir $OUTPUT_DIR_NAME || fail "Can't make output directory"
+	cd $OUTPUT_DIR_NAME
+	OUTPUT_DIR=$(pwd)
+	popd >/dev/null
+}
+
+#
+# Executes a single test
+#
+function execute-test
+{
+	[[ $# -eq 1 ]] || fail "Missing test to execute"
+	test_path=$1
+	test_name=$(basename $1)
+	test_dir=$(dirname $1)
+	test_odir="$OUTPUT_DIR/test.$TESTS_RUN"
+	ext=$(echo $test_name | cut -d. -f 3)
+	EXEC=""
+
+	echo "Executing test: $test_name"
+
+	mkdir "$test_odir" >/dev/null || fail "Can't make directory"
+
+	pushd "$test_dir" >/dev/null
+	case "$ext" in
+	"sh")
+		EXEC=$BASH_EXEC	
+		;;
+	"js")
+		EXEC=$NODE_EXEC
+		;;
+	*)
+		;;
+	esac
+	
+	if [ "$EXEC" == "" ]; then
+		printf ">>>Unsupported test type: %s\n\n" $ext
+		result=2
+	elif $EXEC $test_name >$test_odir/stdout 2>$test_odir/stderr; then
+		result=0
+	else
+		result=1
+	fi
+
+	popd > /dev/null
+
+	case "$result" in
+	0) 
+		mv $test_odir "$OUTPUT_DIR/success.$CURRENT_PASSES"
+		((CURRENT_PASSES++))
+		;;
+	1)
+		printf ">>>Failure: details in failure.%d\n\n" $CURRENT_FAILURES
+		cp "$test_path" "$test_odir/test"
+		mv "$test_odir" "$OUTPUT_DIR/failure.$CURRENT_FAILURES"
+		((CURRENT_FAILURES++))
+		;;
+	2)
+		mv $test_odir "$OUTPUT_DIR/error.$CURRENT_ERRORS"
+		((CURRENT_ERRORS++))
+		;;
+	*)
+		 fail "Got unkown return value from execute-test"
+		;;
+	esac
+
+	return $result
+}
+
+#
+# Print out final numbers
+#
+function results
+{
+	printf "\n===================================================\n\n"
+	printf "Results:\n"
+	printf "\tTests passed:\t%d/%d\n" $CURRENT_PASSES $TESTS_RUN
+	printf "\tTests failed:\t%d/%d\n" $CURRENT_FAILURES $TESTS_RUN
+	printf "\tTests errored:\t%d/%d\n" $CURRENT_ERRORS $TESTS_RUN
+	printf "\n===================================================\n"
+}
+
+function cleanup
+{
+	if [ $OPT_KEEP_SUCCESS -eq 0 ]; then
+		pushd $OUTPUT_DIR >/dev/null
+		rm -rf success.*
+		rm -rf error.*
+		popd >/dev/null
+	fi
+}
+
+
+base=$(dirname $0)
+
+while getopts ":o:akh" c $@; do
+	case "$c" in
+	a) 
+		OPT_RUN_ALL=1
+		;;
+	k)
+		OPT_KEEP_SUCCESS=1
+		;;
+	o)
+		OPT_OUTPUT_DIR=$OPTARG	
+		;;
+	h)
+		usage
+		;;
+	:)
+		usage "option requires an argument -- $OPTARG"
+		;;
+	*)
+		echo "invalid option: $OPTARG"
+		;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+if [ "$OPT_OUTPUT_DIR" == "" ]; then
+	usage "output-dir not specified"
+fi
+
+if [ $# -eq 0 -a $OPT_RUN_ALL -eq 0 ]; then
+	usage "must specify tests to run or -a"
+fi
+
+setup $base
+get-output-base $OPT_OUTPUT_DIR
+
+if [ $OPT_RUN_ALL -eq 1 ]; then
+	get-all-tests $base
+else
+	for t in $@; do
+		[[ -f $t ]] || fail "cannot find test $t"
+		pushd $(dirname $t) >/dev/null
+		abs=$(pwd)
+		popd >/dev/null
+		TESTS="$abs/$(basename $t) $TESTS"
+	done
+fi
+
+welcome
+setup-output
+
+for t in $TESTS; do
+	execute-test $t
+	((TESTS_RUN++))
+done
+results
+cleanup

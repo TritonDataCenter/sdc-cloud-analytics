@@ -12,6 +12,7 @@ ROOT		 = $(BUILD)/root
 ROOT_CA		 = $(ROOT)/opt/smartdc/ca
 TOOLSDIR	 = tools
 JS_SUBDIRS	 = cmd lib
+TST_SUBDIRS	 = tst
 SRC		:= $(shell pwd)
 NODEDIR		:= $(SRC)/deps/node-install/bin
 
@@ -39,6 +40,7 @@ JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
 DEMO_FILES		:= $(shell find demo -type f)
 DEMO_DIRS		:= $(shell find demo -type d)
 WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
+TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
 SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 
 SMF_MANIFESTS = \
@@ -69,6 +71,7 @@ PKGDIRS_cabase := \
 	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)	\
 	$(PKGROOT)/cabase/lib			\
 	$(PKGROOT)/cabase/lib/ca		\
+	$(PKGROOT)/cabase/lib/tst		\
 	$(PKGROOT)/cabase/pkg			\
 	$(PKGROOT)/cabase/smf			\
 	$(PKGROOT)/cabase/smf/manifest		\
@@ -128,6 +131,7 @@ ROOT_DIRS = \
 	$(ROOT_CA)/deps/node-uname				\
 	$(ROOT_CA)/lib						\
 	$(ROOT_CA)/lib/ca					\
+	$(ROOT_CA)/lib/tst					\
 	$(ROOT_CA)/pkg						\
 	$(ROOT_CA)/smf						\
 	$(ROOT_CA)/smf/method					\
@@ -186,13 +190,13 @@ check-shell: $(SH_SCRIPTS)
 check-jsl: check-jsl-main check-jsl-web
 
 check-jsl-main:
-	$(JSL) --conf=$(JSL_CONF_MAIN) $(JS_FILES) $(DEMO_JSFILES)
+	$(JSL) --conf=$(JSL_CONF_MAIN) $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
 
 check-jsl-web:
 	$(JSL) --conf=$(JSL_CONF_WEB) $(WEBJS_FILES)
 
 check-jsstyle:
-	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES)
+	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 
 check: check-shell check-manifests check-jsstyle check-jsl
 	@echo check okay

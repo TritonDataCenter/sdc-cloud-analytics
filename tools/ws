@@ -21,7 +21,10 @@ for dir in $ws_root/lib/*; do
 done
 
 for dir in $ws_root/deps/*; do
-	export NODE_PATH="$NODE_PATH:$ws_root/deps/$(basename $dir)"
+	mod=$(basename $dir)
+	export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod"
+	[[ -d $ws_root/deps/$mod/build/default ]] &&
+		export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod/build/default"
 done
 
 export NODE_PATH="$NODE_PATH:$ws_root/deps/connect/lib"

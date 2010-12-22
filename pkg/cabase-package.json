@@ -1,0 +1,29 @@
+{
+	"name":		"cabase",
+	"description":	"Joyent Cloud Analytics Common Libraries",
+	"version":	"0.0.1-1",
+	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
+	"author":	"Joyent (joyent.com)",
+	"bin":		{
+		"caaggsvc":	"cmd/caaggsvc.js",
+		"caconfigsvc":	"cmd/caconfigsvc.js",
+		"cactl":	"cmd/cactl.js",
+		"cademo":	"demo/basicvis/cademo.js",
+		"cainstsvc":	"cmd/cainstsvc.js"
+	},
+	"scripts": {
+		"postactivate":		"pkg/pkg-postactivate.sh",
+		"postdeactivate":	"pkg/pkg-postdeactivate.sh"
+	},
+	"engines": {
+		"node":	">=0.2.4 <0.3.0"
+	},
+	"dependencies": {
+		"amqp": 	">=0.0.2",
+		"connect":	">=0.4.0",
+		"heatmap":	"*",
+		"kstat":	"*",
+		"libdtrace":	"*",
+		"png":		">=1.0.2"
+	}
+}

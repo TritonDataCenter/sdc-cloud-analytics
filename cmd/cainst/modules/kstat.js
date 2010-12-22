@@ -6,7 +6,7 @@ var ASSERT = require('assert');
 
 var mod_kstat = require('kstat');
 
-var mod_ca = require('ca');
+var mod_ca = require('../../../lib/ca/ca-common');
 
 var inskHostname;
 

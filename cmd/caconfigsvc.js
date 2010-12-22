@@ -7,12 +7,12 @@
 
 var mod_sys = require('sys');
 
-var mod_ca = require('ca');
-var mod_caamqp = require('ca-amqp');
-var mod_cap = require('ca-amqp-cap');
-var mod_cahttp = require('ca-http');
-var mod_log = require('ca-log');
-var HTTP = require('http-constants');
+var mod_ca = require('../lib/ca/ca-common');
+var mod_caamqp = require('../lib/ca/ca-amqp');
+var mod_cap = require('../lib/ca/ca-amqp-cap');
+var mod_cahttp = require('../lib/ca/ca-http');
+var mod_log = require('../lib/ca/ca-log');
+var HTTP = require('../lib/ca/http-constants');
 
 var cfg_http;			/* http server */
 var cfg_cap;			/* camqp CAP wrapper */
@@ -129,7 +129,6 @@ function cfgHttpRouter(server)
 
 	for (ii = 0; ii < infixes.length; ii++) {
 		base = cfg_http_baseuri + infixes[ii];
-		cfg_log.dbg('base = "%s"', base);
 		server.get(base + metrics, cfgHttpMetricsList);
 		server.get(base + instrumentations,
 		    cfgHttpInstrumentationsList);

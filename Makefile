@@ -7,11 +7,13 @@
 #
 BUILD		 = build
 DIST		 = $(BUILD)/dist
+PKGROOT		 = $(BUILD)/pkg
 ROOT		 = $(BUILD)/root
 ROOT_CA		 = $(ROOT)/opt/smartdc/ca
 TOOLSDIR	 = tools
 JS_SUBDIRS	 = cmd lib
 SRC		:= $(shell pwd)
+NODEDIR		:= $(SRC)/deps/node-install/bin
 
 #
 # Tools
@@ -23,7 +25,8 @@ JSSTYLE		 = $(TOOLSDIR)/jsstyle
 XMLLINT		 = xmllint --noout
 TAR		 = tar
 RMTREE		 = rm -rf
-NODE_WAF	:= $(SRC)/deps/node-install/bin/node-waf
+NODE_WAF	:= $(NODEDIR)/node-waf
+NPM		:= npm
 
 #
 # Files
@@ -33,6 +36,8 @@ JSL_CONF_WEB		 = tools/jsl_support/jsl.web.conf
 DEMO_JSFILES		 = demo/basicvis/cademo.js
 DEMO_WEBJSFILES		 = demo/basicvis/caflot.js demo/basicvis/caadmin.js
 JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
+DEMO_FILES		:= $(shell find demo -type f)
+DEMO_DIRS		:= $(shell find demo -type d)
 WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
 SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 
@@ -42,9 +47,51 @@ SMF_MANIFESTS = \
 	smf/manifest/smartdc-ca-cainstsvc.xml
 
 SH_SCRIPTS = \
-	smf/method/canodesvc	\
-	tools/cadeploy		\
+	pkg/pkg-postactivate.sh		\
+	pkg/pkg-postdeactivate.sh	\
+	smf/method/canodesvc		\
+	tools/cadeploy			\
 	tools/cadeploy-local
+
+PKGS		 = cabase
+PKG_TARBALLS	 = $(PKGS:%=$(PKGROOT)/%.tar.gz)
+
+PKGDIRS_cabase := \
+	$(PKGROOT)/cabase			\
+	$(PKGROOT)/cabase/cmd			\
+	$(PKGROOT)/cabase/cmd/cainst		\
+	$(PKGROOT)/cabase/cmd/cainst/modules	\
+	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)	\
+	$(PKGROOT)/cabase/lib			\
+	$(PKGROOT)/cabase/lib/ca		\
+	$(PKGROOT)/cabase/pkg			\
+	$(PKGROOT)/cabase/smf			\
+	$(PKGROOT)/cabase/smf/manifest		\
+	$(PKGROOT)/cabase/smf/method		\
+	$(PKGROOT)/cabase/tools
+
+PKGFILES_cabase = \
+	$(PKGROOT)/cabase/package.json			\
+	$(PKGROOT)/cabase/cmd/cactl.js			\
+	$(DEMO_FILES:%=$(PKGROOT)/cabase/%)		\
+	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
+	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
+	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
+	$(PKGROOT)/cabase/lib/ca			\
+
+DEPS_cabase = \
+	connect			\
+	node-amqp		\
+	node-heatmap		\
+	node-kstat		\
+	node-libdtrace		\
+	node-png
+
+PKGDEPS_cabase = $(DEPS_cabase:%=$(PKGROOT)/cabase/node_modules/%)
+
+PKG_DIRS := \
+	$(PKGROOT)		\
+	$(PKGDIRS_cabase)
 
 ROOT_DIRS = \
 	$(ROOT_CA)						\
@@ -64,6 +111,7 @@ ROOT_DIRS = \
 	$(ROOT_CA)/deps/node-png				\
 	$(ROOT_CA)/lib						\
 	$(ROOT_CA)/lib/ca					\
+	$(ROOT_CA)/pkg						\
 	$(ROOT_CA)/smf						\
 	$(ROOT_CA)/smf/method					\
 	$(ROOT_CA)/smf/manifest					\
@@ -145,11 +193,38 @@ xref: cscope.files
 .PHONY: cscope.files
 
 #
+# "pkg" target builds package tarball
+#
+pkg: $(PKG_TARBALLS)
+
+$(PKGROOT)/cabase.tar.gz: install-cabase
+	cd $(PKGROOT) && $(TAR) cf - cabase | gzip > cabase.tar.gz
+
+#
 # "install" target install files into the proto ("root") area
 #
-install: all install-rootdirs install-rootfiles install-deps
+install: all install-rootdirs install-rootfiles install-deps \
+    install-pkgs
 
 install-rootdirs: $(ROOT_DIRS)
+
+install-pkgdirs: $(PKG_DIRS)
+
+install-pkgs: install-cabase
+
+install-cabase: all install-pkgdirs $(PKGFILES_cabase) $(PKGDEPS_cabase)
+
+$(PKGROOT)/cabase/node_modules/%: deps/%
+	cd $(PKGROOT)/cabase && PATH=$$PATH:$(NODEDIR) $(NPM) bundle install $(SRC)/$^
+
+$(PKG_DIRS):
+	mkdir -p $(PKG_DIRS)
+
+$(PKGROOT)/cabase/%: %
+	cp $^ $@
+
+$(PKGROOT)/%/package.json: pkg/%-package.json
+	cp $^ $@
 
 $(ROOT_DIRS):
 	mkdir -p $(ROOT_DIRS)

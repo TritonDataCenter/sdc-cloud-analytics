@@ -2,7 +2,7 @@
  * cmd/cainst/modules/dtrace.js: DTrace Instrumenter backend
  */
 
-var mod_ca = require('ca');
+var mod_ca = require('../../../lib/ca/ca-common');
 var mod_dtrace = require('libdtrace');
 var mod_sys = require('sys');
 var ASSERT = require('assert');

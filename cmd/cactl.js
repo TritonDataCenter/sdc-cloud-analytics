@@ -2,10 +2,10 @@
  * cactl: poke and prod components of a Cloud Analytics instance
  */
 
-var mod_ca = require('ca');
-var mod_caamqp = require('ca-amqp');
-var mod_cap = require('ca-amqp-cap');
-var mod_log = require('ca-log');
+var mod_ca = require('../lib/ca/ca-common');
+var mod_caamqp = require('../lib/ca/ca-amqp');
+var mod_cap = require('../lib/ca/ca-amqp-cap');
+var mod_log = require('../lib/ca/ca-log');
 var mod_sys = require('sys');
 
 var cc_timeout_msec = 3 * 1000;		/* timeout after 3s */

@@ -2,13 +2,13 @@
  * caaggsvc: Cloud Analytics Aggregator/Retriever service
  */
 
-var mod_ca = require('ca');
-var mod_caamqp = require('ca-amqp');
-var mod_cap = require('ca-amqp-cap');
-var mod_cahttp = require('ca-http');
-var mod_log = require('ca-log');
+var mod_ca = require('../lib/ca/ca-common');
+var mod_caamqp = require('../lib/ca/ca-amqp');
+var mod_cap = require('../lib/ca/ca-amqp-cap');
+var mod_cahttp = require('../lib/ca/ca-http');
+var mod_log = require('../lib/ca/ca-log');
 var mod_heatmap = require('heatmap');
-var HTTP = require('http-constants');
+var HTTP = require('../lib/ca/http-constants');
 var ASSERT = require('assert');
 
 var agg_name = 'aggsvc';		/* component name */

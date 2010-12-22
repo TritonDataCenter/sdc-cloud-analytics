@@ -18,6 +18,8 @@ deps 	library dependencies (see below)
 
 lib 	source files implementing library code, shared by multiple consumers
 
+pkg	npm packaging metadata and scripts
+
 tools 	miscellaneous tools, including:
 		jsl - javascript lint
 		jsstyle - javascript style checker based on OpenSolaris's cstyle
@@ -33,6 +35,7 @@ installed already on both development and test machines:
 	o python (for jsl only)
 	o perl (for jsstyle only)
 	o libpng
+	o npm (for building packages)
 
 The project also depends on the following bundled components:
 
@@ -61,38 +64,13 @@ node-libdtrace will build on both Solaris and MacOS.  The kstat and libdtrace
 native libraries are only used by the instrumenter component.
 
 
-RUNNING THE CODE
-
-To run commands for testing, you can use:
-
-	# tools/ws
-	# node cmd/<source>.js
-
-The "ws" tool takes care of setting NODE_PATH appropriately to include all of
-our dependencies.
-
-If you find it more convenient to let SMF manage these services, or if you need
-to run on a different system (e.g., because you're developing on a local zone
-but want to run in a global zone), use tools/cadeploy to deploy to HOST:
-
-	# gmake dist
-	# tools/cadeploy -s agg -s cfg -s inst -h HOST -f build/dist/dist.tar.gz
-
-This will copy the production files to /opt/smartdc/ca on the target system and
-import SMF services (smartdc/ca/ca*svc) for each of the configuration,
-aggregator, and instrumenter services.  You can rerun the same command to update
-the services running on the remote system.
-
-Remember to install libpng on the target system.
-
-
 DEMO
 
-Try the 'basicvis' demo:
+If you're not sure what to run first, try the 'basicvis' demo:
 
-- Use the above steps to deploy to a system (e.g., COAL-S or COAL-147).  Update
-  demo/basicvis/caflot.js to point to the system you're running the
-  configuration and aggregator services on, and then run:
+- Use the steps under "Running the Code" below to deploy to a system (e.g.,
+  COAL-S or COAL-147).  Update demo/basicvis/caflot.js to point to the system
+  you're running the configuration and aggregator services on, and then run:
 
 	# node demo/basicvis/cademo.js
 
@@ -100,7 +78,54 @@ Try the 'basicvis' demo:
   http://HOST:23183/ where HOST is the system where you're running the demo.
 
 - You should be able to create and delete graphs for the stats already
-  supported, including scalars, decompositions, and heatmaps.  Enjoy!
+  supported, including scalars, decompositions, and heatmaps.
+
+
+RUNNING THE CODE
+
+To actually run code, you have three options:
+
+(1) The most flexible method (typically used for development and testing) is to
+    invoke:
+
+	# tools/ws
+	# node cmd/<source>.js
+
+    The "ws" tool takes care of setting NODE_PATH appropriately to include all of
+    our dependencies.  You can choose exactly what you need to run.
+
+(2) If you find it more convenient to let SMF manage these services, or if you
+    need to run on a different system (e.g., because you're developing on a
+    local zone but want to run in a global zone), you can use tools/cadeploy to
+    deploy services to HOST:
+
+	# gmake dist
+	# tools/cadeploy -s agg -s cfg -s inst -h HOST -f build/dist/dist.tar.gz
+
+    This will copy the production files to /opt/smartdc/ca on the target system
+    and import SMF services (smartdc/ca/ca*svc) for each of the configuration,
+    aggregator, and instrumenter services.  You can rerun the same command to
+    update the services running on the remote system.
+    
+    Remember to install libpng on the target system before doing this.
+
+(3) When we actually start deploying this on CoaL and production systems, we'll
+    be using npm packages.  This method will supersede the above deployment
+    tool but it's not yet complete.  To use it:
+
+    	# gmake pkg
+	# scp build/pkg/cabase.tar.gz ...
+	
+	Then, wherever you copied the tarball:
+
+	# npm install /path/to/cabase.tar.gz
+
+    The only currently available package is "cabase", which delivers all of the
+    code and SMF manifests, as well as "binaries" into your path to invoke the
+    various commands and tools (including each of the three services).  In the
+    future, we will have an additional package for each separately-deployed
+    service.  These packages will depend on "cabase" and simply manage SMF
+    services.
 
 
 NOTES
@@ -109,7 +134,7 @@ All of the interfaces here including command names, arguments, tools, services,
 paths, ports, and properties are Unstable and subject to change.
 
 Checked in code should be lint-clean, jsstyle-clean, and code reviewed.  Each
-line on a commit comment should contain a JIRA ticket number and description
+line in a commit comment should contain a JIRA ticket number and description
 and nothing else.
 
 The "jsl" implementation here assumes a Solaris environment and several

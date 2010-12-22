@@ -80,12 +80,12 @@ PKGFILES_cabase = \
 	$(PKGROOT)/cabase/lib/ca			\
 
 DEPS_cabase = \
-	connect			\
-	node-amqp		\
-	node-heatmap		\
-	node-kstat		\
-	node-libdtrace		\
-	node-png
+	amqp		\
+	connect		\
+	heatmap		\
+	kstat		\
+	libdtrace	\
+	png
 
 PKGDEPS_cabase = $(DEPS_cabase:%=$(PKGROOT)/cabase/node_modules/%)
 
@@ -215,6 +215,9 @@ install-pkgs: install-cabase
 install-cabase: all install-pkgdirs $(PKGFILES_cabase) $(PKGDEPS_cabase)
 
 $(PKGROOT)/cabase/node_modules/%: deps/%
+	cd $(PKGROOT)/cabase && PATH=$$PATH:$(NODEDIR) $(NPM) bundle install $(SRC)/$^
+
+$(PKGROOT)/cabase/node_modules/%: deps/node-%
 	cd $(PKGROOT)/cabase && PATH=$$PATH:$(NODEDIR) $(NPM) bundle install $(SRC)/$^
 
 $(PKG_DIRS):

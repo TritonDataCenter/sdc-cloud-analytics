@@ -13,16 +13,15 @@ ws_root=$(pwd)
 cd - > /dev/null
 
 #
-# For each subdir under 'lib' and 'deps', add it to NODE_PATH.  This isn't
-# pretty but it gets the job done.
+# For each subdir under deps', add it to NODE_PATH.  This isn't pretty but it
+# gets the job done.
 #
-for dir in $ws_root/lib/*; do
-	export NODE_PATH="$NODE_PATH:$ws_root/lib/$(basename $dir)"
-done
 
 for dir in $ws_root/deps/*; do
-	export NODE_PATH="$NODE_PATH:$ws_root/deps/$(basename $dir)"
-	export NODE_PATH="$NODE_PATH:$ws_root/deps/$(basename $dir)build/default"
+	mod=$(basename $dir)
+	export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod"
+	[[ -d $ws_root/deps/$mod/build/default ]] &&
+		export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod/build/default"
 done
 
 export NODE_PATH="$NODE_PATH:$ws_root/deps/connect/lib"

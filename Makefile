@@ -275,6 +275,22 @@ $(DIST)/dist.tar.gz: install
 	(cd $(ROOT) && $(TAR) cf - *) | gzip > $(DIST)/dist.tar.gz
 
 #
+# The "release" target creates a ca.tar.bz2 suitable for release to the
+# head-node. To formally release this, it should be copied to assets.joyent.us
+# and placed into the /data/assets/templates/liveimg directory.  (Access
+# assets.joyent.us via the user "jill", for which access is exclusively via
+# authorized ssh key.)  That is, to formally release it, from build/dist:
+#
+#     scp ca.tar.bz2 jill@assets.joyent.us:/data/assets/templates/liveimg
+#
+# Subsequent head-node builds will then pick up the new release.
+#
+release: $(DIST) $(DIST)/ca.tar.bz2
+
+$(DIST)/ca.tar.bz2: install
+	(cd $(BUILD) && $(TAR) cf - root) | bzip2 > $(DIST)/ca.tar.bz2
+
+#
 # "clean" target removes created files -- we currently have none
 #
 clean:

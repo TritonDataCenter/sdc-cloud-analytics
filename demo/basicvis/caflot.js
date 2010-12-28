@@ -1,7 +1,8 @@
 /*
- * caflot.js: flot-based visualization of CA metrics for demo
+ * caflot.js: flot-based visualization of CA metrics for demo purposes.
+ * Note that variables declared here may be overwritten by cademo.js via the
+ * pseudo-file cavars.js (included after caflot.js in graph.htm).
  */
-
 var gServer = window.location.hostname;
 
 var gPortConfigsvc = 23181;	/* config service HTTP port */

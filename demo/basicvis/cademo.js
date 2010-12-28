@@ -10,11 +10,25 @@ var mod_fs = require('fs');
 var dd_index = 'graph.htm';
 var dd_cwd = __dirname;
 var dd_port = 23183;
+var dd_vars = [];
+
+if (process.argv.length > 2) {
+	var server = process.argv[2];
+
+	console.log('Cloud analytics server set to ' + server);
+	dd_vars.push('gServer = "' + server + '"');
+}
 
 mod_http.createServer(function (req, res) {
 	var uri = mod_url.parse(req.url).pathname;
 	var path;
 	var filename;
+
+	if (uri == '/cavars.js') {
+		res.writeHead(200);
+		res.end(dd_vars.join('\n'));
+		return;
+	}
 
 	path = (uri == '/') ? dd_index : uri;
 	filename = mod_path.join(dd_cwd, path);

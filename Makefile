@@ -44,7 +44,8 @@ SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 SMF_MANIFESTS = \
 	smf/manifest/smartdc-ca-caconfigsvc.xml 	\
 	smf/manifest/smartdc-ca-caaggsvc.xml		\
-	smf/manifest/smartdc-ca-cainstsvc.xml
+	smf/manifest/smartdc-ca-cainstsvc.xml		\
+	smf/manifest/cainstsvc.xml
 
 SH_SCRIPTS = \
 	pkg/pkg-postactivate.sh		\
@@ -53,7 +54,11 @@ SH_SCRIPTS = \
 	tools/cadeploy			\
 	tools/cadeploy-local
 
-PKGS		 = cabase
+SVC_SCRIPTS = \
+	pkg/pkg-svc-postactivate.sh	\
+	pkg/pkg-svc-postdeactivate.sh
+
+PKGS		 = cabase cainstsvc
 PKG_TARBALLS	 = $(PKGS:%=$(PKGROOT)/%.tar.gz)
 
 PKGDIRS_cabase := \
@@ -72,12 +77,13 @@ PKGDIRS_cabase := \
 
 PKGFILES_cabase = \
 	$(PKGROOT)/cabase/package.json			\
+	$(PKGROOT)/cabase/cmd/node			\
 	$(PKGROOT)/cabase/cmd/cactl.js			\
 	$(DEMO_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
-	$(PKGROOT)/cabase/lib/ca			\
+	$(PKGROOT)/cabase/lib/ca
 
 DEPS_cabase = \
 	amqp		\
@@ -89,9 +95,17 @@ DEPS_cabase = \
 
 PKGDEPS_cabase = $(DEPS_cabase:%=$(PKGROOT)/cabase/node_modules/%)
 
+PKGDIRS_cainstsvc := \
+	$(PKGROOT)/cainstsvc/pkg
+
+PKGFILES_cainstsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/cainstsvc/%)		\
+	$(PKGROOT)/cainstsvc/package.json
+
 PKG_DIRS := \
 	$(PKGROOT)		\
-	$(PKGDIRS_cabase)
+	$(PKGDIRS_cabase)	\
+	$(PKGDIRS_cainstsvc)
 
 ROOT_DIRS = \
 	$(ROOT_CA)						\
@@ -200,6 +214,9 @@ pkg: $(PKG_TARBALLS)
 $(PKGROOT)/cabase.tar.gz: install-cabase
 	cd $(PKGROOT) && $(TAR) cf - cabase | gzip > cabase.tar.gz
 
+$(PKGROOT)/cainstsvc.tar.gz: install-cainstsvc
+	cd $(PKGROOT) && $(TAR) cf - cainstsvc | gzip > cainstsvc.tar.gz
+
 #
 # "install" target install files into the proto ("root") area
 #
@@ -214,6 +231,8 @@ install-pkgs: install-cabase
 
 install-cabase: all install-pkgdirs $(PKGFILES_cabase) $(PKGDEPS_cabase)
 
+install-cainstsvc: install-cabase $(PKGFILES_cainstsvc) $(PKGDEPS_cainstsvc)
+
 $(PKGROOT)/cabase/node_modules/%: deps/%
 	cd $(PKGROOT)/cabase && PATH=$$PATH:$(NODEDIR) $(NPM) bundle install $(SRC)/$^
 
@@ -223,7 +242,13 @@ $(PKGROOT)/cabase/node_modules/%: deps/node-%
 $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)
 
+$(PKGROOT)/cabase/cmd/node: deps/node/node
+	cp $^ $@
+
 $(PKGROOT)/cabase/%: %
+	cp $^ $@
+
+$(PKGROOT)/cainstsvc/%: %
 	cp $^ $@
 
 $(PKGROOT)/%/package.json: pkg/%-package.json

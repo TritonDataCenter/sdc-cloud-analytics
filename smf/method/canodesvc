@@ -57,7 +57,7 @@ ns_exec=cmd/$ns_name.js
 # Set up NODE_PATH properly for our dependencies.
 #
 NODE_PATH=
-for subdir in lib/* deps/*; do
+for subdir in node_modules lib/* deps/*; do
 	[[ -d $subdir ]] || continue
 	NODE_PATH="$NODE_PATH:$ns_root/$subdir"
 done

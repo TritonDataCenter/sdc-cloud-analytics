@@ -5,11 +5,7 @@
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",
 	"bin":		{
-		"caaggsvc":	"cmd/caaggsvc.js",
-		"caconfigsvc":	"cmd/caconfigsvc.js",
 		"cactl":	"cmd/cactl.js",
-		"cademo":	"demo/basicvis/cademo.js",
-		"cainstsvc":	"cmd/cainstsvc.js"
 	},
 	"scripts": {
 		"postactivate":		"pkg/pkg-postactivate.sh",

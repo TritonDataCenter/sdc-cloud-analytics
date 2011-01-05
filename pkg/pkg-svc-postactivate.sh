@@ -7,21 +7,29 @@ function fatal
 }
 
 #
-# This is a little grotty, but we're going to reach into cabase and pull the
-# manifest to the SMF directory.
+# This is a little grotty, but we're going to reach into cabase (via our
+# dependencies) and pull the manifest into the SMF directory -- processing
+# it along the way to reflect the path of both cabase and the directory in
+# which we're being installed.
 #
 svc=${npm_package_name}
 manifest=${svc}.xml
-pkg=${npm_config_root}/.npm/cabase/active/package
+pkg=${npm_config_root}/.npm/${npm_package_name}/${npm_package_version}
+cabase=`echo ${pkg}/dependson/cabase@*/package`
 
-cp ${pkg}/smf/manifest/${manifest} $npm_config_smfdir || \
-     fatal "could not copy $pkg/smf/manifest/$manifest to $npm_config_smfdir"
+export CABASE_DIR=$cabase
+export BASE_DIR=$npm_config_agent_root
 
-manifest=${npm_config_smfdir}/${manifest}
+src=${cabase}/smf/manifest/${manifest}
+dest=${npm_config_smfdir}/${manifest}
 
-fmri=`svccfg inventory ${manifest} | grep ':default'`
+sed -e "s#@@CABASE_DIR@@#$CABASE_DIR#g" \
+    -e "s#@@BASE_DIR@@#$BASE_DIR#g" \
+    $src > $dest || fatal "could not process $src to $dest"
 
-svccfg import ${manifest} || fatal "could not import ${manifest}"
+fmri=`svccfg inventory ${dest} | grep ':default'`
+
+svccfg import ${dest} || fatal "could not import ${dest}"
 svcadm enable -s $fmri || fatal "could not enable $fmri"
 
 exit 0

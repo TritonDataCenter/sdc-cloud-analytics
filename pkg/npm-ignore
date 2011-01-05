@@ -1,0 +1,13 @@
+#
+# This file will be pruned of comments, and become the .npmignore file in
+# the cabase package.  This file is necessary because without it, npm will
+# use the default .npmignore disposition on an "npm publish" -- which
+# is to ignore build/ subdirectories.  This, in turn, is a problem because
+# ignoring the build subdirectories strips the module of the compiled add-ons
+# (i.e., binaries) that are needed for the module to function properly.
+#
+.lock-wscript
+.svn
+.hg
+.git
+CVS

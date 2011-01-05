@@ -77,6 +77,7 @@ PKGDIRS_cabase := \
 
 PKGFILES_cabase = \
 	$(PKGROOT)/cabase/package.json			\
+	$(PKGROOT)/cabase/.npmignore			\
 	$(PKGROOT)/cabase/cmd/node			\
 	$(PKGROOT)/cabase/cmd/cactl.js			\
 	$(DEMO_FILES:%=$(PKGROOT)/cabase/%)		\
@@ -253,6 +254,9 @@ $(PKGROOT)/cainstsvc/%: %
 
 $(PKGROOT)/%/package.json: pkg/%-package.json
 	cp $^ $@
+
+$(PKGROOT)/%/.npmignore: pkg/npm-ignore
+	grep -v ^# $^ > $@
 
 $(ROOT_DIRS):
 	mkdir -p $(ROOT_DIRS)

@@ -2,11 +2,12 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 
 <!-- 
-  This manifest is only used by the NPM package for cainstsvc.  It hardcodes
-  paths related to agent management, and when a better mechanism is
-  available (e.g., templating a manifest or dynamically modifying a new
-  service with svccfg), this manifest should be changed to use it, and
-  unified with its sibling, smartdc-ca-cainstsvc.xml.
+  This manifest is only used by the NPM package for cainstsvc.  It relies on
+  several fields being filled in dynamically via the post-activate script
+  (these fields are delimited with '@@').  When a better and/or more generic
+  mechanism is available (e.g., generic templating of a manifest or dynamically
+  modifying a new service with svccfg), this manifest should be changed to use
+  it, and unified with its sibling, smartdc-ca-cainstsvc.xml.
   -->
 
 <service_bundle type="manifest" name="smartdc-ca-cainstsvc">
@@ -19,16 +20,16 @@
 	<service_fmri value="svc:/system/filesystem/local" />
 </dependency>
 
-<exec_method type="method" name="start" exec="/opt/agents/modules/.npm/cabase/active/package/smf/method/canodesvc" timeout_seconds="10" />
+<exec_method type="method" name="start" exec="@@CABASE_DIR@@/smf/method/canodesvc" timeout_seconds="10" />
 <exec_method type="method" name="stop" exec=":kill" timeout_seconds="10" />
 
 <instance name="default" enabled="true">
 	<property_group name="com.joyent.ca,caconfig" type="application">
 		<propval name="amqp-mode" type="astring" value="host" />
 		<propval name="amqp-host" type="astring" value="10.99.99.5" />
-		<propval name="path-logs" type="astring" value="/opt/agents/log/ca" />
-		<propval name="path-node" type="astring" value="/opt/agents/modules/.npm/cabase/active/package/cmd/node" />
-		<propval name="path-dist" type="astring" value="/opt/agents/modules/.npm/cabase/active/package" />
+		<propval name="path-logs" type="astring" value="@@BASE_DIR@@/log/ca" />
+		<propval name="path-node" type="astring" value="@@CABASE_DIR@@/cmd/node" />
+		<propval name="path-dist" type="astring" value="@@CABASE_DIR@@" />
 	</property_group>
 </instance>
 

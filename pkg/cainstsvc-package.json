@@ -1,7 +1,7 @@
 {
 	"name":		"cainstsvc",
 	"description":	"Joyent Cloud Analytics Instrumenter Service",
-	"version":	"0.0.1-1",
+	"version":	"0.0.2-1",
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",
 	"scripts": {
@@ -12,6 +12,6 @@
 		"node":	">=0.2.4 <0.3.0"
 	},
 	"dependencies": {
-		"cabase": 	"*"
+		"cabase": 	"1.x"
 	}
 }

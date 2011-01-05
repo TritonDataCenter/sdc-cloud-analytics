@@ -6,4 +6,5 @@
 
 cd $(dirname $0)
 export $(./npath)
+cd - > /dev/null
 exec $SHELL

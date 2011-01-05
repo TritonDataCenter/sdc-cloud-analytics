@@ -733,7 +733,13 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 			mod_heatmap.deduct(datasets[0], datasets[ii]);
 	}
 
-	ASSERT.ok(hues.length == datasets.length);
+	/*
+	 * We can have more than the expected number of hues here because we
+	 * won't always have entries for an empty dataset or because the user
+	 * simply provided more hues than were necessary.
+	 */
+	ASSERT.ok(hues.length >= datasets.length);
+	hues = hues.slice(0, datasets.length);
 	mod_heatmap.normalize(datasets, conf);
 
 	conf.hue = hues;

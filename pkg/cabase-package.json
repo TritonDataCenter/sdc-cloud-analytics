@@ -20,6 +20,7 @@
 		"heatmap":	"*",
 		"kstat":	"*",
 		"libdtrace":	"*",
-		"png":		">=1.0.2"
+		"png":		">=1.0.2",
+		"uname":	"*"
 	}
 }

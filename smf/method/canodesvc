@@ -18,7 +18,6 @@ function getprop
 }
 
 ns_arg0=$(basename $0)
-ns_hostname=$(hostname)
 ns_root="$(getprop caconfig/path-dist)"
 ns_node="$(getprop caconfig/path-node)"
 ns_logbase="$(getprop caconfig/path-logs)"
@@ -71,5 +70,5 @@ export NODE_PATH
 mkdir -p "$ns_logbase/$ns_name" || fail "failed to create log directory"
 ns_logfile="$ns_logbase/$ns_name/$(date +%F.%T)"
 smf_clear_env
-HOST=$ns_hostname $ns_node $ns_exec $ns_logfile $ns_args &
+$ns_node $ns_exec $ns_logfile $ns_args &
 exit $SMF_EXIT_OK

@@ -19,3 +19,6 @@
 [submodule "deps/connect"]
 	path = deps/connect
 	url = git://github.com/senchalabs/connect.git
+[submodule "deps/node-uname"]
+	path = deps/node-uname
+	url = git://github.com/davepacheco/node-uname.git

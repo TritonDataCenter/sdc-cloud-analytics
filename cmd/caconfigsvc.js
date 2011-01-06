@@ -54,7 +54,7 @@ var cfg_global_insts = {};	/* global (non-customer) insts */
 function main()
 {
 	var http_port = cfg_http_port;
-	var broker = mod_ca.ca_amqp_default_broker;
+	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
 	var hostname = sysinfo.ca_hostname;
 	var amqp;

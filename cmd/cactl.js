@@ -38,7 +38,7 @@ function main()
 	if (process.argv.length <= 2)
 		usage();
 
-	var broker = mod_ca.ca_amqp_default_broker;
+	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo('cactl', '0.1');
 	var hostname = sysinfo.ca_hostname+ '.' + process.pid;
 	var log = new mod_log.caLog({ out: process.stdout });

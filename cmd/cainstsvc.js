@@ -21,7 +21,7 @@ var stdout = process.stdout;
 
 function main()
 {
-	var broker = mod_ca.ca_amqp_default_broker;
+	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(ins_name, ins_vers);
 	var hostname = sysinfo.ca_hostname;
 	var amqp;

@@ -26,7 +26,7 @@ var agg_log;			/* log handle */
 function main()
 {
 	var http_port = agg_http_port;
-	var broker = mod_ca.ca_amqp_default_broker;
+	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
 	var hostname = sysinfo.ca_hostname;
 	var amqp;

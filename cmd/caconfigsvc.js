@@ -28,6 +28,10 @@ var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
 
+var cfg_retain_min = 10;		/* max data retention time: 10 sec */
+var cfg_retain_max = 10 * 60 * 60;	/* max data retention time: 1 hour */
+var cfg_retain_default = 10 * 60;	/* default data retention: 10 min */
+
 /*
  * The following constants and data structures manage active instrumentations.
  * Each instrumentation is either global or associated with a particular
@@ -248,6 +252,10 @@ function cfgHttpInstCreate(request, response)
 	aggregator.cag_ninsts++;
 
 	cfg_insts[fqid] = {
+		options: {
+		    enabled: true,
+		    'retention-time': cfg_retain_default
+		},
 		agg_result: undefined,
 		insts_failed: 0,
 		insts_ok: 0,
@@ -362,24 +370,46 @@ function cfgHttpInstSetOptions(request, response)
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var options;
+	var inst, retain, options;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
 		return;
 	}
 
-	if (response.ca_json === undefined) {
+	inst = cfg_insts[fqid];
+
+	if (request.ca_json === undefined) {
 		response.send(HTTP.EBADREQUEST, 'no JSON specified');
 		return;
 	}
 
 	/* Validate and apply options, if we supported any. */
-	options = response.ca_json;
-	if (options.enabled !== undefined) {
-		if (options.enabled !== true)
+	options = request.ca_json;
+	if (options.constructor !== Object) {
+		response.send(HTTP.EBADREQUEST, 'invalid options');
+		return;
+	}
+
+	if ('enabled' in options && options['enabled'] !== true) {
+		response.send(HTTP.EBADREQUEST,
+		    'unsupported value for "enabled"');
+		return;
+	}
+
+	if ('retention-time' in options) {
+		retain = parseInt(options['retention-time'], 10);
+		if (isNaN(retain))
 			response.send(HTTP.EBADREQUEST,
-			    'unsupported value for "enabled"');
+			    'unsupported value for "retention-time"');
+		retain = Math.max(retain, cfg_retain_min);
+		retain = Math.min(retain, cfg_retain_max);
+	}
+
+	if (retain != inst.options['retention-time']) {
+		inst.options['retention-time'] = retain;
+		cfgAggEnable(inst.aggregator, fqid);
+		/* XXX wait for response? */
 	}
 
 	cfgHttpInstGetOptions(request, response);
@@ -396,7 +426,7 @@ function cfgHttpInstGetOptions(request, response)
 		return;
 	}
 
-	response.send(HTTP.OK, { enabled: true });
+	response.send(HTTP.OK, cfg_insts[fqid]['options']);
 }
 
 function cfgAggEnable(aggregator, id)
@@ -404,7 +434,7 @@ function cfgAggEnable(aggregator, id)
 	var statkey = mod_ca.caKeyForInst(id);
 	var stattype = cfg_insts[id]['spec']['stattype'];
 	cfg_cap.sendCmdEnableAgg(aggregator.cag_routekey, id, id, statkey,
-	    stattype['dimension']);
+	    stattype['dimension'], cfg_insts[id]['options']);
 }
 
 function cfgInstEnable(instrumenter, id)

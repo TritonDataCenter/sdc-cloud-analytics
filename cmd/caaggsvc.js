@@ -18,6 +18,7 @@ var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
 var agg_http_baseuri = '/ca/';
 
 var agg_insts = {};		/* active instrumentations by id */
+var agg_default_options = { 'enabled': true, 'retention-time': 600 };
 
 var agg_http;
 var agg_cap;			/* cap wrapper */
@@ -109,6 +110,8 @@ function aggCmdEnableAggregation(msg)
 	 */
 	if (id in agg_insts) {
 		/* XXX check against key */
+		agg_insts[id].agi_options = msg.ag_options ||
+		    agg_default_options;
 		agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 		return;
 	}
@@ -120,7 +123,8 @@ function aggCmdEnableAggregation(msg)
 		agi_sources: { sources: {}, nsources: 0 },
 		agi_values: {},
 		agi_last: 0,
-		agi_requests: []
+		agi_requests: [],
+		agi_options: msg.ag_options || agg_default_options
 	    };
 	    agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 	});
@@ -772,11 +776,11 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 }
 
 /*
- * Invoked once/second to time out old HTTP requests.
+ * Invoked once/second to time out old HTTP requests and expire old data.
  */
 function aggTick()
 {
-	var id, inst, ii, rq;
+	var id, inst, ii, rq, when;
 	var now = new Date().getTime();
 
 	for (id in agg_insts) {
@@ -791,6 +795,13 @@ function aggTick()
 				rq.callback(id, rq.datatime, rq.request,
 				    rq.response);
 			}
+		}
+
+		for (when in inst.agi_values) {
+			if (inst.agi_options['retention-time'] > 0 &&
+			    now - (when * 1000) >
+			    inst.agi_options['retention-time'] * 1000)
+				delete (inst.agi_values[when]);
 		}
 	}
 

@@ -11,7 +11,7 @@
   -->
 
 <service_bundle type="manifest" name="smartdc-ca-cainstsvc">
-<service name="site/ca/cainstsvc" type="service" version="1">
+<service name="smartdc/agent/ca/cainstsvc" type="service" version="1">
 
 <dependency name="network" grouping="require_all" restart_on="error" type="service">
 	<service_fmri value="svc:/network/physical" />

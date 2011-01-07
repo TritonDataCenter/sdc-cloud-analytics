@@ -6,17 +6,20 @@
  */
 
 var mod_sys = require('sys');
+var ASSERT = require('assert');
 
 var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
 var mod_log = require('../lib/ca/ca-log');
+var mod_mapi = require('../lib/ca/ca-mapi');
 var HTTP = require('../lib/ca/http-constants');
 
 var cfg_http;			/* http server */
 var cfg_cap;			/* camqp CAP wrapper */
 var cfg_log;			/* log handle */
+var cfg_mapi;			/* mapi handle */
 
 var cfg_name = 'configsvc';	/* component name */
 var cfg_vers = '0.0';		/* component version */
@@ -59,6 +62,7 @@ function main()
 {
 	var http_port = cfg_http_port;
 	var broker = mod_ca.caBroker();
+	var mapi = mod_ca.caMapiConfig();
 	var sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
 	var hostname = sysinfo.ca_hostname;
 	var amqp;
@@ -104,6 +108,14 @@ function main()
 	cfg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
 	cfg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
 	cfg_log.info('%-12s Port %d', 'HTTP server:', http_port);
+
+	if (mapi) {
+		cfg_log.info('%-12s %s:%s', 'MAPI host:', mapi.host, mapi.port);
+		cfg_mapi = new mod_mapi.caMapi(mapi);
+	} else {
+		cfg_log.warn('MAPI_HOST, MAPI_PORT, MAPI_USER, or ' +
+		    'MAPI_PASSWORD not set.  Per-customer use disabled.');
+	}
 
 	amqp.start(function () {
 		cfg_log.info('AMQP broker connected.');
@@ -200,9 +212,7 @@ function cfgInstrumentationsListCustomer(rv, insts, custid)
 function cfgHttpInstCreate(request, response)
 {
 	var custid = request.params['custid'];
-	var params, spec, instid, fqid;
-	var hosts, aggregator, instrumenter;
-	var hostid, ii;
+	var params, spec, instid, aggregator;
 
 	/*
 	 * If the user specified a JSON object, we use that.  Otherwise, we
@@ -229,10 +239,25 @@ function cfgHttpInstCreate(request, response)
 
 	if (custid === undefined) {
 		instid = cfg_inst_id++;  /* XXX should be unique across time. */
-		hosts = [];
-		for (hostid in cfg_instrumenters)
-			hosts.push(hostid);
-	} else {
+		cfgHttpInstCreateFinish(response, custid, instid, spec,
+		    aggregator, null);
+		return;
+	}
+
+	if (!cfg_mapi) {
+		response.send(HTTP.ESERVER, 'mapi not in use');
+		return;
+	}
+
+	cfg_mapi.listContainers(custid, function (err, zonesbyhost) {
+		if (err) {
+			cfg_log.warn('failed to list customer zones for %s: %s',
+			    custid, err.toString());
+			response.send(HTTP.ESERVER, 'failed to list ' +
+			    'customer zones');
+			return;
+		}
+
 		if (!(custid in cfg_customers)) {
 			cfg_customers[custid] = {
 				next_id: 1,
@@ -241,10 +266,16 @@ function cfgHttpInstCreate(request, response)
 		}
 
 		instid = cfg_customers[custid].next_id++;
-		hosts = [];	/* XXX should look up hosts */
-		for (hostid in cfg_instrumenters)
-			hosts.push(hostid);
-	}
+
+		cfgHttpInstCreateFinish(response, custid, instid, spec,
+		    aggregator, zonesbyhost);
+	});
+}
+
+function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
+    zonesbyhost)
+{
+	var fqid, instrumenter, hosts, hostname;
 
 	fqid = mod_ca.caQualifiedId(custid, instid);
 	cfgInstrumentations(custid)[fqid] = true;
@@ -265,14 +296,18 @@ function cfgHttpInstCreate(request, response)
 		aggregator: aggregator
 	};
 
+	if (zonesbyhost)
+		cfg_insts[fqid]['zonesbyhost'] = zonesbyhost;
+
 	cfgAggEnable(aggregator, fqid);
 
 	/*
 	 * XXX wait for agg to complete
 	 */
-	for (ii = 0; ii < hosts.length; ii++) {
+	hosts = zonesbyhost ? zonesbyhost : cfg_instrumenters;
+	for (hostname in hosts) {
 		cfg_insts[fqid].insts_total++;
-		instrumenter = cfg_instrumenters[hosts[ii]];
+		instrumenter = cfg_instrumenters[hostname];
 		instrumenter.ins_insts[fqid] = true;
 		instrumenter.ins_ninsts++;
 		cfgInstEnable(instrumenter, fqid);
@@ -439,10 +474,23 @@ function cfgAggEnable(aggregator, id)
 
 function cfgInstEnable(instrumenter, id)
 {
-	var statkey = mod_ca.caKeyForInst(id);
-	var spec = cfg_insts[id]['spec'];
+	var hostname, statkey, inst, spec;
+	var zonesbyhost, zones;
+
+	hostname = instrumenter.ins_hostname;
+	statkey = mod_ca.caKeyForInst(id);
+
+	inst = cfg_insts[id];
+	spec = inst['spec'];
+	zonesbyhost = inst['zonesbyhost'];
+
+	if (zonesbyhost) {
+		ASSERT.ok(hostname in zonesbyhost);
+		zones = zonesbyhost[hostname];
+	}
+
 	cfg_cap.sendCmdEnableInst(instrumenter.ins_routekey, id, id, statkey,
-	    spec);
+	    spec, zones);
 }
 
 function cfgCheckNewInstrumentation(id)

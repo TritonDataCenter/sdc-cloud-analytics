@@ -54,12 +54,32 @@ var insdFields = {
 	optype: '(args[0]->b_flags & B_READ ? "read" : "write")'
 };
 
+function insdMakePredicate(predicates)
+{
+	if (predicates.length === 0)
+		return ('');
+
+	return ('/' + predicates.map(function (elt) {
+	    return ('(' + elt + ')');
+	}).join(' &&\n') + '/\n');
+}
+
 function insdSyscalls(metric)
 {
 	var decomps = metric.is_decomposition;
 	var latency = false;
 	var script = '';
-	var action, predicate, indexes, index, zero, ii;
+	var action, predicates, zones, indexes, index, zero, ii;
+
+	predicates = [];
+
+	if (metric.is_zones) {
+		zones = metric.is_zones.map(function (elt) {
+			return ('zonename == "' + elt + '"');
+		});
+
+		predicates.push(zones.join(' ||\n'));
+	}
 
 	indexes = [];
 	for (ii = 0; ii < decomps.length; ii++) {
@@ -84,18 +104,18 @@ function insdSyscalls(metric)
 
 	if (latency) {
 		action = 'lquantize(timestamp - self->ts, 0, 100000, 100);';
-		predicate = '/self->ts/\n';
 		script += 'syscall:::entry\n' +
+		    insdMakePredicate(predicates) +
 		    '{\n' +
 		    '\tself->ts = timestamp;\n' +
 		    '}\n\n';
+		predicates = [ 'self->ts' ];
 	} else {
 		action = 'count();';
-		predicate = '';
 	}
 
 	script += 'syscall:::return\n';
-	script += predicate + '\n';
+	script += insdMakePredicate(predicates);
 	script += '{\n';
 	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
 
@@ -112,7 +132,17 @@ function insdIops(metric)
 	var decomps = metric.is_decomposition;
 	var latency = false;
 	var script = '';
-	var action, predicate, indexes, index, zero, ii;
+	var action, predicates, zones, indexes, index, zero, ii;
+
+	predicates = [];
+
+	if (metric.is_zones) {
+		zones = metric.is_zones.map(function (elt) {
+			return ('zonename == "' + elt + '"');
+		});
+
+		predicates.push(zones.join(' ||\n'));
+	}
 
 	indexes = [];
 	for (ii = 0; ii < decomps.length; ii++) {
@@ -139,7 +169,9 @@ function insdIops(metric)
 	}
 
 	if (latency || indexes.length > 0) {
-		script += 'io:::start\n' + '{\n';
+		script += 'io:::start\n';
+		script += insdMakePredicate(predicates);
+		script += '{\n';
 
 		if (latency)
 		    script += '\tstarts[arg0] = timestamp;\n';
@@ -153,19 +185,18 @@ function insdIops(metric)
 		if (latency) {
 			action = 'lquantize(timestamp - starts[arg0]' +
 			    ', 0, 100000, 100);';
-			predicate = '/starts[arg0]/\n';
+			predicates = [ 'starts[arg0]' ];
 		} else {
 			action = 'count();';
-			predicate = mod_ca.caSprintf('/%ss[arg0] != NULL/\n',
-			    decomps[0]);
+			predicates = [ mod_ca.caSprintf(
+			    '%ss[arg0] != NULL', decomps[0]) ];
 		}
 	} else {
 		action = 'count();';
-		predicate = '';
 	}
 
 	script += 'io:::done\n';
-	script += predicate;
+	script += insdMakePredicate(predicates);
 	script += '{\n';
 	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
 

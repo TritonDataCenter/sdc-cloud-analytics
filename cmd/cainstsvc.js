@@ -450,6 +450,8 @@ function insCmdEnable(msg)
 	inst.is_stat = msg.is_stat;
 	inst.is_predicate = mod_ca.caDeepCopy(msg.is_predicate);
 	inst.is_decomposition = mod_ca.caDeepCopy(msg.is_decomposition);
+	if (msg.is_zones)
+		inst.is_zones = mod_ca.caDeepCopy(msg.is_zones);
 	inst.is_impl = metric.metric(inst);
 	inst.is_inst_key = msg.is_inst_key;
 	inst.is_since = new Date();

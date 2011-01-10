@@ -39,6 +39,21 @@ function load_amqp
 	export AMQP_HOST=$host
 }
 
+function load_mapi
+{
+	local host port user pass
+
+	host=$(getprop caconfig/mapi-host)
+	port=$(getprop caconfig/mapi-port)
+	user=$(getprop caconfig/mapi-user)
+	pass=$(getprop caconfig/mapi-password)
+
+	export MAPI_HOST=$host
+	export MAPI_PORT=$port
+	export MAPI_USER=$user
+	export MAPI_PASSWORD=$pass
+}
+
 function load_nodepath
 {
 	NODE_PATH=
@@ -64,9 +79,13 @@ ns_args=
 # Figure out which service to start.
 #
 case $SMF_FMRI in
-	*caconfigsvc*)	ns_name=caconfigsvc ;;
-	*caaggsvc*)	ns_name=caaggsvc ;;
-	*cainstsvc*)	ns_name=cainstsvc ;;
+	*caconfigsvc*)	ns_name=caconfigsvc
+			load_mapi
+			;;
+	*caaggsvc*)	ns_name=caaggsvc
+			;;
+	*cainstsvc*)	ns_name=cainstsvc
+			;;
 	*) 		fail "don't know how to start $SMF_FMRI" ;;
 esac
 
@@ -78,7 +97,7 @@ ns_exec=cmd/$ns_name.js
 
 load_amqp || fail "failed to load amqp config"
 load_nodepath || fail "failed to load node path"
-env | egrep '^(AMQP_|NODE_PATH)'
+env | sort | egrep '^(AMQP_|MAPI_|NODE_PATH)' | grep -v PASSWORD
 
 #
 # Launch the daemon.

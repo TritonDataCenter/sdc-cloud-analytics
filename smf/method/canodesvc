@@ -17,7 +17,35 @@ function getprop
 	svcprop -p com.joyent.ca,$prop $SMF_FMRI
 }
 
+function load_amqp
+{
+	[[ $ns_name = cainstsvc ]] || return 0
+
+	($ns_amqpconfig | while IFS="=" read key value; do
+        	case $key in 
+        	amqp_host)      echo "export AMQP_HOST=$value" ;;
+        	amqp_port)      echo "export AMQP_PORT=$value" ;;
+        	*)              echo "ignoring amqp-config key $key" >&2
+        	esac
+	done) > $ns_tmpfile || return 1
+	. $ns_tmpfile && rm -f $tmpfile || return 1
+}
+
+function load_nodepath
+{
+	NODE_PATH=
+
+	for subdir in node_modules lib/* deps/*; do
+		[[ -d $subdir ]] || continue
+		NODE_PATH="$NODE_PATH:$ns_root/$subdir"
+	done
+
+	export NODE_PATH
+}
+
 ns_arg0=$(basename $0)
+ns_tmpfile=/var/tmp/$ns_arg0.$$
+ns_amqpconfig=/opt/smartdc/agents/bin/amqp-config
 ns_root="$(getprop caconfig/path-dist)"
 ns_node="$(getprop caconfig/path-node)"
 ns_logbase="$(getprop caconfig/path-logs)"
@@ -52,17 +80,9 @@ ns_exec=cmd/$ns_name.js
 [[ -f $ns_exec ]] || fail "couldn't find $ns_exec"
 [[ -x $ns_node ]] || fail "couldn't find executable node"
 
-#
-# Set up NODE_PATH properly for our dependencies.
-#
-NODE_PATH=
-for subdir in node_modules lib/* deps/*; do
-	[[ -d $subdir ]] || continue
-	NODE_PATH="$NODE_PATH:$ns_root/$subdir"
-done
-
-echo "using NODE_PATH = $NODE_PATH"
-export NODE_PATH
+load_amqp || fail "failed to load amqp config"
+load_nodepath || fail "failed to load node path"
+env | egrep '^(AMQP_|NODE_PATH)'
 
 #
 # Launch the daemon.

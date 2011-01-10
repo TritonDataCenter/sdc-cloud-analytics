@@ -15,11 +15,7 @@
 <exec_method type="method" name="stop" exec=":kill" timeout_seconds="10" />
 
 <instance name="default" enabled="true">
-	<property_group name="com.joyent.ca,caaggsvc" type="application">
-		<propval name="http-port" type="integer" value="8006" />
-	</property_group>
 	<property_group name="com.joyent.ca,caconfig" type="application">
-		<propval name="amqp-mode" type="astring" value="host" />
 		<propval name="amqp-host" type="astring" value="10.99.99.5" />
 		<propval name="path-logs" type="astring" value="/var/log/smartdc/ca" />
 		<propval name="path-node" type="astring" value="/opt/smartdc/ca/deps/node/node" />

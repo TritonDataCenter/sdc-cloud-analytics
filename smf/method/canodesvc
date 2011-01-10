@@ -19,16 +19,24 @@ function getprop
 
 function load_amqp
 {
-	[[ $ns_name = cainstsvc ]] || return 0
+	local host
 
-	($ns_amqpconfig | while IFS="=" read key value; do
-        	case $key in 
-        	amqp_host)      echo "export AMQP_HOST=$value" ;;
-        	amqp_port)      echo "export AMQP_PORT=$value" ;;
-        	*)              echo "ignoring amqp-config key $key" >&2
-        	esac
-	done) > $ns_tmpfile || return 1
-	. $ns_tmpfile && rm -f $tmpfile || return 1
+	if [[ -x $ns_amqpconfig ]]; then
+		($ns_amqpconfig | while IFS="=" read key value; do
+        		case $key in 
+        		amqp_host)      echo "export AMQP_HOST=$value" ;;
+        		amqp_port)      echo "export AMQP_PORT=$value" ;;
+        		*)              echo "ignoring amqp-config key $key" >&2
+        		esac
+		done) > $ns_tmpfile || return 1
+		. $ns_tmpfile && rm -f $tmpfile || return 1
+		return 0
+	fi
+
+	host=$(getprop caconfig/amqp-host)
+	[[ -n $host ]] || \
+	    fail "fatal: no amqp-config and no amqp-host property."
+	export AMQP_HOST=$host
 }
 
 function load_nodepath
@@ -56,22 +64,10 @@ ns_args=
 # Figure out which service to start.
 #
 case $SMF_FMRI in
-	*caconfigsvc*)
-		ns_name=caconfigsvc
-		ns_port=$(getprop caconfigsvc/http-port)
-		ns_args="$ns_port"
-		;;
-	*caaggsvc*)
-		ns_name=caaggsvc
-		ns_port=$(getprop caaggsvc/http-port)
-		ns_args="$ns_port"
-		;;
-	*cainstsvc*)
-		ns_name=cainstsvc
-		;;
-	*)
-		fail "don't know how to start $SMF_FMRI"
-		;;
+	*caconfigsvc*)	ns_name=caconfigsvc ;;
+	*caaggsvc*)	ns_name=caaggsvc ;;
+	*cainstsvc*)	ns_name=cainstsvc ;;
+	*) 		fail "don't know how to start $SMF_FMRI" ;;
 esac
 
 cd "$ns_root" || fail "failed to cd"

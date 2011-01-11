@@ -24,7 +24,11 @@ var cfg_mapi;			/* mapi handle */
 var cfg_name = 'configsvc';	/* component name */
 var cfg_vers = '0.0';		/* component version */
 var cfg_http_port = 23181;	/* HTTP port for API endpoint */
-var cfg_http_baseuri = '/ca';
+var cfg_http_baseuri = '/ca';	/* base of HTTP API */
+var cfg_http_custuri = '/customers';	/* subset of HTTP API for custs */
+var cfg_http_insturi = '/instrumentations';	/* Part of HTTP API for insts */
+var cfg_http_valraw = '/value/raw';	/* HTTP API to get raw data */
+var cfg_http_valheat = '/value/heatmap';	/* HTTP API to get heatmaps */
 
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
@@ -293,7 +297,8 @@ function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
 		insts_total: 0,
 		response: response,
 		spec: spec,
-		aggregator: aggregator
+		aggregator: aggregator,
+		custid: custid
 	};
 
 	if (zonesbyhost)
@@ -455,13 +460,29 @@ function cfgHttpInstGetOptions(request, response)
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
+	var uris = [];
+	var baseuri = cfg_http_baseuri;
+	var out;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
 		return;
 	}
 
-	response.send(HTTP.OK, cfg_insts[fqid]['options']);
+	if (custid)
+		baseuri += cfg_http_custuri + '/' + custid;
+
+	baseuri += cfg_http_insturi + '/' + instid;
+
+	out = mod_ca.caDeepCopy(cfg_insts[fqid]['options']);
+	uris.push({ uri: baseuri + cfg_http_valraw, name: 'raw data'});
+	if (cfg_insts[fqid].spec.stattype.type == 'linear-decomposition')
+		uris.push({ uri: baseuri + cfg_http_valheat,
+		    name: 'heatmap data'});
+
+	out['uris'] = uris;
+
+	response.send(HTTP.OK, out);
 }
 
 function cfgAggEnable(aggregator, id)
@@ -497,7 +518,8 @@ function cfgCheckNewInstrumentation(id)
 {
 	var inst = cfg_insts[id];
 	var instid = id.substring(id.lastIndexOf(';') + 1);
-	var response, stattype, dim, type;
+	var response, stattype, dim, type, uri;
+	var headers = {};
 
 	if (!('response' in inst))
 		return;
@@ -530,7 +552,16 @@ function cfgCheckNewInstrumentation(id)
 	stattype = inst.spec.stattype;
 	dim = stattype['dimension'];
  	type = dim == 1 ? 'scalar' : stattype['type'];
-	response.send(HTTP.CREATED, { id: instid, dimension: dim, type: type });
+	uri = cfg_http_baseuri;
+
+	if (inst.custid)
+		uri += cfg_http_custuri + '/' + inst.custid;
+
+	uri += cfg_http_insturi + '/' + instid;
+	headers['Location'] = uri;
+
+	response.send(HTTP.CREATED, { id: instid, dimension: dim, type: type,
+	    uri: uri }, headers);
 }
 
 function cfgAckEnableAgg(msg)
@@ -807,7 +838,7 @@ function cfgStatType(modname, statname, decomp)
 			    'module %s, stat %s: %s', modname, statname,
 			    field)));
 
-		if (fields[field].type == 'scalar')
+		if (fields[field].type == 'linear')
 			type = 'linear-decomposition';
 	}
 

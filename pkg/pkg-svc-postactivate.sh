@@ -20,6 +20,15 @@ cabase=`echo ${pkg}/dependson/cabase@*/package`
 export CABASE_DIR=$cabase
 export BASE_DIR=$npm_config_agent_root
 
+if [[ -z $npm_config_agent_root ]]; then
+	#
+	# Because CA-based services can be installed as either agents or
+	# in the ca zone in the head-node, fall back to npm_config_smartdc_root
+	# if we don't find npm_config_agent_root.
+	#
+	export BASE_DIR=${npm_config_smartdc_root:-/opt/smartdc}
+fi
+
 src=${cabase}/smf/manifest/${manifest}
 dest=${npm_config_smfdir}/${manifest}
 

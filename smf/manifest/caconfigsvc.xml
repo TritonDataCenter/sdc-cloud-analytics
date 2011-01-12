@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+
+<service_bundle type="manifest" name="smartdc-ca-caconfigsvc">
+<service name="smartdc/application/ca/caconfigsvc" type="service" version="1">
+
+<dependency name="network" grouping="require_all" restart_on="error" type="service">
+	<service_fmri value="svc:/network/physical" />
+</dependency>
+<dependency name="filesystem" grouping="require_all" restart_on="error" type="service">
+	<service_fmri value="svc:/system/filesystem/local" />
+</dependency>
+
+<exec_method type="method" name="start" exec="@@CABASE_DIR@@/smf/method/canodesvc" timeout_seconds="10" />
+<exec_method type="method" name="stop" exec=":kill" timeout_seconds="10" />
+
+<instance name="default" enabled="true">
+	<property_group name="com.joyent.ca,caconfig" type="application">
+		<propval name="amqp-host" type="astring" value="10.99.99.5" />
+		<propval name="mapi-host" type="astring" value="" />
+		<propval name="mapi-port" type="astring" value="" />
+		<propval name="mapi-user" type="astring" value="" />
+		<propval name="mapi-password" type="astring" value="" />
+		<propval name="path-logs" type="astring" value="@@BASE_DIR@@/ca/log" />
+		<propval name="path-node" type="astring" value="@@CABASE_DIR@@/cmd/node" />
+		<propval name="path-dist" type="astring" value="@@CABASE_DIR@@" />
+	</property_group>
+</instance>
+
+<stability value='Unstable' />
+
+<template>
+	<common_name><loctext xml:lang="C">Cloud Analytics Configuration Service</loctext></common_name>
+</template>
+
+</service>
+</service_bundle>

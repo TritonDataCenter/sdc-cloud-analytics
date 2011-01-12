@@ -47,6 +47,8 @@ SMF_MANIFESTS = \
 	smf/manifest/smartdc-ca-caconfigsvc.xml 	\
 	smf/manifest/smartdc-ca-caaggsvc.xml		\
 	smf/manifest/smartdc-ca-cainstsvc.xml		\
+	smf/manifest/caconfigsvc.xml			\
+	smf/manifest/caaggsvc.xml			\
 	smf/manifest/cainstsvc.xml
 
 SH_SCRIPTS = \
@@ -60,7 +62,7 @@ SVC_SCRIPTS = \
 	pkg/pkg-svc-postactivate.sh	\
 	pkg/pkg-svc-postdeactivate.sh
 
-PKGS		 = cabase cainstsvc
+PKGS		 = cabase caconfigsvc caaggsvc cainstsvc
 PKG_TARBALLS	 = $(PKGS:%=$(PKGROOT)/%.tar.gz)
 
 PKGDIRS_cabase := \
@@ -100,6 +102,20 @@ DEPS_cabase = \
 
 PKGDEPS_cabase = $(DEPS_cabase:%=$(PKGROOT)/cabase/node_modules/%)
 
+PKGDIRS_caconfigsvc := \
+	$(PKGROOT)/caconfigsvc/pkg
+
+PKGFILES_caconfigsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/caconfigsvc/%)		\
+	$(PKGROOT)/caconfigsvc/package.json
+
+PKGDIRS_caaggsvc := \
+	$(PKGROOT)/caaggsvc/pkg
+
+PKGFILES_caaggsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/caaggsvc/%)		\
+	$(PKGROOT)/caaggsvc/package.json
+
 PKGDIRS_cainstsvc := \
 	$(PKGROOT)/cainstsvc/pkg
 
@@ -110,6 +126,8 @@ PKGFILES_cainstsvc = \
 PKG_DIRS := \
 	$(PKGROOT)		\
 	$(PKGDIRS_cabase)	\
+	$(PKGDIRS_caconfigsvc)	\
+	$(PKGDIRS_caaggsvc)	\
 	$(PKGDIRS_cainstsvc)
 
 ROOT_DIRS = \
@@ -223,6 +241,12 @@ pkg: $(PKG_TARBALLS)
 $(PKGROOT)/cabase.tar.gz: install-cabase
 	cd $(PKGROOT) && $(TAR) cf - cabase | gzip > cabase.tar.gz
 
+$(PKGROOT)/caconfigsvc.tar.gz: install-caconfigsvc
+	cd $(PKGROOT) && $(TAR) cf - caconfigsvc | gzip > caconfigsvc.tar.gz
+
+$(PKGROOT)/caaggsvc.tar.gz: install-caaggsvc
+	cd $(PKGROOT) && $(TAR) cf - caaggsvc | gzip > caaggsvc.tar.gz
+
 $(PKGROOT)/cainstsvc.tar.gz: install-cainstsvc
 	cd $(PKGROOT) && $(TAR) cf - cainstsvc | gzip > cainstsvc.tar.gz
 
@@ -236,9 +260,13 @@ install-rootdirs: $(ROOT_DIRS)
 
 install-pkgdirs: $(PKG_DIRS)
 
-install-pkgs: install-cabase
+install-pkgs: install-cabase install-caconfigsvc install-caaggsvc install-cainstsvc
 
 install-cabase: all install-pkgdirs $(PKGFILES_cabase) $(PKGDEPS_cabase)
+
+install-caconfigsvc: install-cabase $(PKGFILES_caconfigsvc) $(PKGDEPS_caconfigsvc)
+
+install-caaggsvc: install-cabase $(PKGFILES_caaggsvc) $(PKGDEPS_caaggsvc)
 
 install-cainstsvc: install-cabase $(PKGFILES_cainstsvc) $(PKGDEPS_cainstsvc)
 
@@ -255,6 +283,12 @@ $(PKGROOT)/cabase/cmd/node: deps/node/node
 	cp $^ $@
 
 $(PKGROOT)/cabase/%: %
+	cp $^ $@
+
+$(PKGROOT)/caconfigsvc/%: %
+	cp $^ $@
+
+$(PKGROOT)/caaggsvc/%: %
 	cp $^ $@
 
 $(PKGROOT)/cainstsvc/%: %
@@ -315,20 +349,24 @@ $(DIST)/dist.tar.gz: install
 	(cd $(ROOT) && $(TAR) cf - *) | gzip > $(DIST)/dist.tar.gz
 
 #
-# The "release" target creates a ca.tar.bz2 suitable for release to the
+# The "release" target creates a ca-pkg.tar.bz2 suitable for release to the
 # head-node. To formally release this, it should be copied to assets.joyent.us
 # and placed into the /data/assets/templates/liveimg directory.  (Access
 # assets.joyent.us via the user "jill", for which access is exclusively via
 # authorized ssh key.)  That is, to formally release it, from build/dist:
 #
-#     scp ca.tar.bz2 jill@assets.joyent.us:/data/assets/templates/liveimg
+#     scp ca-pkg*bz2 jill@assets.joyent.us:/data/assets/templates/liveimg
 #
 # Subsequent head-node builds will then pick up the new release.
 #
-release: $(DIST) $(DIST)/ca.tar.bz2
+release: pkg $(DIST) $(DIST)/ca-pkg.tar.bz2
 
-$(DIST)/ca.tar.bz2: install
-	(cd $(BUILD) && $(TAR) cf - root) | bzip2 > $(DIST)/ca.tar.bz2
+$(ROOT)/pkg:
+	cd $(ROOT) && ln -s ../pkg .
+
+$(DIST)/ca-pkg.tar.bz2: install $(ROOT)/pkg
+	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz) | \
+	    bzip2 > $(DIST)/ca-pkg.tar.bz2
 
 #
 # "clean" target removes created files -- we currently have none

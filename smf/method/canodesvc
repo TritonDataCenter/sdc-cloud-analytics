@@ -66,12 +66,21 @@ function load_nodepath
 	export NODE_PATH
 }
 
+function run_realtime
+{
+	local pid=$1
+
+	priocntl -s -c RT -i pid $pid
+	[[ $? != 0 ]] && echo "Failed to move process into the RT class"
+}
+
 ns_arg0=$(basename $0)
 ns_tmpfile=/var/tmp/$ns_arg0.$$
 ns_amqpconfig=/opt/smartdc/agents/bin/amqp-config
 ns_root="$(getprop caconfig/path-dist)"
 ns_node="$(getprop caconfig/path-node)"
 ns_logbase="$(getprop caconfig/path-logs)"
+ns_rt=$(getprop caconfig/run-rt)
 ns_name=
 ns_args=
 
@@ -106,4 +115,6 @@ mkdir -p "$ns_logbase/$ns_name" || fail "failed to create log directory"
 ns_logfile="$ns_logbase/$ns_name/$(date +%F.%T)"
 smf_clear_env
 $ns_node $ns_exec $ns_logfile $ns_args &
+ns_pid=$!
+[[ $ns_rt == "true" ]] && run_realtime $ns_pid
 exit $SMF_EXIT_OK

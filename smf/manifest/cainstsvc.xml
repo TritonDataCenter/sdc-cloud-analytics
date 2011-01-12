@@ -28,6 +28,7 @@
 		<propval name="path-logs" type="astring" value="@@BASE_DIR@@/log/ca" />
 		<propval name="path-node" type="astring" value="@@CABASE_DIR@@/cmd/node" />
 		<propval name="path-dist" type="astring" value="@@CABASE_DIR@@" />
+		<propval name="run-rt" type="astring" value="true" />
 	</property_group>
 </instance>
 

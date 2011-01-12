@@ -19,6 +19,7 @@
 		<propval name="path-logs" type="astring" value="/var/log/smartdc/ca" />
 		<propval name="path-node" type="astring" value="/opt/smartdc/ca/deps/node/node" />
 		<propval name="path-dist" type="astring" value="/opt/smartdc/ca" />
+		<propval name="run-rt" type="astring" value="true" />
 	</property_group>
 </instance>
 

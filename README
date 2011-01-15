@@ -49,6 +49,7 @@ The project also depends on the following bundled components:
 	o node-libdtrace, a native node module in deps/node-libdtrace
 	o node-png, a libpng wrapper in deps/node-png
 	o node-uname, a SUSv3-based uname implementation
+	o node-libGeoIP, a libGeoIP wrapper in deps/node-libGeoIP
 
 To check these out, use
 

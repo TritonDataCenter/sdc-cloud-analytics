@@ -21,6 +21,7 @@
 		"kstat":	"*",
 		"libdtrace":	"*",
 		"png":		">=1.0.2",
-		"uname":	"*"
+		"uname":	"*",
+		"libGeoIP":	"*"
 	}
 }

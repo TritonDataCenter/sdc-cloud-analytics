@@ -94,7 +94,8 @@ DEPS_cabase = \
 	kstat		\
 	libdtrace	\
 	png		\
-	uname
+	uname		\
+	libGeoIP
 
 PKGDEPS_cabase = $(DEPS_cabase:%=$(PKGROOT)/cabase/node_modules/%)
 
@@ -143,6 +144,7 @@ ROOT_DIRS = \
 	$(ROOT_CA)/deps/node-kstat				\
 	$(ROOT_CA)/deps/node-png				\
 	$(ROOT_CA)/deps/node-uname				\
+	$(ROOT_CA)/deps/node-libGeoIP				\
 	$(ROOT_CA)/lib						\
 	$(ROOT_CA)/lib/ca					\
 	$(ROOT_CA)/lib/tst					\
@@ -166,7 +168,8 @@ ROOT_DEPFILES := \
 	$(ROOT_CA)/deps/node-kstat/kstat.node			\
 	$(ROOT_CA)/deps/node-libdtrace/libdtrace.node		\
 	$(ROOT_CA)/deps/node-png/png.node			\
-	$(ROOT_CA)/deps/node-uname/uname.node
+	$(ROOT_CA)/deps/node-uname/uname.node			\
+	$(ROOT_CA)/deps/node-libGeoIP/libGeoIP.node
 
 CONNECT_FILES := $(shell cd deps/connect/lib && find connect -name '*.js')
 ROOT_DEPFILES += $(CONNECT_FILES:%=$(ROOT_CA)/deps/connect/%)
@@ -176,7 +179,8 @@ NATIVE_DEPS = \
 	deps/node-kstat/build/default/kstat.node		\
 	deps/node-libdtrace/build/default/libdtrace.node	\
 	deps/node-png/build/default/png.node			\
-	deps/node-uname/build/default/uname.node
+	deps/node-uname/build/default/uname.node		\
+	deps/node-libGeoIP/build/default/libGeoIP.node
 
 #
 # Targets
@@ -327,6 +331,9 @@ $(ROOT_CA)/deps/node-kstat/kstat.node: deps/node-kstat/build/default/kstat.node
 $(ROOT_CA)/deps/node-uname/uname.node: deps/node-uname/build/default/uname.node
 	cp $^ $@
 
+$(ROOT_CA)/deps/node-libGeoIP/libGeoIP.node: deps/node-libGeoIP/build/default/libGeoIP.node
+	cp $^ $@
+
 $(ROOT_CA)/deps/node-libdtrace/libdtrace.node: deps/node-libdtrace/build/default/libdtrace.node
 	cp $^ $@
 
@@ -369,5 +376,6 @@ dist-clean:
 	(cd deps/node-libdtrace && $(NODE_WAF) distclean)
 	(cd deps/node-png && $(NODE_WAF) distclean)
 	(cd deps/node-uname && $(NODE_WAF) distclean)
+	(cd deps/node-libGeoIP && $(NODE_WAF) distclean)
 	(cd deps/node && $(MAKE) distclean)
 	$(RMTREE) $(BUILD) deps/node-install

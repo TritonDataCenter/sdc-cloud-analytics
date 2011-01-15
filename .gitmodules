@@ -22,3 +22,6 @@
 [submodule "deps/node-uname"]
 	path = deps/node-uname
 	url = git://github.com/davepacheco/node-uname.git
+[submodule "deps/node-libGeoIP"]
+	path = deps/node-libGeoIP
+	url = git@github.com:bcantrill/node-libGeoIP.git

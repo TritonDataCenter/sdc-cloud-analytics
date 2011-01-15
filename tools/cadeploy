@@ -15,11 +15,10 @@ function usage
 {
 	echo "$d_arg0: $*" >&2
 	cat <<-USAGE >&2
-Usage: $d_arg0 [-r] -h host -s svc [-s svc ...] -f filename.tar.gz
+Usage: $d_arg0 [-r] -h host -s svc [-s svc ...]
 
 Deploy the named service(s) to the specified host.
 
-    -f  File name to deploy (built with "gmake dist")
     -r	Remove old contents first
     -h	Hostname to deploy to
     -s	Service to deploy; one or more of
@@ -35,10 +34,10 @@ d_svcs=
 d_tmpbase=/var/tmp/$d_arg0.$$
 d_wsroot=
 
-while getopts ":s:h:f:r" c; do
+while getopts ":s:h:r" c; do
 	case "$c" in
 	r)	eval opt_$c=true				;;
-	h|f)	eval opt_$c="$OPTARG"				;;
+	h)	eval opt_$c="$OPTARG"				;;
 	s)	d_svcs="$d_svcs $OPTARG"			;;
 	:)	usage "option requires an argument -- $OPTARG"	;;
 	*)	usage "illegal option -- $OPTARG"		;;
@@ -47,19 +46,26 @@ done
 
 [[ -n $d_svcs ]] || usage "-s is required"
 [[ -n $opt_h ]] || usage "-h is required"
-[[ -n $opt_f ]] || usage "-f is required"
 
-d_fmris=
+cd $(dirname $0)
+d_base=$(pwd)/../build/pkg
+cd -
+
+d_fmris=cabase
+d_tgzs=$d_base/cabase.tar.gz
 for svc in $d_svcs; do
 	case $svc in
 	agg|caaggsvc)
 		d_fmris="$d_fmris caaggsvc"
+		d_tgzs="$d_tgzs $d_base/caaggsvc.tar.gz"
 		;;
 	cfg|config|caconfig|caconfigsvc)
 		d_fmris="$d_fmris caconfigsvc"
+		d_tgzs="$d_tgzs $d_base/caconfigsvc.tar.gz"
 		;;
 	inst|cainst|cainstsvc)
 		d_fmris="$d_fmris cainstsvc"
+		d_tgzs="$d_tgzs $d_base/cainstsvc.tar.gz"
 		;;
 	*)
 		usage "illegal service: $svc"
@@ -68,17 +74,30 @@ for svc in $d_svcs; do
 done
 
 d_rdeploy=${d_tmpbase}_deploy.sh
+r_rdeploy=$d_arg0.$$_deploy.sh
 
 cat > $d_rdeploy << REMOTE_DEPLOY
 #!/bin/bash
 
 shopt -s xpg_echo
 
+#
+# By default use the version of npm in your path, unless this specific version
+# exists.
+#
+r_npm=npm
+[[ -x /opt/smartdc/agents/bin/agents-npm ]] && \
+    r_npm=/opt/smartdc/agents/bin/agents-npm
+[[ -x /opt/local/bin/npm ]] && \
+    r_npm=/opt/local/bin/npm
+
 function fail
 {
 	echo "\$*" >&2
 	exit 1
 }
+
+[[ ! -x "\$r_npm" ]] && fail "Missing npm"
 
 r_svcs=\$(svcs -H -ofmri '*/ca/*')
 for svc in \$r_svcs; do
@@ -102,25 +121,36 @@ fi
 
 cat >> $d_rdeploy << REMOTE_DEPLOY
 cd /
-echo "Extracting new tarball ... \c"
-gzcat $d_tmpbase.tar.gz | tar xf - || fail "fail"
-echo "done."
-
-/opt/smartdc/ca/tools/cadeploy-local $d_fmris || \
-    fail "failed to execute second stage"
+for svc in $d_fmris; do
+	echo "Installing service \$svc ... \c"
+	\$r_npm install $d_tmpbase/\$svc.tar.gz || fail "can't npm install $svc"
+done
 
 echo "Removing tarball and script ... \c"
-rm -f $d_tmpbase.tar.gz $d_rdeploy
+rm -f $d_tmpbase/$r_rdeploy
+for tgz in $d_fmris; do
+	rm -f $d_tmpbase/\$tgz.tar.gz
+done
+rmdir $d_tmpbase
+
+r_svcs=\$(svcs -H -ofmri '*/ca/*')
+for svc in \$r_svcs; do
+	echo "Enabling \$svc ... \c"
+	svcadm enable -s \$svc || fail "failed"
+	echo "done."
+done
+
 echo "done."
 REMOTE_DEPLOY
 
-echo "Copying script and $opt_f to root@$opt_h via scp (may prompt for root password twice)"
-scp $opt_f root@$opt_h:$d_tmpbase.tar.gz || fail "failed"
-scp $d_rdeploy root@$opt_h:$d_rdeploy || fail "failed"
+echo "Making remote temporary directory (may prompt for root password)"
+ssh root@$opt_h mkdir $d_tmpbase || fail "failed"
+echo "Copying script and packages to root@$opt_h via scp (may prompt for root password twice)"
+scp $d_rdeploy $d_tgzs root@$opt_h:$d_tmpbase || fail "failed"
 
 echo "Invoking remote script (may prompt again)."
-ssh root@$opt_h bash $d_rdeploy || fail "failed"
+ssh root@$opt_h bash $d_tmpbase/$r_rdeploy || fail "failed"
 
 echo "Removing local tarball and script ... \c"
-rm -f $d_rdeploy $d_tmpbase.tar.gz
+rm -f $d_rdeploy
 echo "done."

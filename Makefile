@@ -44,9 +44,6 @@ TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
 SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 
 SMF_MANIFESTS = \
-	smf/manifest/smartdc-ca-caconfigsvc.xml 	\
-	smf/manifest/smartdc-ca-caaggsvc.xml		\
-	smf/manifest/smartdc-ca-cainstsvc.xml		\
 	smf/manifest/caconfigsvc.xml			\
 	smf/manifest/caaggsvc.xml			\
 	smf/manifest/cainstsvc.xml
@@ -56,7 +53,6 @@ SH_SCRIPTS = \
 	pkg/pkg-postdeactivate.sh	\
 	smf/method/canodesvc		\
 	tools/cadeploy			\
-	tools/cadeploy-local
 
 SVC_SCRIPTS = \
 	pkg/pkg-svc-postactivate.sh	\
@@ -338,17 +334,6 @@ $(ROOT_CA)/deps/node/node: deps/node-install/bin/node
 	cp $^ $@
 
 #
-# "dist" target creates tarball from the current root
-#
-dist: $(DIST) $(DIST)/dist.tar.gz
-
-$(DIST):
-	mkdir -p $@
-
-$(DIST)/dist.tar.gz: install
-	(cd $(ROOT) && $(TAR) cf - *) | gzip > $(DIST)/dist.tar.gz
-
-#
 # The "release" target creates a ca-pkg.tar.bz2 suitable for release to the
 # head-node. To formally release this, it should be copied to assets.joyent.us
 # and placed into the /data/assets/templates/liveimg directory.  (Access
@@ -360,6 +345,9 @@ $(DIST)/dist.tar.gz: install
 # Subsequent head-node builds will then pick up the new release.
 #
 release: pkg $(DIST) $(DIST)/ca-pkg.tar.bz2
+
+$(DIST):
+	mkdir -p $@
 
 $(ROOT)/pkg:
 	cd $(ROOT) && ln -s ../pkg .

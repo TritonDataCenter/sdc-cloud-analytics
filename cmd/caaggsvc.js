@@ -357,7 +357,7 @@ function aggHttpValueCommon(request, response, callback)
 	var inst, now, record, start, since, err;
 
 	if (!(fqid in agg_insts)) {
-		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+		response.send(HTTP.ENOTFOUND);
 		return;
 	}
 
@@ -382,7 +382,7 @@ function aggHttpValueCommon(request, response, callback)
 		}
 
 		if (err.found) {
-			response.send(HTTP.EBADREQUEST, err.msg);
+			response.send(HTTP.EBADREQUEST, { error: err.msg });
 			return;
 		}
 	} else {
@@ -457,7 +457,6 @@ function aggReaggregate(data, selected)
 			/*
 			 * Easy case: there is no additional decomposition.
 			 */
-			ASSERT.ok(selected.length === 0); /* XXX from client */
 			return ({ data: [ data ], present: {}});
 		}
 	}
@@ -684,7 +683,7 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 			}
 		} else {
 			hues = [ 21 ];
-			for (ii = 1; ii < selected.length; ii++)
+			for (ii = 0; ii < selected.length; ii++)
 				hues.push((hues[hues.length - 1] + 91) % 360);
 
 			if (isolate)
@@ -692,7 +691,7 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 		}
 	} catch (ex) {
 		agg_log.exception(ex);
-		response.send(HTTP.EBADREQUEST, ex.message);
+		response.send(HTTP.EBADREQUEST, { error: ex.message });
 		return;
 	}
 

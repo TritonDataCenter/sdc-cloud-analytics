@@ -230,14 +230,15 @@ function cfgHttpInstCreate(request, response)
 		spec = cfgValidateMetric(params);
 	} catch (ex) {
 		response.send(HTTP.EBADREQUEST,
-		    'failed to validate instrumentation: ' + ex.message);
+		    { error: 'failed to validate request: ' + ex.message });
 		return;
 	}
 
 	aggregator = cfgPickAggregator();
 
 	if (!aggregator) {
-		response.send(HTTP.ESERVER, 'no aggregators available');
+		response.send(HTTP.ESERVER,
+		    { error: 'no aggregators available' });
 		return;
 	}
 
@@ -249,7 +250,7 @@ function cfgHttpInstCreate(request, response)
 	}
 
 	if (!cfg_mapi) {
-		response.send(HTTP.ESERVER, 'mapi not in use');
+		response.send(HTTP.ESERVER, { error: 'mapi not in use' });
 		return;
 	}
 
@@ -257,8 +258,8 @@ function cfgHttpInstCreate(request, response)
 		if (err) {
 			cfg_log.warn('failed to list customer zones for %s: %s',
 			    custid, err.toString());
-			response.send(HTTP.ESERVER, 'failed to list ' +
-			    'customer zones');
+			response.send(HTTP.ESERVER,
+			    { error: 'failed to list customer zones' });
 			return;
 		}
 
@@ -380,7 +381,7 @@ function cfgHttpInstDelete(request, response)
 	var instrumenter, aggregator, hostid;
 
 	if (!(fqid in cfg_insts)) {
-		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+		response.send(HTTP.ENOTFOUND);
 		return;
 	}
 
@@ -413,35 +414,35 @@ function cfgHttpInstSetOptions(request, response)
 	var inst, retain, options;
 
 	if (!(fqid in cfg_insts)) {
-		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+		response.send(HTTP.ENOTFOUND);
 		return;
 	}
 
 	inst = cfg_insts[fqid];
 
 	if (request.ca_json === undefined) {
-		response.send(HTTP.EBADREQUEST, 'no JSON specified');
+		response.send(HTTP.EBADREQUEST, { error: 'no JSON specified' });
 		return;
 	}
 
 	/* Validate and apply options, if we supported any. */
 	options = request.ca_json;
 	if (options.constructor !== Object) {
-		response.send(HTTP.EBADREQUEST, 'invalid options');
+		response.send(HTTP.EBADREQUEST, { error: 'invalid options' });
 		return;
 	}
 
 	if ('enabled' in options && options['enabled'] !== true) {
 		response.send(HTTP.EBADREQUEST,
-		    'unsupported value for "enabled"');
+		    { error: 'unsupported value for "enabled"' });
 		return;
 	}
 
 	if ('retention-time' in options) {
 		retain = parseInt(options['retention-time'], 10);
 		if (isNaN(retain))
-			response.send(HTTP.EBADREQUEST,
-			    'unsupported value for "retention-time"');
+			response.send(HTTP.EBADREQUEST, { error:
+			    'unsupported value for "retention-time"' });
 		retain = Math.max(retain, cfg_retain_min);
 		retain = Math.min(retain, cfg_retain_max);
 	}
@@ -465,7 +466,7 @@ function cfgHttpInstGetOptions(request, response)
 	var out;
 
 	if (!(fqid in cfg_insts)) {
-		response.send(HTTP.ENOTFOUND, HTTP.MSG_NOTFOUND);
+		response.send(HTTP.ENOTFOUND);
 		return;
 	}
 
@@ -539,13 +540,13 @@ function cfgCheckNewInstrumentation(id)
 	if (inst.agg_done === false) {
 		/* XXX could try another aggregator. */
 		response.send(HTTP.ESERVER,
-		    'error: failed to enable aggregator');
+		    { error: 'failed to enable aggregator' });
 		return;
 	}
 
 	if (inst.insts_failed > 0) {
 		response.send(HTTP.ESERVER,
-		    'error: failed to enable some instrumenters');
+		    { error: 'failed to enable some instrumenters' });
 		return;
 	}
 

@@ -214,34 +214,85 @@ function insdIops(metric)
 function insDTraceMetric(prog)
 {
 	this.cad_prog = prog;
-	this.cad_dtr = new mod_dtrace.Consumer();
 }
 
 insDTraceMetric.prototype.instrument = function (callback)
 {
 	var sep = '----------------------------------------';
-	insd_log.dbg('\n%s\n%s%s', sep, this.cad_prog, sep);
-	this.cad_dtr.strcompile(this.cad_prog);
-	this.cad_dtr.go(); /* XXX should be asynch? */
-	callback();
+
+	/*
+	 * Only log the script on the first time through here.
+	 */
+	if (this.cad_dtr === undefined)
+		insd_log.dbg('\n%s\n%s%s', sep, this.cad_prog, sep);
+
+	this.cad_dtr = new mod_dtrace.Consumer();
+
+	try {
+		this.cad_dtr.strcompile(this.cad_prog);
+		this.cad_dtr.go();
+
+		if (callback)
+			callback();
+	} catch (ex) {
+		insd_log.error('instrumentation failed; exception follows');
+		insd_log.exception(ex);
+		this.cad_dtr = null;
+		if (callback)
+			callback(ex);
+	}
 };
 
 insDTraceMetric.prototype.deinstrument = function (callback)
 {
-	this.cad_dtr.stop(); /* XXX can object be reused? */
-	callback();
+	this.cad_dtr.stop();
+	this.cad_dtr = null;
+
+	if (callback)
+		callback();
 };
 
 insDTraceMetric.prototype.value = function ()
 {
 	var agg = {};
-
-	this.cad_dtr.aggwalk(function (id, key, val) {
+	var iteragg = function (id, key, val) {
 		if (!(id in agg))
 			agg[id] = {};
 
 		agg[id][key] = val;
-	});
+	};
+
+	/*
+	 * If we failed to instrument, all we can do is return an error.
+	 * Because the instrumenter won't call value() except after a successful
+	 * instrument(), this can only happen if we successfully enable the
+	 * instrumentation but DTrace aborts sometime later and we fail to
+	 * reenable it.
+	 */
+	if (!this.cad_dtr)
+		return (undefined);
+
+	try {
+		this.cad_dtr.aggwalk(iteragg);
+	} catch (ex) {
+		/*
+		 * In some cases (such as simple drops), we could reasonably
+		 * ignore this and drive on.  Or we could stop this consumer,
+		 * increase the buffer size, and re-enable.  In some cases,
+		 * though, the consumer has already aborted so we have to create
+		 * a new handle and re-enable.  For now, we deal with all of
+		 * these the same way: create a new handle and re-enable.
+		 * XXX this should be reported to the configuration service as
+		 * an asynchronous instrumenter error.
+		 * XXX shouldn't all log entries be reported back to the
+		 * configuration service for debugging?
+		 */
+		insd_log.error('re-enabling instrumentation due to error ' +
+		    'reading aggregation. exception follows:');
+		insd_log.exception(ex);
+		this.instrument();
+		return (undefined);
+	}
 
 	return (this.reduce(agg));
 };

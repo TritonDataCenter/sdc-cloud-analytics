@@ -329,10 +329,9 @@ var ins_last;
 
 function insTick()
 {
-	var id, when, value, whentime;
+	var id, when, value;
 
-	when = new Date(); /* XXX should this be reported by the subsystem? */
-	whentime = when.getTime();
+	when = new Date().getTime(); /* XXX should this come from mod? */
 
 	/*
 	 * If for some reason we get invoked multiple times within the same
@@ -340,14 +339,12 @@ function insTick()
 	 * aggregator.
 	 */
 	if (ins_last &&
-	    Math.floor(whentime / 1000) ==
-	    Math.floor(ins_last.getTime() / 1000))
+	    Math.floor(when / 1000) == Math.floor(ins_last / 1000))
 		return;
 
 	for (id in ins_insts) {
 		value = ins_insts[id].is_impl.value();
-		ins_cap.sendData(ins_insts[id].is_inst_key, id, value,
-			whentime);
+		ins_cap.sendData(ins_insts[id].is_inst_key, id, value, when);
 	}
 
 	ins_last = when;

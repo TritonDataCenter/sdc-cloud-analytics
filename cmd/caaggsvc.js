@@ -174,7 +174,7 @@ function aggData(msg)
 	var hostname = msg.ca_hostname;
 	var inst, rq, ii;
 
-	if (id === undefined || value === undefined || time === undefined) {
+	if (id === undefined || time === undefined) {
 		agg_log.warn('dropped data message with missing field');
 		return;
 	}
@@ -229,7 +229,7 @@ function aggData(msg)
 
 function aggAggregateScalar(map, key, value)
 {
-	if (!(key in map))
+	if (!(key in map) || map[key] === undefined)
 		map[key] = 0;
 
 	map[key] += value;
@@ -243,7 +243,7 @@ function aggAggregateDistribution(map, key, newdist)
 
 	ASSERT.ok(newdist.constructor == Array);
 
-	if (!(key in map))
+	if (!(key in map) || map[key] === undefined)
 		map[key] = [];
 
 	olddist = map[key];
@@ -290,6 +290,9 @@ function aggAggregateValue(map, key, value)
 {
 	var subkey;
 
+	if (value === undefined)
+		return;
+
 	if (typeof (value) == 'number') {
 		aggAggregateScalar(map, key, value);
 		return;
@@ -303,7 +306,7 @@ function aggAggregateValue(map, key, value)
 	ASSERT.ok(value.constructor == Object);
 
 	for (subkey in value) {
-		if (!(key in map))
+		if (!(key in map) || map[key] === undefined)
 			map[key] = {};
 		aggAggregateValue(map[key], subkey, value[subkey]);
 	}

@@ -6,5 +6,7 @@
 
 cd $(dirname $0)
 export $(./npath)
+export AMQP_HOST=10.99.99.5	# only used for COAL
+export PATH=$PWD/../deps/node-install/bin:$PATH
 cd - > /dev/null
 exec $SHELL

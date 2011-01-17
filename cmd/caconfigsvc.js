@@ -476,7 +476,7 @@ function cfgHttpInstGetOptions(request, response)
 
 	out = mod_ca.caDeepCopy(cfg_insts[fqid]['options']);
 	uris.push({ uri: baseuri + cfg_http_valraw, name: 'raw data'});
-	if (cfg_insts[fqid].spec.stattype.type == 'linear-decomposition')
+	if (cfg_insts[fqid].spec.stattype.type == 'numeric-decomposition')
 		uris.push({ uri: baseuri + cfg_http_valheat,
 		    name: 'heatmap data'});
 
@@ -794,8 +794,8 @@ function cfgNotifyInstrumenterError(msg)
  *
  *	type		Describes the datum itself.  If dimension is 1, then
  *			type is always 'scalar'.  If any decompositions use a
- *			linear field (e.g., latency), then type is
- *			'linear-decomposition'.  Otherwise, type is
+ *			numeric field (e.g., latency), then type is
+ *			'numeric-decomposition'.  Otherwise, type is
  *			'discrete-decomposition'.
  *
  * Combined, this information allows clients to know whether to visualize the
@@ -805,8 +805,8 @@ function cfgNotifyInstrumenterError(msg)
  *	METRIC				DIM	type		VISUAL
  *	i/o ops				1	scalar		line
  *	i/o ops by disk			2	discrete 	multi-line
- *	i/o ops by latency		2	linear		heatmap
- *	i/o ops by latency and disk	3	linear		heatmap
+ *	i/o ops by latency		2	numeric		heatmap
+ *	i/o ops by latency and disk	3	numeric		heatmap
  *
  * If the given instrumentation does not specify a valid stat, this function
  * throws an exception whose message describes why.
@@ -838,8 +838,8 @@ function cfgStatType(modname, statname, decomp)
 			    'module %s, stat %s: %s', modname, statname,
 			    field)));
 
-		if (fields[field].type == 'linear')
-			type = 'linear-decomposition';
+		if (fields[field].type == 'numeric')
+			type = 'numeric-decomposition';
 	}
 
 	/* XXX validate predicate */

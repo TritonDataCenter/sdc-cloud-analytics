@@ -23,7 +23,7 @@ exports.insinit = function (ins, log)
 		zonename: { label: 'zone name', type: 'string' },
 		syscall: { label: 'system call', type: 'string' },
 		execname: { label: 'application name', type: 'string' },
-		latency: { label: 'latency', type: 'linear' }
+		latency: { label: 'latency', type: 'numeric' }
 	    },
 	    metric: insdSyscalls
 	});
@@ -39,7 +39,7 @@ exports.insinit = function (ins, log)
 		zonename: { label: 'zone name', type: 'string' },
 		optype: { label: 'type', type: 'string' },
 		execname: { label: 'application name', type: 'string' },
-		latency: { label: 'latency', type: 'linear' }
+		latency: { label: 'latency', type: 'numeric' }
 	    },
 	    metric: insdIops
 	});

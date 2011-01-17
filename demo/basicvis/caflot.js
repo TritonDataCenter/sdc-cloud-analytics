@@ -457,7 +457,8 @@ gGraph.prototype.initDetails = function ()
 				if (decomps[ii] != fieldname)
 					continue;
 
-				if (metric.fields[fieldname].type == 'linear') {
+				if (metric.fields[fieldname].type ==
+				    'numeric') {
 					this.g_subtype = 'heatmap';
 					continue;
 				}

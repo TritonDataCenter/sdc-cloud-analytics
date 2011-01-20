@@ -1,0 +1,194 @@
+#!/bin/bash
+
+#
+# Run this script on the headnode to set up a local zone for developing Cloud
+# Analytics.  The script takes a single argument: the desired username.
+#
+
+shopt -s xpg_echo
+
+sh_arg0=$(basename $0)
+sh_tmpbase=/var/tmp/$sh_arg0.$$
+sh_urlbase="http://10.99.99.8:8080"
+sh_curl="curl -u admin:tot@ls3crit"
+sh_zonetpl="bare_256"
+sh_user="$1"
+
+sh_custuri=
+sh_conturi=
+sh_zonename=
+sh_zoneip=
+
+function fail
+{
+	local msg="$*"
+	[[ -z "$msg" ]] && msg="failed"
+	echo "$sh_arg0: $msg" >&2
+	exit 1
+}
+
+function sh_extract
+{
+	grep "<$1>" | sed -e "s#.*<$1>\([^<]*\)</$1>.*#\1#"
+}
+
+function sh_extract_header
+{
+	egrep "^$1: " | sed -e "s#$1: ##" | tr -d '\r\n'
+}
+
+function sh_install_agents
+{
+        if svcs smartdc/agent/provisioner > /dev/null 2>&1; then
+                echo "skipped (already done)"
+                return 0
+        fi
+
+        bash /mnt/usbkey/ur-scripts/agents-*.sh > $sh_tmpbase.agents.out 2>&1 || \
+            fail "failed to install agents; see $sh_tmpbase.agents.out"
+        rm -f $sh_tmpbase.agents.out
+        echo "done."
+}
+
+function sh_loadcust
+{
+        sh_custuri=$($sh_curl -s --url $sh_urlbase/customers | \
+	    sh_extract uri | head -1)
+}
+
+function sh_loadtpl
+{
+        local uris name
+
+	echo "Listing templates ... \c"
+        uris=$($sh_curl -s --url $sh_urlbase/templates | sh_extract uri)
+	for uri in $uris; do
+		echo "$uri \c"
+	done
+	echo
+
+	echo "Retrieving URI for template $sh_zonetpl ... \c"
+        for uri in $uris; do
+                name=$($sh_curl -s --url $sh_urlbase$uri | sh_extract name | \
+                    head -1)
+                if [[ $name = $sh_zonetpl ]]; then
+                        sh_zonetpluri=$uri
+			echo $uri
+                        return;
+                fi
+        done
+
+        fail "not found"
+}
+
+function sh_provision
+{
+        local custuri=$1 tpluri=$2
+	local out turi
+
+        out=$($sh_curl -s -i -X POST -d template=$tpluri \
+	    --url "$sh_urlbase$custuri/containers" 2>&1)
+
+        [[ $? -eq 0 ]] || fail "failed to create zone: $out"
+	turi=$(echo "$out" | sh_extract_header X-Joyent-Transition-URI)
+	[[ -n $turi ]] || fail "no transition URI"
+
+	while [[ -z $sh_conturi ]]; do
+		sleep 1
+		out=$($sh_curl -s -i --url $sh_urlbase$turi 2>&1)
+        	[[ $? -eq 0 ]] || fail "failed to get transition: $out"
+		sh_conturi=$(echo "$out" | sh_extract_header Location)
+		echo ".\c"
+	done
+
+	out=$($sh_curl -s --url $sh_urlbase$sh_conturi)
+	sh_zonename=$(echo "$out" | sh_extract name | head -1)
+	sh_zoneip=$(echo "$out" | sh_extract address)
+}
+
+[[ -n $sh_user ]] || fail "usage: $sh_arg0 <username>"
+
+echo "Installing agents (including provisioner) ... \c"
+sh_install_agents || fail
+
+echo "Retrieving customer uri ... \c"
+sh_loadcust || fail "failed"
+[[ -n $sh_custuri ]] || fail "no customer uri found"
+echo "$sh_custuri"
+
+sh_loadtpl || fail "failed"
+[[ -n $sh_zonetpluri ]] || fail "failed to get template URI"
+
+echo "Provisioning $sh_zonetpl zone ... \c"
+sh_provision $sh_custuri $sh_zonetpluri || fail "failed"
+[[ -n $sh_zonename ]] || fail "no zone name found"
+[[ -n $sh_zoneip ]] || fail "no zone IP found"
+echo "$sh_zonename ($sh_zoneip)"
+
+cat > /zones/${sh_zonename}/root/root/setup_zone.sh <<EOF
+#!/bin/bash
+shopt -s xpg_echo
+
+function fail
+{
+	echo "$*"
+	exit 1
+}
+
+echo "Updating DNS ... \c"
+cat > /etc/resolv.conf << DNS
+domain joyent.us
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+DNS
+echo "done."
+
+echo "Testing DNS ... \c"
+ping example.com || fail "failed"
+
+echo "Enabling root login via ssh ... \c"
+sed -e 's#^PermitRootLogin no\$#PermitRootLogin yes#' /etc/ssh/sshd_config > \
+    /etc/ssh/sshd_config_new && mv /etc/ssh/sshd_config_new /etc/ssh/sshd_config \
+    || fail "failed"
+svcadm disable -s ssh || fail "failed to disable service"
+svcadm enable -s ssh || fail "failed to enable service"
+echo "done."
+
+echo "Creating user '$sh_user' ... \c"
+if egrep ^$sh_user: /etc/passwd > /dev/null; then
+	echo "skipped (already exists)"
+else
+mkdir -p /home/$sh_user/.ssh || fail "failed to create /home/$sh_user"
+useradd -c $sh_user -d /home/$sh_user -G staff -s /bin/bash \
+    -K defaultpriv=basic,dtrace_user,dtrace_proc,dtrace_kernel $sh_user || \
+    fail "failed to create user"
+chown -R $sh_user:staff /home/$sh_user || fail "failed to chmod"
+cat > /home/$sh_user/.npmrc << NPMRC
+root = ~/.node_modules
+tar = gtar
+NPMRC
+
+cat > /home/$sh_user/.profile << PROFILE
+export PATH=/usr/bin:/usr/sbin:/opt/local/bin:/opt/local/sbin:/usr/sfw/bin:/usr/openwin/bin:/usr/ccs/bin:/usr/xpg4/bin:/opt/local/gcc34/bin
+export MANPATH=/opt/local/man:/opt/local/share/man:/usr/share/man:/usr/sfw/share/man:/usr/openwin/share/man
+PROFILE
+
+echo "done."
+fi
+
+# Update PATH to include GNU egrep by default, and for pkgin
+export PATH=/opt/local/bin:$PATH
+
+echo "Setting up pkgsrc and packages ... \c"
+echo "http://pkgsrc.joyent.com/2010Q3/All" > /opt/local/etc/pkgin/repositories.conf
+pkgin update > /dev/null
+pkgin -y in binutils gcc34 cscope pkg-config gmake scmgit python26 png npm GeoIP GeoLiteCity > /dev/null
+echo "done."
+EOF
+
+chmod +x /zones/$sh_zonename/root/root/setup_zone.sh
+zlogin $sh_zonename /root/setup_zone.sh || fail
+
+echo "Setup complete for zone $sh_zonename at $sh_zoneip."
+echo "Remember to set the passwords for root and $sh_user manually before using ssh."
+

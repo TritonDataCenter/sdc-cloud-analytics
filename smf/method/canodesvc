@@ -66,6 +66,11 @@ function load_nodepath
 	export NODE_PATH
 }
 
+function load_geoip
+{
+	export GEOIP_DATABASE=/opt/local/share/GeoIP/GeoIPCity.dat
+}
+
 function run_realtime
 {
 	local pid=$1
@@ -92,6 +97,7 @@ case $SMF_FMRI in
 			load_mapi
 			;;
 	*caaggsvc*)	ns_name=caaggsvc
+			load_geoip
 			;;
 	*cainstsvc*)	ns_name=cainstsvc
 			;;

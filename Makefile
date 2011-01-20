@@ -15,6 +15,7 @@ JS_SUBDIRS	 = cmd lib
 TST_SUBDIRS	 = tst
 SRC		:= $(shell pwd)
 NODEDIR		:= $(SRC)/deps/node-install/bin
+WEBREV		 = $(TOOLSDIR)/webrev_support
 
 #
 # Tools
@@ -29,12 +30,14 @@ RMTREE		 = rm -rf
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= npm
 MKERRNO		 = $(TOOLSDIR)/mkerrno
+CC		 = cc
+CFLAGS		 = -pedantic
 
 #
 # Files
 #
-JSL_CONF_MAIN		 = tools/jsl_support/jsl.conf
-JSL_CONF_WEB		 = tools/jsl_support/jsl.web.conf
+JSL_CONF_MAIN		 = $(TOOLSDIR)/jsl_support/jsl.conf
+JSL_CONF_WEB		 = $(TOOLSDIR)/jsl_support/jsl.web.conf
 DEMO_JSFILES		 = demo/basicvis/cademo.js
 DEMO_WEBJSFILES		 = demo/basicvis/caflot.js demo/basicvis/caadmin.js
 JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
@@ -188,7 +191,7 @@ NATIVE_DEPS = \
 #
 # Targets
 #
-all: $(SRC)/deps/node-install $(NATIVE_DEPS) lib/ca/errno.js
+all: $(WEBREV)/bin/codereview $(SRC)/deps/node-install $(NATIVE_DEPS) lib/ca/errno.js
 
 $(SRC)/deps/node-install:
 	mkdir -p $(SRC)/deps/node-install
@@ -238,6 +241,14 @@ xref: cscope.files
 	$(CSCOPE) -bqR
 
 .PHONY: cscope.files
+
+#
+# Bulids necessary binary components for tools
+#
+
+$(WEBREV)/bin/codereview:
+	$(CC) $(CFLAGS) $(WEBREV)/src/lwlp.c -o $(WEBREV)/bin/codereview
+	
 
 #
 # "pkg" target builds package tarball
@@ -374,6 +385,7 @@ $(DIST)/ca-pkg.tar.bz2: install $(ROOT)/pkg
 #
 clean:
 	rm -f lib/ca/errno.js
+	rm -f $(WEBREV)/bin/codereview 
 
 #
 # "dist-clean" target removes installed root and built dependencies

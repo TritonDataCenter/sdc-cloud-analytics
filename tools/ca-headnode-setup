@@ -182,7 +182,7 @@ export PATH=/opt/local/bin:$PATH
 echo "Setting up pkgsrc and packages ... \c"
 echo "http://pkgsrc.joyent.com/2010Q3/All" > /opt/local/etc/pkgin/repositories.conf
 pkgin update > /dev/null
-pkgin -y in binutils gcc34 cscope pkg-config gmake scmgit python26 png npm GeoIP GeoLiteCity > /dev/null
+pkgin -y in binutils gcc34 cscope pkg-config gmake scmgit python24 python26 png npm GeoIP GeoLiteCity ghostscript > /dev/null
 echo "done."
 EOF
 

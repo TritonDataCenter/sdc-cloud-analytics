@@ -7,7 +7,7 @@ var mod_assert = require('assert');
 var mod_tl = require('../../lib/tst/ca-test');
 var mod_ca = require('../../lib/ca/ca-common');
 
-var PORT = 23182;
+var PORT = mod_ca.ca_http_port_agg_base;
 
 var httpFail = function (errno, path)
 {

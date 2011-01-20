@@ -576,7 +576,7 @@ var checkData = function (time)
 	    mod_tl.ctHttpRequest({
 		method: 'GET',
 		path: url,
-		port: 23182
+		port: mod_ca.ca_http_port_agg_base
 	    }, function (response, rdata) {
 		mod_assert.equal(response.statusCode, 200,
 			'bad HTTP status: ' + response.statusCode);

@@ -5,8 +5,7 @@
  */
 var gServer = window.location.hostname;
 
-var gPortConfigsvc = 23181;	/* config service HTTP port */
-var gPortAggsvc = 23182;	/* aggregator HTTP port */
+var gPort = 23181;		/* config service HTTP port */
 var gPlotWidth = 600;		/* plot width (pixels) */
 var gPlotHeight = 300;		/* plot height (pixels) */
 var gnBuckets = 50;		/* vertical buckets (for heatmaps) */
@@ -73,7 +72,7 @@ function gInitColors()
  */
 function gInitMetrics()
 {
-	var url = 'http://' + gServer + ':' + gPortConfigsvc + '/ca' +
+	var url = 'http://' + gServer + ':' + gPort + '/ca' +
 	    gCustUri() + '/metrics';
 	var request = new XMLHttpRequest();
 
@@ -137,7 +136,7 @@ function gInitMetricsFini(metrics)
  */
 function gInitInstrumentations()
 {
-	var url = 'http://' + gServer + ':' + gPortConfigsvc + '/ca' +
+	var url = 'http://' + gServer + ':' + gPort + '/ca' +
 	    gCustUri() + '/instrumentations';
 	var request = new XMLHttpRequest();
 
@@ -641,9 +640,9 @@ gGraph.prototype.initUri = function ()
 	if (this.g_inst_id !== undefined)
 		this.g_uri_base += '/' + this.g_inst_id;
 
-	this.g_uri_cfg = 'http://' + gServer + ':' + gPortConfigsvc +
+	this.g_uri_cfg = 'http://' + gServer + ':' + gPort +
 	    this.g_uri_base;
-	this.g_uri_val = 'http://' + gServer + ':' + gPortAggsvc +
+	this.g_uri_val = 'http://' + gServer + ':' + gPort +
 	    this.g_uri_base + '/value/' + this.g_subtype;
 };
 

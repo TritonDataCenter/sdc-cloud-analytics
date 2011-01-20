@@ -50,8 +50,7 @@ if (dd_server) {
 
 if (dd_useproxy) {
 	console.log('Using proxy server on port 80.');
-	dd_vars.push('gPortConfigsvc = 80');
-	dd_vars.push('gPortAggsvc = 80');
+	dd_vars.push('gPort = 80');
 }
 
 mod_http.createServer(function (req, res) {

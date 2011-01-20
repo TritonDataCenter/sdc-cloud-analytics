@@ -13,9 +13,10 @@ var ASSERT = require('assert');
 
 var agg_name = 'aggsvc';		/* component name */
 var agg_vers = '0.0';			/* component version */
-var agg_http_port = 23182;		/* http port */
 var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
 var agg_http_baseuri = '/ca/';
+var agg_http_port_base = mod_ca.ca_http_port_agg_base;
+var agg_http_port;			/* actual http port */
 
 var agg_insts = {};		/* active instrumentations by id */
 var agg_default_options = { 'enabled': true, 'retention-time': 600 };
@@ -26,7 +27,7 @@ var agg_log;			/* log handle */
 
 function main()
 {
-	var http_port = agg_http_port;
+	var http_port_base = agg_http_port_base;
 	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
 	var hostname = sysinfo.ca_hostname;
@@ -60,16 +61,17 @@ function main()
 	agg_log.info('%-12s %s', 'Hostname:', hostname);
 	agg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
 	agg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
-	agg_log.info('%-12s Port %d', 'HTTP server:', http_port);
 
 	agg_http = new mod_cahttp.caHttpServer({
 	    log: agg_log,
-	    port: http_port,
+	    port_base: http_port_base,
 	    router: aggHttpRouter
 	});
 
 	agg_http.start(function () {
-	    agg_log.info('HTTP server started.');
+	    agg_http_port = agg_http.port();
+	    agg_log.info('%-12s Port %d (started)',
+		'HTTP server:', agg_http_port);
 	    amqp.start(aggStarted);
 	    setTimeout(aggTick, 1000);
 	});
@@ -77,7 +79,7 @@ function main()
 
 function aggNotifyConfig()
 {
-	agg_cap.sendNotifyAggOnline(mod_ca.ca_amqp_key_config);
+	agg_cap.sendNotifyAggOnline(mod_ca.ca_amqp_key_config, agg_http_port);
 }
 
 function aggStarted()
@@ -117,6 +119,7 @@ function aggCmdEnableAggregation(msg)
 	}
 
 	agg_cap.bind(datakey, function () {
+	    agg_log.info('aggregating instrumentation %s', id);
 	    agg_insts[id] = {
 		agi_dimension: dimension,
 		agi_since: new Date(),

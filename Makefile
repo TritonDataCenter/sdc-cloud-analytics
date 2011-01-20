@@ -28,6 +28,7 @@ TAR		 = tar
 RMTREE		 = rm -rf
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= npm
+MKERRNO		 = $(TOOLSDIR)/mkerrno
 
 #
 # Files
@@ -37,6 +38,7 @@ JSL_CONF_WEB		 = tools/jsl_support/jsl.web.conf
 DEMO_JSFILES		 = demo/basicvis/cademo.js
 DEMO_WEBJSFILES		 = demo/basicvis/caflot.js demo/basicvis/caadmin.js
 JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
+JS_FILES		+= lib/ca/errno.js
 DEMO_FILES		:= $(shell find demo -type f)
 DEMO_DIRS		:= $(shell find demo -type d)
 WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
@@ -186,7 +188,7 @@ NATIVE_DEPS = \
 #
 # Targets
 #
-all: $(SRC)/deps/node-install $(NATIVE_DEPS)
+all: $(SRC)/deps/node-install $(NATIVE_DEPS) lib/ca/errno.js
 
 $(SRC)/deps/node-install:
 	mkdir -p $(SRC)/deps/node-install
@@ -196,6 +198,9 @@ deps/node/build/default/node:
 
 %.node: $(NODE_WAF)
 	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
+
+lib/ca/errno.js: /usr/include/sys/errno.h
+	$(MKERRNO) $^ > $@
 
 #
 # "check" targets check syntax for files
@@ -208,13 +213,13 @@ check-shell: $(SH_SCRIPTS)
 
 check-jsl: check-jsl-main check-jsl-web
 
-check-jsl-main:
+check-jsl-main: $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
 	$(JSL) --conf=$(JSL_CONF_MAIN) $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
 
-check-jsl-web:
+check-jsl-web: $(WEBJS_FILES)
 	$(JSL) --conf=$(JSL_CONF_WEB) $(WEBJS_FILES)
 
-check-jsstyle:
+check-jsstyle: $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 
 check: check-shell check-manifests check-jsstyle check-jsl
@@ -368,11 +373,12 @@ $(DIST)/ca-pkg.tar.bz2: install $(ROOT)/pkg
 # "clean" target removes created files -- we currently have none
 #
 clean:
+	rm -f lib/ca/errno.js
 
 #
 # "dist-clean" target removes installed root and built dependencies
 #
-dist-clean:
+dist-clean: clean
 	(cd deps/node-kstat && $(NODE_WAF) distclean)
 	(cd deps/node-libdtrace && $(NODE_WAF) distclean)
 	(cd deps/node-png && $(NODE_WAF) distclean)

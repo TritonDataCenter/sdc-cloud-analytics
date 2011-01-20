@@ -7,7 +7,7 @@
 var mod_assert = require('assert');
 var mod_ca = require('../../lib/ca/ca-common');
 var mod_tl = require('../../lib/tst/ca-test');
-var CFG_PORT = 23181;
+var CFG_PORT = mod_ca.ca_http_port_config;
 var fakeInst, fakeAgg;
 
 /*
@@ -92,7 +92,8 @@ var startWorld = function ()
 {
 	fakeAgg.cap_amqp.start(function () {
 		mod_tl.ctStdout.info('Called agg online');
-		fakeAgg.sendNotifyAggOnline(mod_ca.ca_amqp_key_config);
+		fakeAgg.sendNotifyAggOnline(mod_ca.ca_amqp_key_config,
+		    mod_ca.ca_http_port_agg_base);
 		fakeInst.cap_amqp.start(function () {
 			mod_tl.ctStdout.info('Called inst online');
 			fakeInst.sendNotifyInstOnline(mod_ca.ca_amqp_key_config,

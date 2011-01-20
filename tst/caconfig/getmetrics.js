@@ -109,7 +109,7 @@ var checkMetrics = function ()
 	    mod_tl.ctHttpRequest({
 		method: 'GET',
 		path: url,
-		port: 23181
+		port: mod_ca.ca_http_port_config
 	    }, function (response, data) {
 		mod_assert.equal(response.statusCode, 200,
 			'bad HTTP status: ' + response.statusCode);

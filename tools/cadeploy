@@ -145,12 +145,13 @@ REMOTE_DEPLOY
 
 echo "Making remote temporary directory (may prompt for root password)"
 ssh root@$opt_h mkdir $d_tmpbase || fail "failed"
-echo "Copying script and packages to root@$opt_h via scp (may prompt for root password twice)"
+
+echo "Copying script and packages to root@$opt_h via scp (may prompt for root password)"
 scp $d_rdeploy $d_tgzs root@$opt_h:$d_tmpbase || fail "failed"
 
 echo "Invoking remote script (may prompt again)."
 ssh root@$opt_h bash $d_tmpbase/$r_rdeploy || fail "failed"
 
-echo "Removing local tarball and script ... \c"
+echo "Removing local script ... \c"
 rm -f $d_rdeploy
 echo "done."

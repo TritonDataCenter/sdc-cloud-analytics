@@ -182,7 +182,6 @@ function get-all-tests
 
 function welcome
 {
-	sleeps=2
 	NUM_TESTS=$(echo $TESTS | wc -w)
 	printf "Welcome to catest\n"
 	printf "Configuration:\n"
@@ -191,8 +190,6 @@ function welcome
 	printf "\tKeep non-failure output: $OPT_KEEP_SUCCESS\n"
 	printf "\tFound %d test(s) to run\n" $NUM_TESTS
 	printf "\n"
-	printf "Waiting %d seconds to begin testing, now is your chance to abort...\n" $sleeps
-	sleep $sleeps
 	printf "\n===================================================\n\n"
 }
 
@@ -314,7 +311,7 @@ while getopts ":o:akh" c $@; do
 		usage "option requires an argument -- $OPTARG"
 		;;
 	*)
-		echo "invalid option: $OPTARG"
+		usage "invalid option: $OPTARG"
 		;;
 	esac
 done

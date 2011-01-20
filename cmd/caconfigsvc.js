@@ -21,13 +21,13 @@ var cfg_cap;			/* camqp CAP wrapper */
 var cfg_log;			/* log handle */
 var cfg_mapi;			/* mapi handle */
 
-var cfg_name = 'configsvc';	/* component name */
-var cfg_vers = '0.0';		/* component version */
-var cfg_http_port = 23181;	/* HTTP port for API endpoint */
-var cfg_http_baseuri = '/ca';	/* base of HTTP API */
-var cfg_http_custuri = '/customers';	/* subset of HTTP API for custs */
+var cfg_name = 'configsvc';			/* component name */
+var cfg_vers = '0.0';				/* component version */
+var cfg_http_port = mod_ca.ca_http_port_config;	/* HTTP port for API endpoint */
+var cfg_http_baseuri = '/ca';			/* base of HTTP API */
+var cfg_http_custuri = '/customers';		/* cust subset of HTTP API */
 var cfg_http_insturi = '/instrumentations';	/* Part of HTTP API for insts */
-var cfg_http_valraw = '/value/raw';	/* HTTP API to get raw data */
+var cfg_http_valraw = '/value/raw';		/* HTTP API to get raw data */
 var cfg_http_valheat = '/value/heatmap';	/* HTTP API to get heatmaps */
 
 var cfg_aggregators = {};	/* all aggregators, by hostname */
@@ -156,6 +156,8 @@ function cfgHttpRouter(server)
 		server.del(base + instrumentations_id, cfgHttpInstDelete);
 		server.get(base + instrumentations_id, cfgHttpInstGetOptions);
 		server.put(base + instrumentations_id, cfgHttpInstSetOptions);
+		server.get(base + instrumentations_id + '/value/*',
+		    cfgHttpInstValue);
 	}
 }
 
@@ -224,7 +226,7 @@ function cfgHttpInstCreate(request, response)
 	 */
 	params = request.ca_json || request.ca_params;
 
-	cfg_log.dbg('request to instrument:\n%j', params);
+	cfg_log.info('request to instrument:\n%j', params);
 
 	try {
 		spec = cfgValidateMetric(params);
@@ -292,7 +294,7 @@ function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
 		    enabled: true,
 		    'retention-time': cfg_retain_default
 		},
-		agg_result: undefined,
+		agg_done: undefined,
 		insts_failed: 0,
 		insts_ok: 0,
 		insts_total: 0,
@@ -486,6 +488,24 @@ function cfgHttpInstGetOptions(request, response)
 	response.send(HTTP.OK, out);
 }
 
+function cfgHttpInstValue(request, response)
+{
+	var custid = request.params['custid'];
+	var instid = request.params['instid'];
+	var fqid = mod_ca.caQualifiedId(custid, instid);
+	var inst, port;
+
+	if (!(fqid in cfg_insts)) {
+		response.send(HTTP.ENOTFOUND);
+		return;
+	}
+
+	inst = cfg_insts[fqid];
+	port = inst.aggregator.cag_http_port;
+	ASSERT.ok(port);
+	mod_cahttp.caHttpForward(request, response, '127.0.0.1', port);
+}
+
 function cfgAggEnable(aggregator, id)
 {
 	var statkey = mod_ca.caKeyForInst(id);
@@ -661,6 +681,11 @@ function cfgNotifyAggregatorOnline(msg)
 {
 	var id, agg, action;
 
+	if (!('ag_http_port' in msg)) {
+		cfg_log.warn('ignoring aggonline msg with no port: %j', msg);
+		return;
+	}
+
 	if (msg.ca_hostname in cfg_aggregators) {
 		agg = cfg_aggregators[msg.ca_hostname];
 		action = 'restarted';
@@ -678,6 +703,7 @@ function cfgNotifyAggregatorOnline(msg)
 	agg.cag_os_name = msg.ca_os_name;
 	agg.cag_os_release = msg.ca_os_release;
 	agg.cag_os_revision = msg.ca_os_revision;
+	agg.cag_http_port = msg.ag_http_port;
 
 	for (id in agg.cag_insts)
 		cfgAggEnable(agg, id);

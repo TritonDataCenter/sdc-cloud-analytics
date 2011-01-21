@@ -1,4 +1,4 @@
-#!/usr/bin/perl -W
+#!/usr/bin/env perl -W
 
 #
 # mkerrno: generate a node module with errno constants from STDIN in the form

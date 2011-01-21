@@ -1,0 +1,10 @@
+#
+# CA repo patterns to ignore for version control.
+#
+*.pyc
+*.o
+build
+cscope.*
+deps/node-install
+lib/ca/errno.js
+tools/webrev_support/bin/codereview

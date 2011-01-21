@@ -1,0 +1,10 @@
+#
+# Sample per-user gitignore file for CA developers.  To use this, copy this
+# file to ~/.gitignore and add a reference to your ~/.gitconfig file to use
+# it.  These patterns can't just be put in the repository's gitignore file
+# because git won't check that for our submodules' directories.
+#
+*.node
+.*.swp
+.lock-wscript
+build

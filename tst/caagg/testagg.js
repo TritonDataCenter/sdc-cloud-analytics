@@ -435,6 +435,18 @@ var createExpOutKeyDist = function (nhosts, baseVal)
 
 var keyDistDim = 3;
 
+var getDataUndefined = function (hostid, baseVal)
+{
+	return (undefined);
+};
+
+var createExpOutUndefined = function (nhosts, baseVal)
+{
+	return (0);
+};
+
+var undefinedDim = 1;
+
 /*
  * Variables that we want to use for the test
  */
@@ -443,7 +455,7 @@ var cid = 1;
 var id = mod_tl.ctGetQualId(undefined, cid);
 var baseValue = 42;
 var insts = [];
-var nsources, exp, createExpOut, getData, dim, validate;
+var nsources, exp, createExpOut, getData, dim;
 
 if (process.argv.length != 4) {
 	mod_tl.ctStdout.error('testagg.js: test-type nhosts');
@@ -488,6 +500,11 @@ switch (process.argv[2]) {
 		createExpOut = createExpOutKeyDist;
 		dim = keyDistDim;
 		break;
+	case 'undefined':
+		getData = getDataUndefined;
+		createExpOut = createExpOutUndefined;
+		dim = undefinedDim;
+		break;
 	default:
 		mod_tl.ctStdout.error('testagg.js: Invalid test type: ' +
 		    process.argv[2]);
@@ -498,7 +515,7 @@ switch (process.argv[2]) {
 mod_tl.ctStdout.info(mod_ca.caSprintf('Running test %s with %d instrumenters',
     process.argv[2], nsources));
 
-mod_assert.ok(getData != null, 'bad geData function');
+mod_assert.ok(getData != null, 'bad getData function');
 mod_assert.ok(createExpOut != null, 'bad createExpOut function');
 mod_assert.ok(dim != null, 'bad dimension');
 
@@ -541,6 +558,7 @@ var startWorld = function ()
 
 	fakeConfig.cap_amqp.start(function () {
 		mod_tl.ctStdout.info('Called config service Online');
+		mod_assert.ok(!notified);
 		fakeConfig.sendNotifyCfgOnline(mod_ca.ca_amqp_key_all);
 	});
 };
@@ -566,8 +584,9 @@ var sendData = function (source)
 	mod_tl.advance(time);
 };
 
-var checkData = function (time)
+var retrieveData = function (time)
 {
+	var response_data;
 	var func = function (resFunc) {
 	    var url = mod_ca.caSprintf(
 		'/ca/instrumentations/%d/value/raw?start_time=%d',
@@ -578,40 +597,39 @@ var checkData = function (time)
 		path: url,
 		port: mod_ca.ca_http_port_agg_base
 	    }, function (response, rdata) {
-		mod_assert.equal(response.statusCode, 200,
-			'bad HTTP status: ' + response.statusCode);
-		var resp = JSON.parse(rdata);
-
 		try {
-			mod_tl.ctStdout.info(mod_ca.caSprintf('Got value: %j',
-resp.value));
-			if (validate) {
-				validate(resp.value, exp);
-			} else  {
-				mod_assert.deepEqual(resp.value, exp,
-				    mod_ca.caSprintf(
-				    'wrong value for data: expected: %j,' +
-				    'got msg: %j', exp, resp));
-			}
+			mod_assert.equal(response.statusCode, 200,
+			    'bad HTTP status: ' + response.statusCode);
+			response_data = JSON.parse(rdata);
+			mod_assert.equal(response_data.nreporting, nsources);
 		} catch (ex) {
+			mod_tl.ctStdout.dbg('polling: %j', ex);
 			resFunc(ex);
 			return;
 		}
-
-		resFunc(null, 0);
-
+		resFunc(null);
 	    });
 	};
 
-	var suc = function () { process.exit(0); };
+	var next = function () { mod_tl.advance(response_data); };
+	mod_tl.ctTimedCheck(func, next, 50, 500);
+};
 
-	mod_tl.ctTimedCheck(func, suc, 50, 500);
+var checkData = function (rdata)
+{
+	mod_tl.ctStdout.info(mod_ca.caSprintf('Response: %j', rdata));
+
+	mod_assert.deepEqual(rdata.value, exp,
+	    mod_ca.caSprintf('wrong value for data: expected: %j,' +
+	    'got msg: %j', exp, rdata));
+
+	process.exit(0);
 };
 
 /*
  * Push everything
  */
-mod_tl.ctPushFunc(startWorld, enableAgg, sendData, checkData);
+mod_tl.ctPushFunc(startWorld, enableAgg, sendData, retrieveData, checkData);
 
 /*
  * Start the test!

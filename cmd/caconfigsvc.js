@@ -503,7 +503,7 @@ function cfgHttpInstValue(request, response)
 	inst = cfg_insts[fqid];
 	port = inst.aggregator.cag_http_port;
 	ASSERT.ok(port);
-	mod_cahttp.caHttpForward(request, response, '127.0.0.1', port);
+	mod_cahttp.caHttpForward(request, response, '127.0.0.1', port, cfg_log);
 }
 
 function cfgAggEnable(aggregator, id)

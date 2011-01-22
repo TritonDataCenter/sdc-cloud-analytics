@@ -424,6 +424,7 @@ function aggHttpValueRawDone(id, when, request, response)
 {
 	var inst = agg_insts[id];
 	var record = inst.agi_values[when];
+	var zero = inst.agi_dimension > 1 ? {} : 0;
 	var ret;
 
 	ret = {};
@@ -431,10 +432,10 @@ function aggHttpValueRawDone(id, when, request, response)
 	ret.nsources = inst.agi_sources.nsources;
 
 	if (record) {
-		ret.value = record.value;
+		ret.value = record.value !== undefined ? record.value : zero;
 		ret.nreporting = record.count;
 	} else {
-		ret.value = inst.agi_dimension > 1 ? {} : 0;
+		ret.value = zero;
 		ret.nreporting = 0;
 	}
 
@@ -447,31 +448,84 @@ function aggHttpValueHeatmap(request, response)
 	aggHttpValueCommon(request, response, aggHttpValueHeatmapDone);
 }
 
-function aggReaggregate(data, selected)
+/*
+ * This complex helper function deserves some explanation.  aggExtractDatasets
+ * converts raw data from an instrumentation into a list of datasets to be shown
+ * on the heatmap and a set of values present in the heatmap.
+ *
+ * The input parameters are:
+ *
+ *	data		Represents the raw data for a heatmap-capable
+ *			instrumentation over a particular period of time
+ *			corresponding to a user request.
+ *
+ *	selected	An array of selected values.  This can only be non-empty
+ *			if the instrumentation contains a decomposition by a
+ *			discrete field, in which case the members of 'selected'
+ *			are particular values of the field that the user wants
+ *			broken out separately.
+ *
+ *	dimension	Dimensionality of the instrumentation.  Tells us whether
+ *			there's a discrete decomposition or not.
+ *
+ * This function returns an object with the following fields:
+ *
+ *	data		An array of datasets that's a precursor to the heatmap
+ *			input. Basically, each element corresponds to a set of
+ *			data points that will be drawn with a unique hue on the
+ *			heatmap.  The first element represents all points on the
+ *			heatmap, and subsequent elements represents points
+ *			corresponding to selected fields.  (The caller will
+ *			deduct these from the first element when it actually
+ *			draws the heatmap.)
+ *
+ *	present		If the instrumentation contains no discrete
+ *			decomposition, this object is empty.  If it does, this
+ *			object's keys represent the set of values for the
+ *			discrete decomposed field which have non-zero components
+ *			anywhere in the resulting heatmap.
+ */
+function aggExtractDatasets(data, selected, dimension)
 {
 	var totals, decomposed, present;
 	var retdata, time, ii, key;
 
+	/*
+	 * We can only be invoked for heatmaps (implies dimension >= 2) and we
+	 * don't support more than 2 decompositions (implies dimension <= 3).
+	 */
+	ASSERT.ok(dimension == 2 || dimension == 3);
+
+	/*
+	 * Regardless of anything else, if there's no data for this
+	 * instrumentation then there's exactly one dataset which is empty and
+	 * no fields are present.
+	 */
 	if (mod_ca.caIsEmpty(data))
 		return ({ data: [ {} ], present: {} });
 
-	for (time in data) {
-		if (data[time].constructor == Array) {
-			/*
-			 * Easy case: there is no additional decomposition.
-			 */
-			return ({ data: [ data ], present: {}});
-		}
-	}
+	/*
+	 * The next simplest case is where there's no additional discrete
+	 * decomposition.  Recall that this function is only ever invoked in the
+	 * heatmap case, so the instrumentation must be a numeric decomposition,
+	 * so it has dimension at least 2.  If there's no discrete
+	 * decomposition, then dimension == 2.  In that case, there's exactly
+	 * one dataset containing all of the points and no broken-out values are
+	 * present.
+	 */
+	if (dimension == 2)
+		return ({ data: [ data ], present: {} });
 
 	/*
-	 * In this case, there's a decomposition but the user may or may not be
-	 * viewing it right now.  At the very least we should come up with the
-	 * totals and present values.
+	 * We have a discrete decomposition field.  If the user has selected
+	 * particular values of that field, we'll have to go extract their
+	 * components and return them as separate datasets.  But whether or not
+	 * any values are selected we must calculate the totals and present
+	 * values by looking at the component values for each field.
 	 */
+	retdata = [];
 	totals = {};
 	present = {};
-	retdata = [];
 
 	for (time in data) {
 		totals[time] = [];
@@ -485,11 +539,17 @@ function aggReaggregate(data, selected)
 
 	retdata.push(totals);
 
+	/*
+	 * If there are zero fields selected, we're done.  Just return one
+	 * dataset representing the totals and the set of present fields we just
+	 * computed.
+	 */
 	if (selected.length === 0)
 		return ({ data: retdata, present: present });
 
 	/*
-	 * Hardest case: the user has also selected some particular values.
+	 * In this case the user has actually selected some values so we must
+	 * extract those as separate datasets.
 	 */
 	decomposed = {};
 	for (ii = 0; ii < selected.length; ii++)
@@ -725,7 +785,7 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 		nsamples: duration
 	};
 
-	agg = aggReaggregate(rawdata, selected);
+	agg = aggExtractDatasets(rawdata, selected, inst.agi_dimension);
 	datasets = [];
 	for (ii = 0; ii < agg.data.length; ii++)
 		datasets.push(mod_heatmap.bucketize(agg.data[ii], conf));

@@ -41,7 +41,7 @@ OPT_RUN_ALL=0
 OPT_OUTPUT_DIR=""
 
 #
-# Name for our restults directory
+# Name for our results directory
 #
 OUTPUT_DIR_NAME="catest.$$"
 
@@ -185,7 +185,7 @@ function welcome
 	NUM_TESTS=$(echo $TESTS | wc -w)
 	printf "Welcome to catest\n"
 	printf "Configuration:\n"
-	printf "\tOutput Directory: $OUTPUT_BASE_DIR\n"
+	printf "\tOutput Directory: $OUTPUT_BASE_DIR/$OUTPUT_DIR_NAME\n"
 	printf "\tNode executable: $NODE_EXEC\n"
 	printf "\tKeep non-failure output: $OPT_KEEP_SUCCESS\n"
 	printf "\tFound %d test(s) to run\n" $NUM_TESTS
@@ -356,3 +356,4 @@ for t in $TESTS; do
 done
 results
 cleanup
+exit $CURRENT_FAILURES

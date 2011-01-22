@@ -58,5 +58,6 @@ runtest 'key-key-scalar' 10
 runtest 'simple-dist' 10
 runtest 'hole-dist' 10
 runtest 'key-dist' 10
+runtest 'undefined' 1
 
 exit 0

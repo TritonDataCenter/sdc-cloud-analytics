@@ -344,6 +344,8 @@ function insTick()
 
 	for (id in ins_insts) {
 		value = ins_insts[id].is_impl.value();
+		if (value === undefined)
+			ins_log.warn('undefined value from inst %s', id);
 		ins_cap.sendData(ins_insts[id].is_inst_key, id, value, when);
 	}
 

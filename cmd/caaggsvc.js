@@ -283,9 +283,11 @@ function aggAggregateDistribution(map, key, newdist)
 		 * The current range in the new distribution doesn't match any
 		 * existing range in the old distribution, so just insert the
 		 * new data point wherever we are (which may be the end of the
-		 * old distribution).
+		 * old distribution).  We create a new data point consisting of
+		 * a reference to the range in the new distribution (ranges are
+		 * immutable) and a copy of the range's value.
 		 */
-		olddist.splice(oo, 0, newdist[nn]);
+		olddist.splice(oo, 0, [ newdist[nn][0], newdist[nn][1] ]);
 	}
 }
 

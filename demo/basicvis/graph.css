@@ -17,11 +17,13 @@ tr {
 }
 
 .gToolbar {
-	padding-bottom: 14px;
 	padding-left: 4px;
 	padding-right: 4px;
+	padding-top: 4px;
+	padding-bottom: 4px;
 	width: 810px;
-	height: 15px;
+	height: auto;
+	overflow: auto;
 	margin-bottom: 10px;
 }
 
@@ -30,7 +32,20 @@ tr {
 	padding-right: 4px;
 }
 
-.gToolbar > h3 {
-	padding-left: 10px;
+.gToolbar > p {
 	color: #666666;
+	font-size: 1.4em;
+	float: right;
+}
+
+.gNumeric > p {
+	width: 500px;
+	margin: 5px;
+	margin-top: 7px;
+}
+
+.gDiscrete > p {
+	width: 650px;
+	margin: 5px;
+	margin-top: 7px;
 }

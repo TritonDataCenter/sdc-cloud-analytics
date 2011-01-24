@@ -4,6 +4,7 @@
 
 var mod_ca = require('../../../lib/ca/ca-common');
 var mod_dtrace = require('libdtrace');
+var mod_capred = require('../../../lib/ca/ca-pred');
 var mod_sys = require('sys');
 var ASSERT = require('assert');
 
@@ -54,6 +55,16 @@ var insdFields = {
 	optype: '(args[0]->b_flags & B_READ ? "read" : "write")'
 };
 
+/*
+ * A utility to create the probe-specific insdFields object
+ */
+function insFieldsCreate(obj)
+{
+	var copy = mod_ca.caDeepCopy(insdFields);
+	mod_ca.caDeepCopyInto(copy, obj);
+	return (copy);
+}
+
 function insdMakePredicate(predicates)
 {
 	if (predicates.length === 0)
@@ -67,11 +78,15 @@ function insdMakePredicate(predicates)
 function insdSyscalls(metric)
 {
 	var decomps = metric.is_decomposition;
-	var latency = false;
+	var hasPredicate = false;
+	var aggLatency = false;
+	var traceLatency = false;
 	var script = '';
-	var action, predicates, zones, indexes, index, zero, ii;
+	var action, predicates, zones, indexes, index, zero, ii, pred;
 
 	predicates = [];
+
+	hasPredicate = mod_capred.caPredNonTrivial(metric.is_predicate);
 
 	if (metric.is_zones) {
 		zones = metric.is_zones.map(function (elt) {
@@ -84,13 +99,17 @@ function insdSyscalls(metric)
 	indexes = [];
 	for (ii = 0; ii < decomps.length; ii++) {
 		if (decomps[ii] == 'latency') {
-			latency = true;
+			traceLatency = true;
+			aggLatency = true;
 			continue;
 		}
 
 		ASSERT.ok(decomps[ii] in insdFields);
 		indexes.push(insdFields[decomps[ii]]);
 	}
+
+	if (mod_capred.caPredContainsField('latency', metric.is_predicate))
+		traceLatency = true;
 
 	ASSERT.ok(indexes.length < 2); /* could actually support more */
 
@@ -99,30 +118,48 @@ function insdSyscalls(metric)
 		zero = {};
 	} else {
 		index = '';
-		zero = latency ? [] : 0;
+		zero = aggLatency ? [] : 0;
 	}
 
-	if (latency) {
-		action = 'lquantize(timestamp - self->ts, 0, 100000, 100);';
+	if (traceLatency) {
 		script += 'syscall:::entry\n' +
 		    insdMakePredicate(predicates) +
 		    '{\n' +
 		    '\tself->ts = timestamp;\n' +
 		    '}\n\n';
 		predicates = [ 'self->ts' ];
+	}
+
+	if (aggLatency) {
+		action = 'lquantize(timestamp - self->ts, 0, 100000, 100);';
 	} else {
 		action = 'count();';
 	}
+
+	if (hasPredicate) {
+		pred = mod_ca.caDeepCopy(metric.is_predicate);
+		mod_capred.caPredReplaceFields(insFieldsCreate({
+		    latency: '(timestamp - self->ts)'
+		}), pred);
+		predicates.push(mod_capred.caPredPrint(pred));
+	}
+
 
 	script += 'syscall:::return\n';
 	script += insdMakePredicate(predicates);
 	script += '{\n';
 	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
 
-	if (latency)
+	script += '}\n';
+
+	if (traceLatency) {
+		script += '\nsyscall:::return\n';
+		script += '{\n';
+
 		script += '\tself->ts = 0;\n';
 
-	script += '}\n';
+		script += '}\n';
+	}
 
 	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
 }
@@ -130,11 +167,16 @@ function insdSyscalls(metric)
 function insdIops(metric)
 {
 	var decomps = metric.is_decomposition;
-	var latency = false;
 	var script = '';
-	var action, predicates, zones, indexes, index, zero, ii;
+	var ii, predicates, zones, indexes, zero, index;
+	var fields, before, hasPredicate, pred;
+	var aggLatency, action;
 
 	predicates = [];
+	before = [];
+
+	hasPredicate = mod_capred.caPredNonTrivial(metric.is_predicate);
+	fields = mod_capred.caPredFields(metric.is_predicate);
 
 	if (metric.is_zones) {
 		zones = metric.is_zones.map(function (elt) {
@@ -142,17 +184,30 @@ function insdIops(metric)
 		});
 
 		predicates.push(zones.join(' ||\n'));
+
+		if (!mod_ca.caArrayContains(fields, 'zonename'))
+			fields.push('zonename');
 	}
 
+	/*
+	 * The indexes variable is being used to determine how we aggregate the
+	 * data ultimately where as the fields, determine which data we need to
+	 * store during the entry probe
+	 */
 	indexes = [];
 	for (ii = 0; ii < decomps.length; ii++) {
 		if (decomps[ii] == 'latency') {
-			latency = true;
+			aggLatency = true;
+			if (!mod_ca.caArrayContains(fields, decomps[ii]))
+				fields.push(decomps[ii]);
 			decomps.splice(ii--, 1);
 			continue;
 		}
 
 		ASSERT.ok(decomps[ii] in insdFields);
+		if (!mod_ca.caArrayContains(fields, decomps[ii]))
+			fields.push(decomps[ii]);
+
 		indexes.push(insdFields[decomps[ii]]);
 	}
 
@@ -165,46 +220,63 @@ function insdIops(metric)
 		zero = {};
 	} else {
 		index = '';
-		zero = latency ? [] : 0;
+		zero = aggLatency ? [] : 0;
 	}
 
-	if (latency || indexes.length > 0) {
+	for (ii = 0; ii < fields.length; ii++) {
+		if (fields[ii] != 'latency' && fields[ii] != 'optype')
+			before.push(fields[ii]);
+	}
+
+	if (aggLatency || before.length > 0) {
 		script += 'io:::start\n';
-		script += insdMakePredicate(predicates);
 		script += '{\n';
 
-		if (latency)
-		    script += '\tstarts[arg0] = timestamp;\n';
+		if (mod_ca.caArrayContains(fields, 'latency'))
+			script += '\tlatencys[arg0] = timestamp;\n';
 
-		for (ii = 0; ii < indexes.length; ii++)
+		for (ii = 0; ii < before.length; ii++)
 			script += mod_ca.caSprintf('\t%ss[arg0] = %s;\n',
-			    decomps[ii], indexes[ii]);
+			    before[ii], insdFields[before[ii]]);
 
 		script += '}\n\n';
+	}
 
-		if (latency) {
-			action = 'lquantize(timestamp - starts[arg0]' +
-			    ', 0, 100000, 100);';
-			predicates = [ 'starts[arg0]' ];
-		} else {
-			action = 'count();';
-			predicates = [ mod_ca.caSprintf(
-			    '%ss[arg0] != NULL', decomps[0]) ];
-		}
+	if (aggLatency) {
+		action = 'lquantize(timestamp - latencys[arg0]' +
+		    ', 0, 100000, 100);';
+		predicates.push('latencys[arg0]');
+	} else if (indexes.length > 0) {
+		action = 'count();';
+		predicates.push(mod_ca.caSprintf('%ss[arg0] != NULL',
+		    decomps[0]));
 	} else {
 		action = 'count();';
+	}
+
+	if (hasPredicate) {
+		pred = mod_ca.caDeepCopy(metric.is_predicate);
+		mod_capred.caPredReplaceFields({
+		    latency: '(timestamp - latencys[arg0])',
+		    zonename: 'zonenames[arg0]',
+		    hostname: 'hostnames[arg0]',
+		    execname: 'execnames[arg0]',
+		    optype: '(args[0]->b_flags & B_READ ? "read" : "write")'
+		}, pred);
+		predicates.push(mod_capred.caPredPrint(pred));
 	}
 
 	script += 'io:::done\n';
 	script += insdMakePredicate(predicates);
 	script += '{\n';
 	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
+	script += '}\n\n';
 
-	if (latency)
-		script += '\tstarts[arg0] = 0;\n';
+	script += 'io:::done\n';
+	script += '{\n';
 
-	for (ii = 0; ii < indexes.length; ii++)
-		script += mod_ca.caSprintf('\t%ss[arg0] = 0\n', decomps[ii]);
+	for (ii = 0; ii < fields.length; ii++)
+		script += mod_ca.caSprintf('\t%ss[arg0] = 0;\n', fields[ii]);
 
 	script += '}\n';
 

@@ -6,6 +6,7 @@ var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_log = require('../lib/ca/ca-log');
+var mod_capred = require('../lib/ca/ca-pred');
 
 var ins_name = 'instsvc';	/* component name */
 var ins_vers = '0.0';		/* component version */
@@ -401,7 +402,7 @@ function insCmdEnable(msg)
 	    !('is_stat' in msg) || !('is_predicate' in msg) ||
 	    !('is_decomposition' in msg) || !('is_inst_key' in msg)) {
 		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
-		    'missing field', id);
+		    'missing field', id, msg.is_inst_id);
 		return;
 	}
 
@@ -432,13 +433,27 @@ function insCmdEnable(msg)
 				break;
 		}
 
+		if (!mod_ca.caIsEmpty(msg.is_predicate)) {
+			try {
+				mod_capred.caPredValidate(metrics[ii].fields,
+				    msg.is_predicate);
+			} catch (ex) {
+				if (ex instanceof
+				    mod_capred.caPredValidationError)
+					continue;
+
+				ins_log.exception(ex);
+				continue;
+			}
+		}
+
 		if (jj == msg.is_decomposition.length)
 			break;
 	}
 
 	if (ii == metrics.length) {
 		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
-		    'unsupported decomposition', id);
+		    'unsupported decomposition and/or predicate', id);
 		return;
 	}
 

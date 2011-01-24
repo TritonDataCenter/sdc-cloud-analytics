@@ -12,6 +12,7 @@ var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
+var mod_capred = require('../lib/ca/ca-pred');
 var mod_log = require('../lib/ca/ca-log');
 var mod_mapi = require('../lib/ca/ca-mapi');
 var HTTP = require('../lib/ca/http-constants');
@@ -354,7 +355,7 @@ function cfgPickAggregator()
  */
 function cfgValidateMetric(params)
 {
-	var decomp;
+	var decomp, pred, stat;
 	var spec = {};
 	var check = function (obj, field, required) {
 		if (required && !obj[field])
@@ -366,12 +367,24 @@ function cfgValidateMetric(params)
 	spec.modname = check(params, 'module', true);
 	spec.statname = check(params, 'stat', true);
 	decomp = check(params, 'decomposition', false);
+	pred = check(params, 'predicate', false);
 
 	if (typeof (decomp) == typeof (''))
 		decomp = decomp.length > 0 ? decomp.split(',') : [];
 
 	spec.decomp = decomp;
 	spec.stattype = cfgStatType(spec.modname, spec.statname, spec.decomp);
+
+	/* Validate the predicate */
+	if (pred !== '') {
+		pred = JSON.parse(pred);
+		stat = cfg_statmods[spec.modname]['stats'][spec.statname];
+		mod_capred.caPredValidate(stat['fields'], pred);
+		spec.pred = pred;
+	} else {
+		spec.pred = {};
+	}
+
 	return (spec);
 }
 
@@ -868,8 +881,6 @@ function cfgStatType(modname, statname, decomp)
 		if (fields[field].type == 'numeric')
 			type = 'numeric-decomposition';
 	}
-
-	/* XXX validate predicate */
 
 	return ({ dimension: decomp.length + 1, type: type });
 }

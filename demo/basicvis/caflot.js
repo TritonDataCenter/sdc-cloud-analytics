@@ -180,7 +180,8 @@ function gInitInstrumentationsFini(instrumentations)
 			metric: metric,
 			decomps: inst.decomp,
 			customer_id: inst.customer_id,
-			inst_id: inst.inst_id
+			inst_id: inst.inst_id,
+			predicate: inst.pred
 		});
 
 		container.appendChild(graph.getContainer());
@@ -228,7 +229,7 @@ function gAddStat()
 {
 	var statsel, decompsel, decomp2sel;
 	var statoption, decompoption, decomp2option;
-	var container, metric, decomps, graph;
+	var metric, decomps, graph, preds;
 
 	statsel = document.getElementById('gStatSelector');
 	statoption = statsel.options[statsel.selectedIndex];
@@ -239,6 +240,7 @@ function gAddStat()
 
 	metric = gMetrics[statoption.value];
 	decomps = [];
+	preds = {};
 
 	if (decompoption.value !== '')
 		decomps.push(decompoption.value);
@@ -249,20 +251,11 @@ function gAddStat()
 	graph = new gGraph({
 		metric: metric,
 		decomps: decomps,
+		predicate: preds,
 		customer_id: gCustId() || undefined
 	});
 
-	container = document.getElementById('gContainerDiv');
-	container.appendChild(graph.getContainer());
-	graph.serverCreate(function (err, result) {
-		if (err) {
-			container.removeChild(graph.getContainer());
-			alert(err);
-			return;
-		}
-
-		gGraphs[graph.getId()] = graph;
-	});
+	gAppendGraph(graph);
 }
 
 /*
@@ -380,6 +373,8 @@ function gDecompSelected()
  *
  *	decomps		list of fields identifying the decomposition
  *
+ *	predicate	the JSON representation of a predicate
+ *
  * The following configuration options identifying the customer id (scope) and
  * instrumentation id MAY be specified:
  *
@@ -394,6 +389,7 @@ function gGraph(conf)
 	this.g_decomps = conf.decomps;
 	this.g_custid = conf.customer_id;
 	this.g_inst_id = conf.inst_id;
+	this.g_predicate = conf.predicate;
 
 	this.g_title = conf.metric.modlabel + ': ' + conf.metric.statlabel;
 
@@ -403,6 +399,10 @@ function gGraph(conf)
 			return (conf.metric.fields[elt].label);
 		    }).join(' and ');
 	}
+
+	if (!isEmpty(conf.predicate))
+		this.g_title += ' predicated on ' +
+		    this.predName(conf.predicate);
 
 	this.initDetails();
 	this.initDom();
@@ -474,6 +474,10 @@ gGraph.prototype.initDetails = function ()
 		} else {
 			this.g_columns.push({ sTitle: 'value' });
 		}
+	}
+
+	if (!isEmpty(this.g_predicate)) {
+		this.g_body += '&predicate=' + JSON.stringify(this.g_predicate);
 	}
 
 	if (this.g_subtype == 'raw') {
@@ -553,9 +557,10 @@ gGraph.prototype.initDom = function ()
 gGraph.prototype.createToolbar = function ()
 {
 	var graph = this;
-	var head, subdiv, button;
+	var head, subdiv, button, drill;
+	var dialog, diadiv, diaform, diacur, enabDia, diaOpt, diasel;
 
-	head = document.createElement('h3');
+	head = document.createElement('p');
 	head.appendChild(document.createTextNode(this.g_title));
 
 	subdiv = document.createElement('div');
@@ -569,9 +574,95 @@ gGraph.prototype.createToolbar = function ()
 		icons: { primary: 'ui-icon-trash' }
 	}).click(function () { gRemoveStat(graph); });
 
+	dialog = subdiv.appendChild(document.createElement('div'));
+	$(dialog).dialog({
+		autoOpen: false,
+		title: 'Create Drilldown'
+	});
+
+	diadiv = document.createElement('div');
+
+	$(dialog).append(diadiv);
+
+	diaform = diadiv.appendChild(document.createElement('form'));
+	var diapar = diaform.appendChild(document.createElement('p'));
+	diapar.appendChild(document.createTextNode('Field: '));
+	diacur = diapar.appendChild(document.createElement('select'));
+	diacur.id = 'gDrilldownField' + graph.g_id;
+	diacur.onchange = function () {
+	    var graphid = graph.g_id;
+	    gDrillFieldChanged(graphid);
+	};
+
+	diasel = diacur;
+
+	enabDia = false;
+	diaOpt = diacur.appendChild(document.createElement('option'));
+	diaOpt.value = '';
+	diaOpt.appendChild(document.createTextNode('<None>'));
+	for (var field in graph.g_metric.fields) {
+		enabDia = true;
+		diaOpt = diacur.appendChild(
+		    document.createElement('option'));
+		diaOpt.value = field;
+		diaOpt.appendChild(document.createTextNode(
+		    graph.g_metric.fields[field].label));
+	}
+
+	diapar = diaform.appendChild(document.createElement('p'));
+	diapar.appendChild(document.createTextNode('Operator: '));
+	diacur = diapar.appendChild(document.createElement('select'));
+	diacur.id = 'gDrilldownOperator' + graph.g_id;
+	diaOpt = diacur.appendChild(document.createElement('option'));
+	diaOpt.value = '';
+	diaOpt.appendChild(document.createTextNode('<None>'));
+	diacur.disabled = true;
+	diacur.onclick = function () {
+	    var graphid = graph.g_id;
+	    gDrillOpChanged(graphid);
+	};
+
+	diapar = diaform.appendChild(document.createElement('p'));
+	diacur = diapar.appendChild(document.createElement('label'));
+	diacur.appendChild(document.createTextNode('Value: '));
+	diacur = diapar.appendChild(document.createElement('input'));
+	diacur.type = 'text';
+	diacur.disabled = true;
+	diacur.id = 'gDrilldownValue' + graph.g_id;
+
+	diapar = diaform.appendChild(document.createElement('p'));
+	diacur = diapar.appendChild(document.createElement('input'));
+	diacur.disabled = true;
+	diacur.type = 'button';
+	diacur.id = 'gDrilldownSubmit' + graph.g_id;
+	diacur.value = 'Drilldown!';
+	diacur.onclick = function () {
+	    var gid = graph.g_id;
+	    var dia = dialog;
+	    gDrillSubmit(gid, dia);
+	};
+
+	if (enabDia) {
+		drill = subdiv.appendChild(document.createElement('button'));
+
+		drill.appendChild(document.createTextNode('drilldown'));
+		$(drill).button({
+		    label: 'drilldown'
+		}).click(function () {
+		    /* Make sure we reset the drilldown to empty */
+		    diasel.selectedIndex = 0;
+		    gDrillFieldChanged(graph.g_id);
+		    $(dialog).dialog('close');
+		    $(dialog).dialog('open');
+		});
+	}
+
 	if (this.g_subtype != 'heatmap') {
 		subdiv.appendChild(head);
+		subdiv.className += ' gDiscrete';
 		return (subdiv);
+	} else {
+		subdiv.className += ' gNumeric';
 	}
 
 	subdiv.appendChild(this.createButton('isolate', [
@@ -1365,4 +1456,190 @@ gColor.prototype.css = function ()
 gColor.prototype.toString = function ()
 {
 	return (this.css());
+};
+
+function gDrillFieldChanged(graphId)
+{
+	var fieldSel, opSel, valSel, opt, field, metric, subSel;
+
+	fieldSel = document.getElementById('gDrilldownField' + graphId);
+	field = fieldSel.options[fieldSel.selectedIndex];
+	opSel = document.getElementById('gDrilldownOperator' + graphId);
+	valSel = document.getElementById('gDrilldownValue' + graphId);
+	valSel.value = '';
+	valSel.disabled = true;
+	subSel = document.getElementById('gDrilldownSubmit' + graphId);
+	subSel.disabled = true;
+
+	opSel.disabled = true;
+	while (opSel.options.length > 0)
+		opSel.remove(opSel.options[0]);
+
+	opt = opSel.appendChild(document.createElement('option'));
+	opt.value = '';
+	opt.appendChild(document.createTextNode('<none>'));
+
+	if (field.value === '')
+		return;
+
+	metric = gGraphs[graphId].g_metric;
+
+	opSel.disabled = false;
+
+	opt = opSel.appendChild(document.createElement('option'));
+	opt.value = 'eq';
+	opt.appendChild(document.createTextNode('=='));
+
+	opt = opSel.appendChild(document.createElement('option'));
+	opt.value = 'ne';
+	opt.appendChild(document.createTextNode('!='));
+
+	if (metric.fields[field.value].type != 'numeric')
+		return;
+
+	opt = opSel.appendChild(document.createElement('option'));
+	opt.value = 'ge';
+	opt.appendChild(document.createTextNode('>='));
+
+	opt = opSel.appendChild(document.createElement('option'));
+	opt.value = 'gt';
+	opt.appendChild(document.createTextNode('>'));
+
+	opt = opSel.appendChild(document.createElement('option'));
+	opt.value = 'lt';
+	opt.appendChild(document.createTextNode('<'));
+
+	opt = opSel.appendChild(document.createElement('option'));
+	opt.value = 'le';
+	opt.appendChild(document.createTextNode('<='));
+}
+
+function gDrillOpChanged(graphId)
+{
+	var opSel, valSel, subSel;
+
+	opSel = document.getElementById('gDrilldownOperator' + graphId);
+	valSel = document.getElementById('gDrilldownValue' + graphId);
+	subSel = document.getElementById('gDrilldownSubmit' + graphId);
+
+	valSel.disabled = true;
+	subSel.disabled = true;
+
+	if (opSel.options[opSel.selectedIndex].value === '')
+		return;
+
+	valSel.disabled = false;
+	subSel.disabled = false;
+}
+
+function gDrillSubmit(graphId, dialog)
+{
+	var field, op, val;
+	var fieldSel, opSel, valSel;
+	var pred, npred, graph;
+
+	fieldSel = document.getElementById('gDrilldownField' + graphId);
+	opSel = document.getElementById('gDrilldownOperator' + graphId);
+	valSel = document.getElementById('gDrilldownValue' + graphId);
+
+	field = fieldSel.options[fieldSel.selectedIndex].value;
+	op = opSel.options[opSel.selectedIndex].value;
+	val = valSel.value;
+
+	npred = {};
+	npred[op] = [ field, val];
+
+	pred = gGraphs[graphId].g_predicate;
+	if (!isEmpty(pred)) {
+		pred = { and: [ pred, npred ] };
+	} else {
+		pred = npred;
+	}
+
+	graph = new gGraph({
+		metric: gGraphs[graphId].g_metric,
+		decomps: gGraphs[graphId].g_decomps,
+		predicate: pred,
+		customer_id: gCustId() || undefined
+	});
+
+	gAppendGraph(graph);
+
+	$(dialog).dialog('close');
+}
+
+/*
+ * Finishes the creation of a graph
+ */
+function gAppendGraph(graph)
+{
+	var container;
+
+	container = document.getElementById('gContainerDiv');
+	container.appendChild(graph.getContainer());
+	graph.serverCreate(function (err, result) {
+		if (err) {
+			container.removeChild(graph.getContainer());
+			alert(err);
+			return;
+		}
+
+		gGraphs[graph.getId()] = graph;
+	});
+}
+
+function isEmpty(obj)
+{
+	/*jsl:ignore*/
+	for (var key in obj)
+		return (false);
+	/*jsl:end*/
+
+	return (true);
+}
+
+var predKeyMap = {
+    and: '&&',
+    or: '||',
+    lt: '<',
+    le: '<=',
+    ge: '>=',
+    gt: '>',
+    ne: '!=',
+    eq: '=='
+};
+
+/*
+ * Construct the name for a predicate
+ */
+gGraph.prototype.predName = function (pred)
+{
+	var key, pname;
+	var ret = '';
+	var graph = this;
+	var elts;
+
+	/*
+	 * With the way predicates are currently constructed there should only
+	 * ever be one key in the object.
+	 */
+	for (var k in pred)
+		key = k;
+
+	switch (key) {
+	case 'and':
+	case 'or':
+		elts = pred[key].map(function (x, loc) {
+			return (graph.predName(x));
+		});
+		ret = elts.join(' ' + predKeyMap[key] + ' ');
+		break;
+	default:
+		pname = this.g_metric.fields[pred[key][0]].label;
+		ret += pname + ' ' + predKeyMap[key] + ' ' +
+		    pred[key][1];
+		break;
+	}
+
+	return (ret);
 };

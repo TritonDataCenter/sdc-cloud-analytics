@@ -10,8 +10,11 @@ var mod_ca = require('../../../lib/ca/ca-common');
 
 var inskHostname;
 
-exports.insinit = function (ins)
+var insk_log;
+
+exports.insinit = function (ins, log)
 {
+	insk_log = log;
 	ins.registerModule({ name: 'cpu', label: 'CPU' });
 	ins.registerMetric({
 	    module: 'cpu',
@@ -138,7 +141,8 @@ function insKstatMetric(metric)
 	var kstatconf = {};
 	var key;
 
-	ASSERT.equal(metric.is_predicate.length, 0);
+	/* XXX won't work with kstat predicate support */
+	ASSERT.ok(mod_ca.caIsEmpty(metric.is_predicate));
 	ASSERT.ok(metric.is_decomposition.length <= 1);
 	ASSERT.ok(metric.is_decomposition.length === 0 ||
 	    (metric.is_decomposition.length == 1 &&

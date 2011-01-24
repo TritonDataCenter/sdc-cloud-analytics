@@ -16,7 +16,7 @@ tr {
 	vertical-align: top;
 }
 
-.gToolbar {
+.gGraphHeader {
 	padding-left: 4px;
 	padding-right: 4px;
 	padding-top: 4px;
@@ -32,20 +32,9 @@ tr {
 	padding-right: 4px;
 }
 
-.gToolbar > p {
+.gGraphHeader > p {
 	color: #666666;
 	font-size: 1.4em;
-	float: right;
-}
-
-.gNumeric > p {
-	width: 500px;
 	margin: 5px;
-	margin-top: 7px;
-}
-
-.gDiscrete > p {
-	width: 650px;
-	margin: 5px;
-	margin-top: 7px;
+	margin-bottom: 7px;
 }

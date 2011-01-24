@@ -9,9 +9,10 @@ var gPort = 23181;		/* config service HTTP port */
 var gPlotWidth = 600;		/* plot width (pixels) */
 var gPlotHeight = 300;		/* plot height (pixels) */
 var gnBuckets = 50;		/* vertical buckets (for heatmaps) */
-var gnDataPoints = 30;		/* number of data points to show */
 var gMetrics = [];		/* all available metrics */
 var gGraphs = {};		/* currently active graphs */
+var gZoomOptions = [ 5, 10, 30, 60, 300, 600, 3600 ];	/* seconds */
+var gZoomDefault = 2;		/* default is 30 seconds */
 
 /*
  * Color management
@@ -390,6 +391,8 @@ function gGraph(conf)
 	this.g_custid = conf.customer_id;
 	this.g_inst_id = conf.inst_id;
 	this.g_predicate = conf.predicate;
+	this.g_zoom = gZoomDefault;
+	this.g_paused = false;
 
 	this.g_title = conf.metric.modlabel + ': ' + conf.metric.statlabel;
 
@@ -482,8 +485,6 @@ gGraph.prototype.initDetails = function ()
 
 	if (this.g_subtype == 'raw') {
 		this.g_data = [];
-		for (ii = 0; ii < gnDataPoints; ii++)
-			this.g_data.push(null);
 	} else {
 		this.g_hues = [];
 		this.g_selected = {};
@@ -557,27 +558,59 @@ gGraph.prototype.initDom = function ()
 gGraph.prototype.createToolbar = function ()
 {
 	var graph = this;
-	var head, subdiv, button, drill;
+	var head, div, subdiv, drill;
 	var dialog, diadiv, diaform, diacur, enabDia, diaOpt, diasel;
 
 	head = document.createElement('p');
 	head.appendChild(document.createTextNode(this.g_title));
 
-	subdiv = document.createElement('div');
-	subdiv.className = 'gToolbar ui-widget-header ui-corner-all';
+	div = document.createElement('div');
+	div.className = 'gGraphHeader ui-widget-header ui-corner-all';
+	div.appendChild(head);
 
-	button = subdiv.appendChild(document.createElement('button'));
-	button.appendChild(document.createTextNode('delete'));
-	$(button).button({
+	subdiv = div.appendChild(document.createElement('div'));
+	subdiv.className = 'gToolbar';
+
+	subdiv.appendChild(this.createButton({
 		text: false,
 		label: 'delete',
-		icons: { primary: 'ui-icon-trash' }
-	}).click(function () { gRemoveStat(graph); });
+		icons: { primary: 'ui-icon-close' }
+	}, function () { gRemoveStat(graph); }));
+
+	subdiv.appendChild(this.createButton({
+		text: false,
+		label: 'zoom out',
+		icons: { primary: 'ui-icon-zoomout' }
+	}, function () { graph.zoomOut(); }));
+
+	subdiv.appendChild(this.createButton({
+		text: false,
+		label: 'zoom in',
+		icons: { primary: 'ui-icon-zoomin' }
+	}, function () { graph.zoomIn(); }));
+
+	subdiv.appendChild(this.createToggleButton('paused', [ {
+	    label: 'pause',
+	    value: true,
+	    options: {
+		text: false,
+		label: 'pause',
+		icons: { primary: 'ui-icon-pause' }
+	    }
+	}, {
+	    label: 'resume',
+	    value: false,
+	    options: {
+		text: false,
+		label: 'resume',
+		icons: { primary: 'ui-icon-play' }
+	    }
+	} ]));
 
 	dialog = subdiv.appendChild(document.createElement('div'));
 	$(dialog).dialog({
 		autoOpen: false,
-		title: 'Create Drilldown'
+		title: 'Add predicate'
 	});
 
 	diadiv = document.createElement('div');
@@ -617,7 +650,7 @@ gGraph.prototype.createToolbar = function ()
 	diaOpt.value = '';
 	diaOpt.appendChild(document.createTextNode('<None>'));
 	diacur.disabled = true;
-	diacur.onclick = function () {
+	diacur.onchange = function () {
 	    var graphid = graph.g_id;
 	    gDrillOpChanged(graphid);
 	};
@@ -635,7 +668,7 @@ gGraph.prototype.createToolbar = function ()
 	diacur.disabled = true;
 	diacur.type = 'button';
 	diacur.id = 'gDrilldownSubmit' + graph.g_id;
-	diacur.value = 'Drilldown!';
+	diacur.value = 'Add';
 	diacur.onclick = function () {
 	    var gid = graph.g_id;
 	    var dia = dialog;
@@ -647,7 +680,9 @@ gGraph.prototype.createToolbar = function ()
 
 		drill.appendChild(document.createTextNode('drilldown'));
 		$(drill).button({
-		    label: 'drilldown'
+		    text: false,
+		    label: 'add predicate',
+		    icons: { primary: 'ui-icon-plus' }
 		}).click(function () {
 		    /* Make sure we reset the drilldown to empty */
 		    diasel.selectedIndex = 0;
@@ -658,30 +693,28 @@ gGraph.prototype.createToolbar = function ()
 	}
 
 	if (this.g_subtype != 'heatmap') {
-		subdiv.appendChild(head);
 		subdiv.className += ' gDiscrete';
-		return (subdiv);
-	} else {
-		subdiv.className += ' gNumeric';
+		return (div);
 	}
 
-	subdiv.appendChild(this.createButton('isolate', [
-	    { label: 'isolate', value: true },
-	    { label: 'integrate', value: false }
+	subdiv.className += ' gNumeric';
+
+	subdiv.appendChild(this.createToggleButton('isolate', [
+	    { label: 'isolate: off', value: true },
+	    { label: 'isolate: on', value: false }
 	]));
 
-	subdiv.appendChild(this.createButton('weights', [
-	    { label: 'weight', value: 'weight' },
-	    { label: 'count', value: 'count' }
+	subdiv.appendChild(this.createToggleButton('weights', [
+	    { label: 'values: by count', value: 'weight' },
+	    { label: 'values: by weight', value: 'count' }
 	]));
 
-	subdiv.appendChild(this.createButton('coloring', [
-	    { label: 'linear', value: 'linear' },
-	    { label: 'rank', value: 'rank' }
+	subdiv.appendChild(this.createToggleButton('coloring', [
+	    { label: 'color: by rank', value: 'linear' },
+	    { label: 'color: by value (linear)', value: 'rank' }
 	]));
 
-	subdiv.appendChild(head);
-	return (subdiv);
+	return (div);
 };
 
 /*
@@ -689,14 +722,38 @@ gGraph.prototype.createToolbar = function ()
  * member of this graph called 'g_$field'.  Each of exactly two choices must
  * specify a label and a value.
  */
-gGraph.prototype.createButton = function (field, choices)
+gGraph.prototype.createToggleButton = function (field, choices)
 {
 	var graph = this;
 	var button = document.createElement('button');
-	button.appendChild(document.createTextNode(choices[0]['label']));
-	$(button).button({
-		label: choices[0]['label']
-	}).click(function () { graph.toggle(field, choices, button); });
+	var label = choices[0].label;
+
+	if (label)
+		button.appendChild(document.createTextNode(label));
+
+	if (!choices[0].options)
+		choices[0].options = { label: choices[0].label };
+
+	if (!choices[1].options)
+		choices[1].options = { label: choices[1].label };
+
+	$(button).button(choices[0].options).click(
+	    function () { graph.toggle(field, choices, button); });
+
+	return (button);
+};
+
+/*
+ * Creates a non-toggle button that invokes the specified callback when clicked.
+ * 'Options' represents the JQuery button options and usually contains either
+ * 'label' or 'icons'.
+ */
+gGraph.prototype.createButton = function (options, callback)
+{
+	var button = document.createElement('button');
+	if (options.label)
+		button.appendChild(document.createTextNode(options.label));
+	$(button).button(options).click(callback);
 	return (button);
 };
 
@@ -706,13 +763,13 @@ gGraph.prototype.createButton = function (field, choices)
  */
 gGraph.prototype.toggle = function (field, choices, button)
 {
-	var options = {};
+	var options;
 
 	if ($(button).text() == choices[0]['label']) {
-		options.label = choices[1]['label'];
+		options = choices[1]['options'];
 		this['g_' + field] = choices[0]['value'];
 	} else {
-		options.label = choices[0]['label'];
+		options = choices[0]['options'];
 		this['g_' + field] = choices[1]['value'];
 	}
 
@@ -823,7 +880,7 @@ gGraph.prototype.uriParams = function ()
 
 	url = '?width=' + gPlotWidth + '&';
 	url += 'height=' + gPlotHeight + '&';
-	url += 'duration=' + gnDataPoints + '&';
+	url += 'duration=' + gZoomOptions[this.g_zoom] + '&';
 	url += 'nbuckets=' + gnBuckets + '&';
 	url += 'coloring=' + this.g_coloring + '&';
 	url += 'weights=' + this.g_weights;
@@ -849,6 +906,9 @@ gGraph.prototype.refresh = function ()
 {
 	var graph = this;
 	var request, url;
+
+	if (this.g_paused)
+		return;
 
 	url = this.g_uri_val + this.uriParams();
 	request = new XMLHttpRequest();
@@ -905,7 +965,6 @@ gGraph.prototype.updateRaw = function (value)
 	 */
 	graph = this;
 	datum = [ new Date(value.when * 1000), value.value ];
-	this.g_data.shift();
 	this.g_data.push(datum);
 	data = this.rawRecompute();
 	this.g_plot = $.plot(this.g_elt_graph, data, this.g_options);
@@ -929,9 +988,19 @@ gGraph.prototype.rawRecompute = function ()
 	var series, points, datum, row;
 	var keytots, keys, colors;
 	var ii, jj, key, showother, othertot;
+	var ndatapoints = gZoomOptions[this.g_zoom];
+
+	/*
+	 * First, trim or pad g_data as necessary.
+	 */
+	while (ndatapoints < this.g_data.length)
+		this.g_data.shift();
+	while (ndatapoints > this.g_data.length)
+		this.g_data.unshift(null);
 
 	if (this.g_type == 'scalar')
-		return ([ this.rawRecomputeOne(this.g_title, this.g_data) ]);
+		return ([ this.rawRecomputeOne(this.g_title, this.g_data,
+		    ndatapoints) ]);
 
 	/*
 	 * For vector-valued metrics, we essentially transpose the data: while
@@ -966,7 +1035,7 @@ gGraph.prototype.rawRecompute = function ()
 	 *	  use the same color for all of these.
 	 */
 	keytots = {};
-	for (ii = 0; ii < gnDataPoints; ii++) {
+	for (ii = 0; ii < ndatapoints; ii++) {
 		if (this.g_data[ii] === null)
 			continue;
 
@@ -1019,7 +1088,7 @@ gGraph.prototype.rawRecompute = function ()
 		key = colors[gColors[ii]];
 		points = [];
 
-		for (jj = 0; jj < gnDataPoints; jj++) {
+		for (jj = 0; jj < ndatapoints; jj++) {
 			datum = this.g_data[jj];
 
 			if (datum === null) {
@@ -1031,7 +1100,7 @@ gGraph.prototype.rawRecompute = function ()
 			    key in datum[1] ? datum[1][key] : 0 ]);
 		}
 
-		row = this.rawRecomputeOne(key, points);
+		row = this.rawRecomputeOne(key, points, ndatapoints);
 		row.stack = true;
 		row.color = gColors[ii].css();
 		series.push(row);
@@ -1039,7 +1108,7 @@ gGraph.prototype.rawRecompute = function ()
 
 	points = [];
 	showother = false;
-	for (ii = 0; ii < gnDataPoints; ii++) {
+	for (ii = 0; ii < ndatapoints; ii++) {
 		datum = this.g_data[ii];
 
 		if (datum === null) {
@@ -1060,7 +1129,8 @@ gGraph.prototype.rawRecompute = function ()
 	}
 
 	if (showother) {
-		row = this.rawRecomputeOne('&lt;other&gt;', points);
+		row = this.rawRecomputeOne('&lt;other&gt;', points,
+		    ndatapoints);
 		row.stack = true;
 		row.color = gColors[gColors.length - 1].css();
 		series.push(row);
@@ -1072,7 +1142,7 @@ gGraph.prototype.rawRecompute = function ()
 /*
  * See rawRecomputeData -- this recomputes a single row.
  */
-gGraph.prototype.rawRecomputeOne = function (label, rawdata)
+gGraph.prototype.rawRecomputeOne = function (label, rawdata, ndatapoints)
 {
 	var points = [];
 	var ii;
@@ -1081,8 +1151,8 @@ gGraph.prototype.rawRecomputeOne = function (label, rawdata)
 	 * Iterate backwards to back-fill NULL values with zero.  This should
 	 * really be filled with some other pattern to indicate "no data".
 	 */
-	for (ii = gnDataPoints - 1; ii >= 0; ii--) {
-		if (rawdata[ii] !== null || ii == gnDataPoints - 1) {
+	for (ii = ndatapoints - 1; ii >= 0; ii--) {
+		if (rawdata[ii] !== null || ii == ndatapoints - 1) {
 			points[ii] = rawdata[ii];
 			continue;
 		}
@@ -1270,6 +1340,22 @@ gGraph.prototype.heatmapKeyPressed = function (event)
 		return;
 
 	this.heatmapRowSelect(sibling.firstChild, event.shiftKey);
+};
+
+gGraph.prototype.zoomIn = function ()
+{
+	if (this.g_zoom - 1 >= 0) {
+		this.g_zoom--;
+		this.refresh();
+	}
+};
+
+gGraph.prototype.zoomOut = function ()
+{
+	if (this.g_zoom + 1 < gZoomOptions.length) {
+		this.g_zoom++;
+		this.refresh();
+	}
 };
 
 /*

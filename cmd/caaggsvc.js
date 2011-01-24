@@ -397,7 +397,7 @@ function aggHttpValueCommon(request, response, callback)
 	record = inst.agi_values[start];
 
 	if (record && record.count == inst.agi_sources.nsources) {
-		callback(fqid, start, request, response);
+		callback(fqid, start, request, response, 0);
 		return;
 	}
 
@@ -422,7 +422,7 @@ function aggHttpValueRaw(request, response)
 	aggHttpValueCommon(request, response, aggHttpValueRawDone);
 }
 
-function aggHttpValueRawDone(id, when, request, response)
+function aggHttpValueRawDone(id, when, request, response, delay)
 {
 	var inst = agg_insts[id];
 	var record = inst.agi_values[when];
@@ -440,6 +440,9 @@ function aggHttpValueRawDone(id, when, request, response)
 		ret.value = zero;
 		ret.nreporting = 0;
 	}
+
+	if (delay > 0)
+		ret.delayed = delay;
 
 	response.send(HTTP.OK, ret);
 }
@@ -610,7 +613,7 @@ var aggHeatmapParams = {
 	    type: 'number',
 	    default: 60,
 	    min: 1,
-	    max: 600
+	    max: 3600
 	},
 	selected: {
 	    type: 'array',
@@ -703,7 +706,7 @@ function aggHeatmapParam(request, param)
 	return (value);
 }
 
-function aggHttpValueHeatmapDone(id, when, request, response)
+function aggHttpValueHeatmapDone(id, when, request, response, delay)
 {
 	/*
 	 * XXX the way this is coded now, 'when' is the last data point, but it
@@ -836,6 +839,10 @@ function aggHttpValueHeatmapDone(id, when, request, response)
 	ret.minreporting = nreporting;
 	ret.when = when;
 	ret.present = agg.present;
+
+	if (delay > 0)
+		ret.delayed = delay;
+
 	png.encode(function (png_data) {
 		ret.image = png_data.toString('base64');
 		response.send(HTTP.OK, ret);
@@ -860,7 +867,7 @@ function aggTick()
 			if (now - rq.rqtime >= agg_http_req_timeout) {
 				inst.agi_requests.splice(ii--, 1);
 				rq.callback(id, rq.datatime, rq.request,
-				    rq.response);
+				    rq.response, now - rq.rqtime);
 			}
 		}
 

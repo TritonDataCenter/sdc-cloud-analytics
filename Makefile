@@ -30,7 +30,7 @@ RMTREE		 = rm -rf
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= npm
 MKERRNO		 = $(TOOLSDIR)/mkerrno
-CC		 = cc
+CC		 = gcc
 
 #
 # Files

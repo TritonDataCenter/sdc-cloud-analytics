@@ -31,7 +31,6 @@ NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= npm
 MKERRNO		 = $(TOOLSDIR)/mkerrno
 CC		 = cc
-CFLAGS		 = -pedantic
 
 #
 # Files
@@ -247,7 +246,7 @@ xref: cscope.files
 #
 
 $(WEBREV)/bin/codereview:
-	$(CC) $(CFLAGS) $(WEBREV)/src/lwlp.c -o $(WEBREV)/bin/codereview
+	$(CC) $(WEBREV)/src/lwlp.c -o $(WEBREV)/bin/codereview
 	
 
 #

@@ -596,7 +596,12 @@ var retrieveData = function (time)
 		method: 'GET',
 		path: url,
 		port: mod_ca.ca_http_port_agg_base
-	    }, function (response, rdata) {
+	    }, function (err, response, rdata) {
+		if (err) {
+			resFunc(err);
+			return;
+		}
+
 		try {
 			mod_assert.equal(response.statusCode, 200,
 			    'bad HTTP status: ' + response.statusCode);

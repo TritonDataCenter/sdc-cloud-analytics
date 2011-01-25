@@ -85,8 +85,13 @@ fakeAgg = mod_tl.ctCreateCap({
 });
 fakeAgg.on('msg-cmd-enable_aggregation', enableAgg);
 
+var setup = function ()
+{
+	mod_tl.ctWaitForAmqpService(mod_ca.ca_amqp_key_config, mod_tl.advance);
+};
+
 /*
- * Start the aggregator and start the instrumentor from iside it
+ * Start the aggregator and start the instrumenter from inside it
  */
 var startWorld = function ()
 {
@@ -116,26 +121,35 @@ var createInsts = function ()
 	    port: CFG_PORT,
 	    data: postdata,
 	    headers: headers
-	}, function (response, data) {
+	}, function (err, response, data) {
+		if (err)
+			throw (err);
+
 		mod_assert.equal(response.statusCode, 201,
 		    'bad HTTP status: ' + response.statusCode);
 		var resp = JSON.parse(data);
 		mod_tl.ctStdout.info('Advancing from createInsts');
-		mod_tl.advance(resp.id);
+		mod_tl.advance(resp.uri.substring(
+		    resp.uri.lastIndexOf('/') + 1));
 	});
 };
 
 var listInsts = function (id, inputExp)
 {
 	var exp = [ {
-	    modname: 'cpu',
-	    statname: 'utilization',
-	    decomp: [],
-	    stattype: {
-		dimension: 1,
-		type: 'scalar'
-	    },
-	    inst_id: id
+	    module: 'cpu',
+	    stat: 'utilization',
+	    decomposition: [],
+	    predicate: '{}',
+	    'value-dimension': 1,
+	    'value-arity': 'scalar',
+	    enabled: true,
+	    'retention-time': 600,
+	    uri: '/ca/instrumentations/1',
+	    uris: [ {
+		name: 'value_raw',
+		uri: '/ca/instrumentations/1/value/raw'
+	    } ]
 	}];
 
 	if (inputExp)
@@ -145,7 +159,10 @@ var listInsts = function (id, inputExp)
 	    method: 'GET',
 	    path: '/ca/instrumentations',
 	    port: CFG_PORT
-	}, function (response, data) {
+	}, function (err, response, data) {
+		if (err)
+			throw (err);
+
 		mod_assert.equal(response.statusCode, 200,
 		    'bad HTTP status: ' + response.statusCode);
 		var resp = JSON.parse(data);
@@ -165,7 +182,10 @@ var invalidDelete = function (id)
 	    method: 'DELETE',
 	    path: '/ca/instrumentations/foobar-err',
 	    port: CFG_PORT
-	}, function (response, data) {
+	}, function (err, response, data) {
+		if (err)
+			throw (err);
+
 		mod_assert.equal(response.statusCode, 404,
 		    'bad HTTP status: ' + response.statusCode);
 		mod_tl.ctStdout.info('Advancing from invalidDelete');
@@ -182,7 +202,10 @@ var deleteInst = function (id)
 	    method: 'DELETE',
 	    path: '/ca/instrumentations/' + id,
 	    port: CFG_PORT
-	}, function (response, data) {
+	}, function (err, response, data) {
+		if (err)
+			throw (err);
+
 		mod_assert.equal(response.statusCode, 200,
 		    'bad HTTP status: ' + response.statusCode);
 		mod_tl.ctStdout.info('Advancing from deleteInsts');
@@ -193,7 +216,8 @@ var deleteInst = function (id)
 /*
  * Push everything and start the test!
  */
-mod_tl.ctPushFunc(startWorld, createInsts, listInsts, invalidDelete, listInsts,
-    deleteInst, listInsts, function () { process.exit(0); });
+mod_tl.ctSetTimeout(10 * 1000);
+mod_tl.ctPushFunc(setup, startWorld, createInsts, listInsts, invalidDelete,
+    listInsts, deleteInst, listInsts, function () { process.exit(0); });
 mod_tl.ctStdout.info('Advancing to start the test');
 mod_tl.advance();

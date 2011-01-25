@@ -75,6 +75,10 @@ var fakeInstB = mod_tl.ctCreateCap({
 /*
  * Functions for the state machine
  */
+var setup = function ()
+{
+	mod_tl.ctWaitForAmqpService(mod_ca.ca_amqp_key_config, mod_tl.advance);
+};
 
 var startInstA = function ()
 {
@@ -96,7 +100,6 @@ var startInstB = function ()
 		mod_tl.ctStdout.info('Advancing after notifying B is online');
 		mod_tl.advance();
 	});
-
 };
 
 /*
@@ -110,7 +113,12 @@ var checkMetrics = function ()
 		method: 'GET',
 		path: url,
 		port: mod_ca.ca_http_port_config
-	    }, function (response, data) {
+	    }, function (err, response, data) {
+		if (err) {
+			resFunc(err);
+			return;
+		}
+
 		mod_assert.equal(response.statusCode, 200,
 			'bad HTTP status: ' + response.statusCode);
 		var resp = JSON.parse(data);
@@ -136,6 +144,7 @@ var checkMetrics = function ()
 /*
  * Push everything and start the test!
  */
-mod_tl.ctPushFunc(startInstA, startInstB, checkMetrics);
+mod_tl.ctSetTimeout(10 * 1000);
+mod_tl.ctPushFunc(setup, startInstA, startInstB, checkMetrics);
 mod_tl.ctStdout.info('Advancing to start the test');
 mod_tl.advance();

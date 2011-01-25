@@ -73,8 +73,11 @@ function sendrequest()
 	}, recvresponse);
 }
 
-function recvresponse(response, data)
+function recvresponse(err, response, data)
 {
+	if (err)
+		throw (err);
+
 	log.dbg('got response for initial request');
 	log.dbg('headers = %j', response.headers);
 	ASSERT.equal(response.statusCode, rspcode);

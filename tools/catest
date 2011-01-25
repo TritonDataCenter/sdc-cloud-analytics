@@ -137,6 +137,7 @@ function setup
 {
 	base=$1
 	pushd "$base/../" >/dev/null
+	export SRC=$(pwd)
 	if [[ ! -f $NODE_REL || ! -x $NODE_REL ]]; then
 		fail "Node executable not at deps/node/node"
 	fi

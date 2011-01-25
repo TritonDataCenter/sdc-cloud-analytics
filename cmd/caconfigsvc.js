@@ -189,31 +189,23 @@ function cfgHttpInstrumentationsList(request, response)
 	var custid = request.params['custid'];
 	var rv = [];
 
-	cfgInstrumentationsListCustomer(
-	    rv, cfgInstrumentations(custid), custid);
+	cfgInstrumentationsListCustomer(rv, cfgInstrumentations(custid));
 
 	if (custid === undefined) {
 		for (custid in cfg_customers)
 			cfgInstrumentationsListCustomer(rv,
-			    cfgInstrumentations(custid), custid);
+			    cfgInstrumentations(custid));
 	}
 
 	response.send(HTTP.OK, rv);
 }
 
-function cfgInstrumentationsListCustomer(rv, insts, custid)
+function cfgInstrumentationsListCustomer(rv, insts)
 {
-	var instid, inst;
+	var instid;
 
-	for (instid in insts) {
-		inst = mod_ca.caDeepCopy(cfg_insts[instid]['spec']);
-		inst['inst_id'] = instid.substring(instid.lastIndexOf(';') + 1);
-
-		if (custid !== undefined)
-			inst['customer_id'] = custid;
-
-		rv.push(inst);
-	}
+	for (instid in insts)
+		rv.push(cfgHttpInstEmit(cfg_insts[instid]));
 }
 
 function cfgHttpInstCreate(request, response)
@@ -283,12 +275,26 @@ function cfgHttpInstCreate(request, response)
 function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
     zonesbyhost)
 {
-	var fqid, instrumenter, hosts, hostname;
+	var fqid, instrumenter, hosts, hostname, uri, uris;
 
 	fqid = mod_ca.caQualifiedId(custid, instid);
 	cfgInstrumentations(custid)[fqid] = true;
 	aggregator.cag_insts[fqid] = true;
 	aggregator.cag_ninsts++;
+
+	uri = mod_ca.caSprintf('%s%s%s/%s', cfg_http_baseuri,
+	    (custid ? cfg_http_custuri + '/' + custid : ''),
+	    cfg_http_insturi, instid);
+	uris = [];
+
+	if (spec.stattype.type == 'numeric-decomposition') {
+		uris.push({
+		    uri: uri + cfg_http_valheat,
+		    name: 'value_heatmap'
+		});
+	}
+
+	uris.push({ uri: uri + cfg_http_valraw, name: 'value_raw'});
 
 	cfg_insts[fqid] = {
 		options: {
@@ -302,7 +308,9 @@ function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
 		response: response,
 		spec: spec,
 		aggregator: aggregator,
-		custid: custid
+		custid: custid,
+		uri: uri,
+		uris: uris
 	};
 
 	if (zonesbyhost)
@@ -421,6 +429,24 @@ function cfgHttpInstDelete(request, response)
 	response.send(HTTP.OK);
 }
 
+function cfgHttpInstEmit(inst)
+{
+	var ret = {};
+
+	ret['module'] = inst.spec.modname;
+	ret['stat'] = inst.spec.statname;
+	ret['predicate'] = JSON.stringify(inst.spec.pred);
+	ret['decomposition'] = inst.spec.decomp;
+	ret['value-dimension'] = inst.spec.stattype.dimension;
+	ret['value-arity'] = inst.spec.stattype.type;
+	ret['enabled'] = inst.options['enabled'];
+	ret['retention-time'] = inst.options['retention-time'];
+	ret['uri'] = inst.uri;
+	ret['uris'] = inst.uris;
+
+	return (ret);
+}
+
 function cfgHttpInstSetOptions(request, response)
 {
 	var custid = request.params['custid'];
@@ -440,7 +466,7 @@ function cfgHttpInstSetOptions(request, response)
 		return;
 	}
 
-	/* Validate and apply options, if we supported any. */
+	/* Validate and apply options. */
 	options = request.ca_json;
 	if (options.constructor !== Object) {
 		response.send(HTTP.EBADREQUEST, { error: 'invalid options' });
@@ -460,15 +486,15 @@ function cfgHttpInstSetOptions(request, response)
 			    'unsupported value for "retention-time"' });
 		retain = Math.max(retain, cfg_retain_min);
 		retain = Math.min(retain, cfg_retain_max);
+
+		if (retain != inst.options['retention-time']) {
+			inst.options['retention-time'] = retain;
+			cfgAggEnable(inst.aggregator, fqid);
+			/* XXX wait for response? */
+		}
 	}
 
-	if (retain != inst.options['retention-time']) {
-		inst.options['retention-time'] = retain;
-		cfgAggEnable(inst.aggregator, fqid);
-		/* XXX wait for response? */
-	}
-
-	cfgHttpInstGetOptions(request, response);
+	response.send(HTTP.OK, cfgHttpInstEmit(inst));
 }
 
 function cfgHttpInstGetOptions(request, response)
@@ -476,29 +502,13 @@ function cfgHttpInstGetOptions(request, response)
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var uris = [];
-	var baseuri = cfg_http_baseuri;
-	var out;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND);
 		return;
 	}
 
-	if (custid)
-		baseuri += cfg_http_custuri + '/' + custid;
-
-	baseuri += cfg_http_insturi + '/' + instid;
-
-	out = mod_ca.caDeepCopy(cfg_insts[fqid]['options']);
-	uris.push({ uri: baseuri + cfg_http_valraw, name: 'raw data'});
-	if (cfg_insts[fqid].spec.stattype.type == 'numeric-decomposition')
-		uris.push({ uri: baseuri + cfg_http_valheat,
-		    name: 'heatmap data'});
-
-	out['uris'] = uris;
-
-	response.send(HTTP.OK, out);
+	response.send(HTTP.OK, cfgHttpInstEmit(cfg_insts[fqid]));
 }
 
 function cfgHttpInstValue(request, response)
@@ -551,9 +561,7 @@ function cfgInstEnable(instrumenter, id)
 function cfgCheckNewInstrumentation(id)
 {
 	var inst = cfg_insts[id];
-	var instid = id.substring(id.lastIndexOf(';') + 1);
-	var response, stattype, dim, type, uri;
-	var headers = {};
+	var response, headers;
 
 	if (!('response' in inst))
 		return;
@@ -583,19 +591,8 @@ function cfgCheckNewInstrumentation(id)
 		return;
 	}
 
-	stattype = inst.spec.stattype;
-	dim = stattype['dimension'];
- 	type = dim == 1 ? 'scalar' : stattype['type'];
-	uri = cfg_http_baseuri;
-
-	if (inst.custid)
-		uri += cfg_http_custuri + '/' + inst.custid;
-
-	uri += cfg_http_insturi + '/' + instid;
-	headers['Location'] = uri;
-
-	response.send(HTTP.CREATED, { id: instid, dimension: dim, type: type,
-	    uri: uri }, headers);
+	headers = { 'Location': inst.uri };
+	response.send(HTTP.CREATED, cfgHttpInstEmit(inst), headers);
 }
 
 function cfgAckEnableAgg(msg)

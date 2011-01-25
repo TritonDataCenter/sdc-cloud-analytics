@@ -3,8 +3,8 @@
  * Note that variables declared here may be overwritten by cademo.js via the
  * pseudo-file cavars.js (included after caflot.js in graph.htm).
  */
-var gServer = window.location.hostname;
 
+var gServer = window.location.hostname;
 var gPort = 23181;		/* config service HTTP port */
 var gPlotWidth = 600;		/* plot width (pixels) */
 var gPlotHeight = 300;		/* plot height (pixels) */
@@ -169,8 +169,8 @@ function gInitInstrumentationsFini(instrumentations)
 
 		for (jj = 0; jj < gMetrics.length; jj++) {
 			metric = gMetrics[jj];
-			if (metric.module == inst.modname &&
-			    metric.stat == inst.statname)
+			if (metric.module == inst.module &&
+			    metric.stat == inst.stat)
 				break;
 		}
 
@@ -179,10 +179,10 @@ function gInitInstrumentationsFini(instrumentations)
 
 		graph = new gGraph({
 			metric: metric,
-			decomps: inst.decomp,
-			customer_id: inst.customer_id,
-			inst_id: inst.inst_id,
-			predicate: inst.pred
+			decomps: inst.decomposition,
+			predicate: JSON.parse(inst.predicate),
+			uri: inst.uri,
+			value_uri: inst.uris[0].uri
 		});
 
 		container.appendChild(graph.getContainer());
@@ -379,17 +379,20 @@ function gDecompSelected()
  * The following configuration options identifying the customer id (scope) and
  * instrumentation id MAY be specified:
  *
- *	customer_id	if undefined, the global scope is assumed
+ *	customer_id	Customer ID for creating new instrumentations
+ *			If unspecified, the global scope is assumed.
  *
- *	inst_id		if undefined, the stat is assumed not to exist yet
+ *	uri		Instrumentation's URI
+ *			If undefined, instrumentation must not yet exist.
+ *
+ *	value_uri	URI to retrieve instrumentation's value
+ *			If undefined, instrumentation must not yet exist.
  */
 function gGraph(conf)
 {
 	this.g_id = gGraph.gId++;
 	this.g_metric = conf.metric;
 	this.g_decomps = conf.decomps;
-	this.g_custid = conf.customer_id;
-	this.g_inst_id = conf.inst_id;
 	this.g_predicate = conf.predicate;
 	this.g_zoom = gZoomDefault;
 	this.g_paused = false;
@@ -407,9 +410,18 @@ function gGraph(conf)
 		this.g_title += ' predicated on ' +
 		    this.predName(conf.predicate);
 
+	this.g_http = 'http://' + gServer + ':' + gPort;
+	this.g_uri_create = '/ca' + gCustUri(conf.customer_id) +
+	    '/instrumentations';
+
+	if (conf.uri)
+		this.g_uri = conf.uri;
+
+	if (conf.value_uri)
+		this.g_uri_val = conf.value_uri;
+
 	this.initDetails();
 	this.initDom();
-	this.initUri();
 }
 
 gGraph.gId = 0;
@@ -777,23 +789,6 @@ gGraph.prototype.toggle = function (field, choices, button)
 	this.refresh();
 };
 
-/*
- * Initializes members representing several useful URIs for this graph.
- */
-gGraph.prototype.initUri = function ()
-{
-	this.g_uri_base = '/ca' + gCustUri(this.g_custid) +
-	    '/instrumentations';
-
-	if (this.g_inst_id !== undefined)
-		this.g_uri_base += '/' + this.g_inst_id;
-
-	this.g_uri_cfg = 'http://' + gServer + ':' + gPort +
-	    this.g_uri_base;
-	this.g_uri_val = 'http://' + gServer + ':' + gPort +
-	    this.g_uri_base + '/value/' + this.g_subtype;
-};
-
 gGraph.prototype.getContainer = function () { return (this.g_elt_container); };
 gGraph.prototype.getId = function () { return (this.g_id); };
 
@@ -806,9 +801,10 @@ gGraph.prototype.getId = function () { return (this.g_id); };
 gGraph.prototype.serverCreate = function (callback)
 {
 	var graph = this;
+	var url = this.g_http + this.g_uri_create;
 	var request = new XMLHttpRequest();
 
-	request.open('POST', this.g_uri_cfg, true);
+	request.open('POST', url, true);
 	request.setRequestHeader('Content-Type',
 	    'application/x-www-form-urlencoded');
 	request.send(this.g_body);
@@ -835,8 +831,8 @@ gGraph.prototype.serverCreate = function (callback)
 		}
 
 		value = JSON.parse(request.responseText);
-		graph.g_inst_id = value.id;
-		graph.initUri();
+		graph.g_uri = value.uri;
+		graph.g_uri_val = value.uris[0].uri;
 
 		setTimeout(function () {
 			callback(null, value);
@@ -851,9 +847,10 @@ gGraph.prototype.serverCreate = function (callback)
 gGraph.prototype.serverDelete = function (callback)
 {
 	var request;
+	var url = this.g_http + this.g_uri;
 
 	request = new XMLHttpRequest();
-	request.open('DELETE', this.g_uri_cfg, true);
+	request.open('DELETE', url, true);
 	request.send(null);
 	request.onreadystatechange = function () {
 		if (request.readyState != 4)
@@ -910,7 +907,7 @@ gGraph.prototype.refresh = function ()
 	if (this.g_paused)
 		return;
 
-	url = this.g_uri_val + this.uriParams();
+	url = this.g_http + this.g_uri_val + this.uriParams();
 	request = new XMLHttpRequest();
 	request.open('GET', url, true);
 	request.send(null);

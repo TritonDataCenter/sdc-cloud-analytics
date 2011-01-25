@@ -2,10 +2,10 @@
  * caadmin.js: very basic admin view for CA
  */
 
-var aServer = window.location.hostname;
-var aGraph = 'http://' + aServer + ':' + window.location.port + '/graph.htm';
-var aBaseUrl = 'http://' + aServer + ':23181/ca';
-var aUrlMetrics = aBaseUrl + '/metrics';
+var gServer = window.location.hostname;
+var gPort = 23181;		/* config service HTTP port */
+var aGraph = 'http://' + window.location.hostname + ':' +
+    window.location.port + '/graph.htm';
 var aMetrics = [];
 var aCustid;
 var aTable;
@@ -68,10 +68,11 @@ function aDrawRow(tr, data)
  */
 function aInitMetrics()
 {
+	var url = 'http://' + gServer + ':' + gPort + '/ca/metrics';
 	var request;
 
 	request = new XMLHttpRequest();
-	request.open('GET', aUrlMetrics, true);
+	request.open('GET', url, true);
 	request.send(null);
 	request.onreadystatechange = function () {
 		if (request.readyState != 4)
@@ -105,7 +106,7 @@ function aRefresh(callback)
 	var url;
 	var request;
 
-	url = aBaseUrl;
+	url = 'http://' + gServer + ':' + gPort + '/ca';
 
 	if (aCustid !== undefined)
 		url += '/customers/' + aCustid;
@@ -132,17 +133,25 @@ function aRefresh(callback)
 
 function aUpdateTable(instrumentations)
 {
-	var data, datum, custid, ii, instrumentation, module, stat;
+	var data, datum, custidx, custid, ii, instrumentation;
+	var module, stat, uri;
 
 	data = [];
 	for (ii = 0; ii < instrumentations.length; ii++) {
 		instrumentation = instrumentations[ii];
-		custid = instrumentation.customer_id || 'Global';
-		module = aMetrics[instrumentation.modname];
-		stat = module['stats'][instrumentation.statname];
+		uri = instrumentation.uri;
+		custidx = uri.indexOf('/customers/');
+		if (custidx == -1) {
+			custid = 'Global';
+		} else {
+			custid = uri.substring(custidx + '/customers/'.length);
+			custid = custid.substring(0, custid.indexOf('/'));
+		}
+		module = aMetrics[instrumentation.module];
+		stat = module['stats'][instrumentation.stat];
 		datum = [
 		    custid, module['label'], stat['label'],
-		    instrumentation.decomp.join(', ') || 'None',
+		    instrumentation.decomposition.join(', ') || 'None',
 		    ''
 		];
 		data.push(datum);

@@ -601,7 +601,7 @@ var aggHeatmapParams = {
 	    type: 'number',
 	    default: 100000,
 	    min: 0,
-	    max: 100000
+	    max: 10000000000
 	},
 	nbuckets: {
 	    type: 'number',

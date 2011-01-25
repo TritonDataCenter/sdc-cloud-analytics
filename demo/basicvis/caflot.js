@@ -13,6 +13,8 @@ var gMetrics = [];		/* all available metrics */
 var gGraphs = {};		/* currently active graphs */
 var gZoomOptions = [ 5, 10, 30, 60, 300, 600, 3600 ];	/* seconds */
 var gZoomDefault = 2;		/* default is 30 seconds */
+var gyMin = 0;			/* global/default ymin for heatmaps */
+var gyMax = 100000;		/* global/default ymax for heatmaps */
 
 /*
  * Color management
@@ -396,6 +398,8 @@ function gGraph(conf)
 	this.g_predicate = conf.predicate;
 	this.g_zoom = gZoomDefault;
 	this.g_paused = false;
+	this.g_ymin = gyMin;
+	this.g_ymax = gyMax;
 
 	this.g_title = conf.metric.modlabel + ': ' + conf.metric.statlabel;
 
@@ -514,7 +518,7 @@ gGraph.prototype.initDetails = function ()
 gGraph.prototype.initDom = function ()
 {
 	var graph = this;
-	var div, elt, table, tr, td, legend, tbody;
+	var div, elt, table, tr, td, legend, tbody, slider, text;
 
 	div = this.g_elt_container = document.createElement('div');
 	div.className = 'gGraphContainer';
@@ -559,6 +563,29 @@ gGraph.prototype.initDom = function ()
 			return (node);
 		}
 	});
+
+	if (this.g_subtype == 'heatmap') {
+		td = tr.appendChild(document.createElement('td'));
+
+		slider = td.appendChild(document.createElement('div'));
+		slider.className = 'gRange';
+		text = slider.appendChild(document.createElement('div'));
+		text.className = 'gRangeText';
+		$(text).text(graph.g_ymin + ' - ' + graph.g_ymax);
+		$(slider).slider({
+			orientation: 'vertical',
+			range: true,
+			min: graph.g_ymin,
+			max: graph.g_ymax,
+			values: [ gyMin, gyMax ],
+			stop: function (event, ui) {
+				graph.g_ymin = ui.values[0];
+				graph.g_ymax = ui.values[1];
+				$(text).text(graph.g_ymin + ' - ' +
+				    graph.g_ymax);
+			}
+		});
+	}
 
 	$(tbody).click(function (event) {
 	    graph.heatmapRowClicked(event); });
@@ -877,6 +904,8 @@ gGraph.prototype.uriParams = function ()
 
 	url = '?width=' + gPlotWidth + '&';
 	url += 'height=' + gPlotHeight + '&';
+	url += 'ymin=' + this.g_ymin + '&';
+	url += 'ymax=' + this.g_ymax + '&';
 	url += 'duration=' + gZoomOptions[this.g_zoom] + '&';
 	url += 'nbuckets=' + gnBuckets + '&';
 	url += 'coloring=' + this.g_coloring + '&';

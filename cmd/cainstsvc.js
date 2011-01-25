@@ -473,6 +473,7 @@ function insCmdEnable(msg)
 	ins_insts[id] = inst;
 	inst.is_impl.instrument(function (err) {
 		if (err) {
+			delete ins_insts[id];
 			ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
 			    'instrumenter error: ' + err.message, id);
 			return;

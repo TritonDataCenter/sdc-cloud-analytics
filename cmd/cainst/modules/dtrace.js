@@ -45,6 +45,22 @@ exports.insinit = function (ins, log)
 	    metric: insdIops
 	});
 
+	ins.registerModule({ name: 'node', label: 'Node.js' });
+	ins.registerMetric({
+	    module: 'node',
+	    stat: 'httpd',
+	    label: 'HTTP server operations',
+	    type: 'ops',
+	    fields: {
+		method: { label: 'method', type: 'string' },
+		url: { label: 'URL', type: 'string' },
+		raddr: { label: 'remote address', type: 'string' },
+		rport: { label: 'remote port', type: 'string' },
+		latency: { label: 'latency', type: 'numeric' }
+	    },
+	    metric: insdNodeHttpd
+	});
+
 };
 
 var insdFields = {
@@ -244,7 +260,7 @@ function insdIops(metric)
 
 	if (aggLatency) {
 		action = 'lquantize(timestamp - latencys[arg0]' +
-		    ', 0, 100000, 100);';
+		    ', 0, 1000000, 1000);';
 		predicates.push('latencys[arg0]');
 	} else if (indexes.length > 0) {
 		action = 'count();';
@@ -279,6 +295,140 @@ function insdIops(metric)
 		script += mod_ca.caSprintf('\t%ss[arg0] = 0;\n', fields[ii]);
 
 	script += '}\n';
+
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+}
+
+function insdNodeHttpd(metric)
+{
+	var decomps = metric.is_decomposition;
+	var pred = metric.is_predicate;
+	var script = '';
+	var ii, predicates, hasPred, fields, zones, indexes, index;
+	var before, zero, aggLatency, action;
+
+	/*
+	 * We divide latency by the same amount that we do during the quantize,
+	 * so that that the values input by the user will be in the same unit as
+	 * when visualized. Hopefully this will not be needed once we have some
+	 * kind of equantize.
+	 */
+	var transforms = {
+	    latency: '((timestamp - latencys[args[0]->fd]) / 1000000)',
+	    method: '(methods[args[0]->fd])',
+	    url: '(urls[args[0]->fd])',
+	    raddr: '(args[0]->remoteAddress)',
+	    rport: '(args[0]->remotePort)'
+	};
+
+	predicates = [];
+
+	hasPred = mod_capred.caPredNonTrivial(pred);
+	fields = mod_capred.caPredFields(pred);
+
+	if (metric.is_zones) {
+		zones = metric.is_zones.map(function (elt) {
+			return ('zonename == "' + elt + '"');
+		});
+
+		predicates.push(zones.join(' ||\n'));
+	}
+
+	indexes = [];
+	for (ii = 0; ii < decomps.length; ii++) {
+		if (decomps[ii] == 'latency') {
+			aggLatency = true;
+			if (!mod_ca.caArrayContains(fields, decomps[ii]))
+				fields.push(decomps[ii]);
+			decomps.splice(ii--, 1);
+			continue;
+		}
+
+		if (!mod_ca.caArrayContains(fields, decomps[ii]))
+			fields.push(decomps[ii]);
+
+		indexes.push(transforms[decomps[ii]]);
+	}
+
+	ASSERT.ok(indexes.length < 2); /* could actually support more */
+
+	if (indexes.length > 0) {
+		index = '[' + indexes.join(',') + ']';
+		zero = {};
+	} else {
+		index = '';
+		zero = aggLatency ? [] : 0;
+	}
+
+	before = [];
+	for (ii = 0; ii < fields.length; ii++) {
+		if (fields[ii] != 'raddr' && fields[ii] != 'rport')
+			before.push(fields[ii]);
+	}
+
+	if (before.length > 0) {
+		script += 'node*:::http-server-request\n';
+		script += '{\n';
+
+		for (ii = 0; ii < before.length; ii++) {
+			switch (before[ii]) {
+			case 'latency':
+				script += '\tlatencys[args[1]->fd] = ' +
+				    'timestamp;\n';
+				break;
+			case 'method':
+				script += '\tmethods[args[1]->fd] = ' +
+				    'args[0]->method;\n';
+				break;
+			case 'url':
+				script += '\turls[args[1]->fd] = ' +
+				    'args[0]->url;\n';
+				break;
+			default:
+				throw (new Error('invalid field for ' +
+				    'node-httpd' + before[ii]));
+			}
+		}
+
+		script += '}\n\n';
+	}
+
+	if (aggLatency) {
+		action = 'lquantize((timestamp - latencys[args[0]->fd]) / ' +
+		    '1000000, 0, 10000, 10);';
+	} else {
+		action = 'count();';
+	}
+
+	if (aggLatency) {
+		predicates.push('latencys[args[0]->fd]');
+	} else if (indexes.length > 0) {
+		predicates.push(mod_ca.caSprintf('%ss[args[0]->fd] != NULL',
+		    decomps[0]));
+	}
+
+	if (hasPred) {
+		pred = mod_ca.caDeepCopy(metric.is_predicate);
+		mod_capred.caPredReplaceFields(transforms, pred);
+		predicates.push(mod_capred.caPredPrint(pred));
+	}
+
+	script += 'node*:::http-server-response\n';
+	script += insdMakePredicate(predicates);
+	script += '{\n';
+	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
+	script += '}\n\n';
+
+	if (before.length > 0) {
+		script += 'node*:::http-server-response\n';
+		script += '{\n';
+
+		for (ii = 0; ii < before.length; ii++)
+			script += mod_ca.caSprintf('\t%ss[args[0]->fd] = 0;\n',
+			    before[ii]);
+
+		script += '}\n';
+	}
 
 	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
 }

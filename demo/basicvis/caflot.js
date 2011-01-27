@@ -990,7 +990,7 @@ gGraph.prototype.updateRaw = function (value)
 	 * probably not worth fixing for this demo.
 	 */
 	graph = this;
-	datum = [ new Date(value.when * 1000), value.value ];
+	datum = [ new Date(value.start_time * 1000), value.value ];
 	this.g_data.push(datum);
 	data = this.rawRecompute();
 	this.g_plot = $.plot(this.g_elt_graph, data, this.g_options);

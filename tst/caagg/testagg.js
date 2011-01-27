@@ -606,7 +606,7 @@ var retrieveData = function (time)
 			mod_assert.equal(response.statusCode, 200,
 			    'bad HTTP status: ' + response.statusCode);
 			response_data = JSON.parse(rdata);
-			mod_assert.equal(response_data.nreporting, nsources);
+			mod_assert.equal(response_data.minreporting, nsources);
 		} catch (ex) {
 			mod_tl.ctStdout.dbg('polling: %j', ex);
 			resFunc(ex);

@@ -223,7 +223,7 @@ function aggData(msg)
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
 		rq = inst.agi_requests[ii];
 
-		if (rq.datatime <= time) {
+		if (rq.datatime + rq.duration <= time) {
 			inst.agi_requests.splice(ii--, 1);
 			rq.callback(id, rq.datatime, rq.request, rq.response);
 		}
@@ -341,25 +341,31 @@ function aggHttpRouter(server)
 	}
 }
 
+var aggValueParams = {
+	duration: {
+	    type: 'number',
+	    min: 1,
+	    max: 3600
+	},
+	start_time: {
+	    type: 'number',
+	    min: 0
+	}
+};
+
 /*
  * Process the request to retrieve a metric's value.
- * XXX add start, duration parameters.  When we do, it should be illegal for
- * 'start' to be before the earliest time for which we have data (approximated
- * by the s_since field) or more than TIMEOUT seconds in the future (since it
- * will definitely time out).  Otherwise, client requests could hang/time out,
- * which also taxes us (since we keep these in memory).
- * Also, when we add this, we need to make sure that the 'when' that gets stored
- * in agi_requests is still the current time, not the time we were looking for.
  * XXX need some way of noticing when instrumenters are gone for a while --
  * putting them into a "don't wait for me" state.
  * XXX parameter for "don't wait" or "max time to wait"?
  */
-function aggHttpValueCommon(request, response, callback)
+function aggHttpValueCommon(request, response, callback, default_duration,
+    exact)
 {
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst, now, record, start, since, err;
+	var inst, now, lastrecord, start, duration, since;
 
 	if (!(fqid in agg_insts)) {
 		response.send(HTTP.ENOTFOUND);
@@ -368,35 +374,39 @@ function aggHttpValueCommon(request, response, callback)
 
 	inst = agg_insts[fqid];
 	now = new Date().getTime();
-	if ('start_time' in request.ca_params) {
-		start = parseInt(request.ca_params['start_time'], 10);
-		since = parseInt(inst.agi_since.getTime() / 1000, 10);
-		err = {};
-		err.found = false;
-		if (isNaN(start)) {
-			err.found = true;
-			err.msg = 'start_time must be an integer';
-		} else if (start < since) {
-			err.found = true;
-			err.msg = 'start_time must be after instrumentation ' +
-			'began';
-		} else if (start > parseInt(now/1000, 10) +
-				agg_http_req_timeout) {
-			err.found = true;
-			err.msg = 'start_time is too far in the future';
-		}
+	since = inst.agi_since.getTime();
 
-		if (err.found) {
-			response.send(HTTP.EBADREQUEST, { error: err.msg });
-			return;
-		}
-	} else {
-		start = parseInt(now / 1000, 10) - 2;
+	try {
+		start = mod_ca.caHttpParam(aggValueParams, request.ca_params,
+		    'start_time');
+		duration = mod_ca.caHttpParam(aggValueParams, request.ca_params,
+		    'duration');
+
+		if (duration !== undefined && exact &&
+		    duration != default_duration)
+			throw (new mod_ca.caValidationError(
+			    'unsupported value for "duration"'));
+
+		if (duration === undefined)
+			duration = default_duration;
+
+		if (start === undefined)
+			start = parseInt(now / 1000, 10) - duration - 1;
+		else if ((start + duration) * 1000 > now + agg_http_req_timeout)
+			throw (new mod_ca.caValidationError(
+			    'start_time + duration is in the future'));
+	} catch (ex) {
+		if (!(ex instanceof mod_ca.caValidationError))
+			throw (ex);
+
+		response.send(HTTP.EBADREQUEST, { error: ex.message });
+		return;
 	}
 
-	record = inst.agi_values[start];
+	lastrecord = inst.agi_values[start + duration];
 
-	if (record && record.count == inst.agi_sources.nsources) {
+	if ((start + duration) * 1000 < since ||
+	    (lastrecord && lastrecord.count == inst.agi_sources.nsources)) {
 		callback(fqid, start, request, response, 0);
 		return;
 	}
@@ -411,6 +421,7 @@ function aggHttpValueCommon(request, response, callback)
 	inst.agi_requests.push({
 	    rqtime: now,
 	    datatime: start,
+	    duration: duration,
 	    request: request,
 	    response: response,
 	    callback: callback
@@ -419,7 +430,7 @@ function aggHttpValueCommon(request, response, callback)
 
 function aggHttpValueRaw(request, response)
 {
-	aggHttpValueCommon(request, response, aggHttpValueRawDone);
+	aggHttpValueCommon(request, response, aggHttpValueRawDone, 1, true);
 }
 
 function aggHttpValueRawDone(id, when, request, response, delay)
@@ -430,15 +441,16 @@ function aggHttpValueRawDone(id, when, request, response, delay)
 	var ret;
 
 	ret = {};
-	ret.when = when;
+	ret.duration = 1;
+	ret.start_time = when;
 	ret.nsources = inst.agi_sources.nsources;
 
 	if (record) {
 		ret.value = record.value !== undefined ? record.value : zero;
-		ret.nreporting = record.count;
+		ret.minreporting = record.count;
 	} else {
 		ret.value = zero;
-		ret.nreporting = 0;
+		ret.minreporting = 0;
 	}
 
 	if (delay > 0)
@@ -450,7 +462,7 @@ function aggHttpValueRawDone(id, when, request, response, delay)
 function aggHttpValueHeatmap(request, response)
 {
 	/* XXX return 404 for non-heatmap stats? */
-	aggHttpValueCommon(request, response, aggHttpValueHeatmapDone);
+	aggHttpValueCommon(request, response, aggHttpValueHeatmapDone, 60);
 }
 
 /*
@@ -578,7 +590,7 @@ function aggExtractDatasets(data, selected, dimension)
 	return ({ data: retdata, present: present });
 }
 
-var aggHeatmapParams = {
+var aggValueHeatmapParams = {
 	height: {
 	    type: 'number',
 	    default: 300,
@@ -609,12 +621,6 @@ var aggHeatmapParams = {
 	    min: 1,
 	    max: 100
 	},
-	duration: {
-	    type: 'number',
-	    default: 60,
-	    min: 1,
-	    max: 3600
-	},
 	selected: {
 	    type: 'array',
 	    default: []
@@ -639,80 +645,8 @@ var aggHeatmapParams = {
 	}
 };
 
-function aggHeatmapParam(request, param)
+function aggHttpValueHeatmapDone(id, start, request, response, delay)
 {
-	var decl, value, errtail;
-
-	ASSERT.ok(param in aggHeatmapParams);
-	decl = aggHeatmapParams[param];
-
-	if (!(param in request.ca_params))
-		return (decl.default);
-
-	errtail = ' for param "' + param + '"';
-
-	switch (decl.type) {
-	case 'number':
-		value = parseInt(request.ca_params[param], 10);
-
-		if (isNaN(value))
-			throw (new Error('illegal value' + errtail));
-
-		if (value < decl.min)
-			throw (new Error('value too small' + errtail));
-
-		if (value > decl.max)
-			throw (new Error('value too large' + errtail));
-
-		break;
-
-	case 'boolean':
-		value = request.ca_params[param];
-		switch (value) {
-		case 'true':
-			value = true;
-			break;
-		case 'false':
-			value = false;
-			break;
-		default:
-			throw (new Error('invalid boolean' + errtail));
-		}
-
-		break;
-
-	case 'array':
-		value = request.ca_params[param];
-
-		if (typeof (value) == 'string')
-			value = value.split(',');
-		else
-			ASSERT.ok(value.constructor == Array);
-
-		break;
-
-	case 'enum':
-		value = request.ca_params[param];
-
-		if (!(value in decl.choices))
-			throw (new Error('invalid choice' + errtail));
-
-		break;
-
-	default:
-		throw (new Error('invalid type: ' + decl.type));
-	}
-
-	return (value);
-}
-
-function aggHttpValueHeatmapDone(id, when, request, response, delay)
-{
-	/*
-	 * XXX the way this is coded now, 'when' is the last data point, but it
-	 * should really be the first one (but it's the last one we need to make
-	 * sure is present).
-	 */
 	var inst = agg_insts[id];
 	var record, rawdata, agg, nreporting;
 	var datasets, png, conf, range;
@@ -720,34 +654,40 @@ function aggHttpValueHeatmapDone(id, when, request, response, delay)
 	var weights, coloring;
 	var nhues, hues, hue;
 	var ii, ret;
+	var param = function (formals, key) {
+		return (mod_ca.caHttpParam(formals, request.ca_params, key));
+	};
 
 	try {
-		height = aggHeatmapParam(request, 'height');
-		width = aggHeatmapParam(request, 'width');
-		ymin = aggHeatmapParam(request, 'ymin');
-		ymax = aggHeatmapParam(request, 'ymax');
-		nbuckets = aggHeatmapParam(request, 'nbuckets');
-		duration = aggHeatmapParam(request, 'duration');
-		selected = aggHeatmapParam(request, 'selected');
-		isolate = aggHeatmapParam(request, 'isolate');
-		hues = aggHeatmapParam(request, 'hues');
-		weights = aggHeatmapParam(request, 'weights');
-		coloring = aggHeatmapParam(request, 'coloring');
+		duration = param(aggValueParams, 'duration') || 60;
+		height = param(aggValueHeatmapParams, 'height');
+		width = param(aggValueHeatmapParams, 'width');
+		ymin = param(aggValueHeatmapParams, 'ymin');
+		ymax = param(aggValueHeatmapParams, 'ymax');
+		nbuckets = param(aggValueHeatmapParams, 'nbuckets');
+		selected = param(aggValueHeatmapParams, 'selected');
+		isolate = param(aggValueHeatmapParams, 'isolate');
+		hues = param(aggValueHeatmapParams, 'hues');
+		weights = param(aggValueHeatmapParams, 'weights');
+		coloring = param(aggValueHeatmapParams, 'coloring');
 
 		if (ymin >= ymax)
-			throw (new Error('"max" must be greater than "min"'));
+			throw (new mod_ca.caValidationError(
+			    '"ymax" must be greater than "ymin"'));
 
 		nhues = selected.length + (isolate ? 0 : 1);
 
 		if (hues !== undefined) {
 			if (nhues > hues.length)
-				throw (new Error('need ' + nhues + ' hues'));
+				throw (new mod_ca.caValidationError(
+				    'need ' + nhues + ' hues'));
 
 			for (ii = 0; ii < hues.length; ii++) {
 				hue = hues[ii] = parseInt(hues[ii], 10);
 
 				if (isNaN(hue) || hue < 0 || hue >= 360)
-					throw (new Error('invalid hue'));
+					throw (new mod_ca.caValidationError(
+					    'invalid hue'));
 			}
 		} else {
 			hues = [ 21 ];
@@ -758,14 +698,16 @@ function aggHttpValueHeatmapDone(id, when, request, response, delay)
 				hues.shift();
 		}
 	} catch (ex) {
-		agg_log.exception(ex);
+		if (!(ex instanceof mod_ca.caValidationError))
+			throw (ex);
+
 		response.send(HTTP.EBADREQUEST, { error: ex.message });
 		return;
 	}
 
 	rawdata = {};
 
-	for (ii = when - duration + 1; ii <= when; ii++) {
+	for (ii = start; ii < start + duration; ii++) {
 		record = inst.agi_values[ii];
 
 		if (!record)
@@ -774,8 +716,7 @@ function aggHttpValueHeatmapDone(id, when, request, response, delay)
 		if (nreporting === undefined || record < nreporting)
 			nreporting = record.count;
 
-		/* XXX only need to copy if mod_heatmap changes data in place */
-		rawdata[ii] = mod_ca.caDeepCopy(record.value);
+		rawdata[ii] = record.value;
 	}
 
 	conf = {
@@ -786,7 +727,7 @@ function aggHttpValueHeatmapDone(id, when, request, response, delay)
 		width: width,
 		height: height,
 		nbuckets: nbuckets,
-		base: when - duration,
+		base: start,
 		nsamples: duration
 	};
 
@@ -832,12 +773,13 @@ function aggHttpValueHeatmapDone(id, when, request, response, delay)
 	};
 
 	ret = {};
-	ret.sample = conf.base;
-	ret.min = conf.min;
-	ret.max = conf.max;
-	ret.total = Math.round(mod_heatmap.bucketize(agg.data[0], conf)[0][0]);
+	ret.start_time = start;
+	ret.duration = duration;
 	ret.minreporting = nreporting;
-	ret.when = when;
+	ret.nsources = inst.agi_sources.nsources;
+	ret.ymin = conf.min;
+	ret.ymax = conf.max;
+	ret.total = Math.round(mod_heatmap.bucketize(agg.data[0], conf)[0][0]);
 	ret.present = agg.present;
 
 	if (delay > 0)

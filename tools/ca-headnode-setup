@@ -44,7 +44,7 @@ function sh_install_agents
                 return 0
         fi
 
-        bash /mnt/usbkey/ur-scripts/agents-*.sh > $sh_tmpbase.agents.out 2>&1 || \
+        bash /usbkey/ur-scripts/agents-*.sh > $sh_tmpbase.agents.out 2>&1 || \
             fail "failed to install agents; see $sh_tmpbase.agents.out"
         rm -f $sh_tmpbase.agents.out
         echo "done."

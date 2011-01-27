@@ -41,7 +41,7 @@ function main()
 	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
 	    basename: mod_ca.ca_amqp_key_base_aggregator,
 	    hostname: hostname,
-	    bindings: [ 'ca.broadcast' ]
+	    bindings: [ mod_ca.ca_amqp_key_all ]
 	});
 	amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
 	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);

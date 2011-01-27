@@ -101,6 +101,12 @@ OUTPUT_DIR=""
 TESTS=""
 
 #
+# Make sure that we use a different AMQP Namespace
+#
+CA_AMQP_PREFIX="test"
+export CA_AMQP_PREFIX
+
+#
 # Keep track of the hostname and export that env variable for these tests as a
 # fallback for those who don't set it themselves.
 #

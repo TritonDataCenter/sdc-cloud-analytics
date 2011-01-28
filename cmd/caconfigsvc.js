@@ -852,6 +852,8 @@ function cfgStatType(modname, statname, decomp)
 {
 	var sprintf = mod_ca.caSprintf;
 	var mod, stat, fields, field, type, ii;
+	var ndiscrete = 0;
+	var nnumeric = 0;
 
 	if (!(modname in cfg_statmods))
 		throw (new Error('module does not exist: ' + modname));
@@ -875,9 +877,21 @@ function cfgStatType(modname, statname, decomp)
 			    'module %s, stat %s: %s', modname, statname,
 			    field)));
 
-		if (fields[field].type == 'numeric')
+		if (fields[field].type == 'numeric') {
 			type = 'numeric-decomposition';
+			nnumeric++;
+		} else {
+			ndiscrete++;
+		}
 	}
+
+	if (ndiscrete > 1)
+		throw (new Error(sprintf('more than one discrete ' +
+		    'decomposition specified')));
+
+	if (nnumeric > 1)
+		throw (new Error(sprintf('more than one numeric ' +
+		    'decomposition specified')));
 
 	return ({ dimension: decomp.length + 1, type: type });
 }

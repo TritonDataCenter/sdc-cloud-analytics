@@ -11,8 +11,8 @@ var gPlotHeight = 300;		/* plot height (pixels) */
 var gnBuckets = 50;		/* vertical buckets (for heatmaps) */
 var gMetrics = [];		/* all available metrics */
 var gGraphs = {};		/* currently active graphs */
-var gZoomOptions = [ 5, 10, 30, 60, 300, 600, 3600 ];	/* seconds */
-var gZoomDefault = 2;		/* default is 30 seconds */
+var gZoomOptions = [ 10, 30, 60, 300, 600, 3600 ];	/* seconds */
+var gZoomDefault = 1;		/* default is 30 seconds */
 var gyMin = 0;			/* global/default ymin for heatmaps */
 var gyMax = 100000;		/* global/default ymax for heatmaps */
 
@@ -400,6 +400,7 @@ function gGraph(conf)
 	this.g_paused = false;
 	this.g_ymin = gyMin;
 	this.g_ymax = gyMax;
+	this.g_secondsback = 0;
 
 	this.g_title = conf.metric.modlabel + ': ' + conf.metric.statlabel;
 
@@ -500,7 +501,7 @@ gGraph.prototype.initDetails = function ()
 	}
 
 	if (this.g_subtype == 'raw') {
-		this.g_data = [];
+		this.g_data = {};
 	} else {
 		this.g_hues = [];
 		this.g_selected = {};
@@ -628,7 +629,13 @@ gGraph.prototype.createToolbar = function ()
 		icons: { primary: 'ui-icon-zoomin' }
 	}, function () { graph.zoomIn(); }));
 
-	subdiv.appendChild(this.createToggleButton('paused', [ {
+	subdiv.appendChild(this.createButton({
+		text: false,
+		label: 'look at older data',
+		icons: { primary: 'ui-icon-seek-prev' }
+	}, function () { graph.scrollBack(); }));
+
+	this.g_pausebutton = this.createToggleButton('paused', [ {
 	    label: 'pause',
 	    value: true,
 	    options: {
@@ -637,6 +644,7 @@ gGraph.prototype.createToolbar = function ()
 		icons: { primary: 'ui-icon-pause' }
 	    }
 	}, {
+	    onclick: function () { graph.unpaused(); },
 	    label: 'resume',
 	    value: false,
 	    options: {
@@ -644,7 +652,14 @@ gGraph.prototype.createToolbar = function ()
 		label: 'resume',
 		icons: { primary: 'ui-icon-play' }
 	    }
-	} ]));
+	} ]);
+	subdiv.appendChild(this.g_pausebutton);
+
+	subdiv.appendChild(this.createButton({
+		text: false,
+		label: 'look at newer data',
+		icons: { primary: 'ui-icon-seek-next' }
+	}, function () { graph.scrollForward(); }));
 
 	dialog = subdiv.appendChild(document.createElement('div'));
 	$(dialog).dialog({
@@ -776,8 +791,12 @@ gGraph.prototype.createToggleButton = function (field, choices)
 	if (!choices[1].options)
 		choices[1].options = { label: choices[1].label };
 
+	button.caToggle = function () {
+		graph.toggle(field, choices, button);
+	};
+
 	$(button).button(choices[0].options).click(
-	    function () { graph.toggle(field, choices, button); });
+	    function () { button.caToggle(); });
 
 	return (button);
 };
@@ -802,18 +821,25 @@ gGraph.prototype.createButton = function (options, callback)
  */
 gGraph.prototype.toggle = function (field, choices, button)
 {
-	var options;
+	var options, callback, fieldval;
 
 	if ($(button).text() == choices[0]['label']) {
 		options = choices[1]['options'];
-		this['g_' + field] = choices[0]['value'];
+		fieldval = choices[0]['value'];
+		callback = choices[0]['onclick'];
 	} else {
 		options = choices[0]['options'];
-		this['g_' + field] = choices[1]['value'];
+		fieldval = choices[1]['value'];
+		callback = choices[1]['onclick'];
 	}
 
 	$(button).button('option', options);
-	this.refresh();
+	this['g_' + field] = fieldval;
+
+	if (callback)
+		callback();
+
+	this.refresh(true);
 };
 
 gGraph.prototype.getContainer = function () { return (this.g_elt_container); };
@@ -895,18 +921,21 @@ gGraph.prototype.serverDelete = function (callback)
  * Returns the graph-state-specific parameters used when fetching the latest
  * value from the server for this graph's instrumentation.
  */
-gGraph.prototype.uriParams = function ()
+gGraph.prototype.uriParams = function (duration, start)
 {
 	var url, value;
 
-	if (this.g_subtype != 'heatmap')
-		return ('');
+	if (start)
+		url = 'start_time=' + start;
 
-	url = '?width=' + gPlotWidth + '&';
+	if (this.g_subtype != 'heatmap')
+		return (url ? '?' + url : '');
+
+	url += 'width=' + gPlotWidth + '&';
 	url += 'height=' + gPlotHeight + '&';
 	url += 'ymin=' + this.g_ymin + '&';
 	url += 'ymax=' + this.g_ymax + '&';
-	url += 'duration=' + gZoomOptions[this.g_zoom] + '&';
+	url += 'duration=' + duration + '&';
 	url += 'nbuckets=' + gnBuckets + '&';
 	url += 'coloring=' + this.g_coloring + '&';
 	url += 'weights=' + this.g_weights;
@@ -921,22 +950,20 @@ gGraph.prototype.uriParams = function ()
 		url += '&hues=' + this.g_selected[value];
 	}
 
-	return (url);
+	return (url ? '?' + url : '');
 };
 
 /*
- * Kicks off an asynchronous update for this graph, retrieving the latest value
- * and updating the graph.
+ * Retrieves a single data point for time 'start_time' and updates the
+ * visualization.
  */
-gGraph.prototype.refresh = function ()
+gGraph.prototype.retrieveDatum = function (duration, start_time)
 {
 	var graph = this;
 	var request, url;
 
-	if (this.g_paused)
-		return;
-
-	url = this.g_http + this.g_uri_val + this.uriParams();
+	url = this.g_http + this.g_uri_val +
+	    this.uriParams(duration, start_time);
 	request = new XMLHttpRequest();
 	request.open('GET', url, true);
 	request.send(null);
@@ -945,12 +972,82 @@ gGraph.prototype.refresh = function ()
 			return;
 
 		var value = JSON.parse(request.responseText);
+		if (!graph.g_present)
+			graph.g_present = value.start_time + value.duration;
 
 		if (graph.g_subtype == 'heatmap')
 			graph.updateHeatmap(value);
 		else
 			graph.updateRaw(value);
 	};
+
+};
+
+/*
+ * Kicks off an asynchronous update for this graph, retrieving the latest value
+ * and updating the graph.
+ */
+gGraph.prototype.refresh = function (force)
+{
+	var start, duration, time, nretrieved;
+
+	if (!force && this.g_present) {
+		this.g_present++;
+
+		if (this.g_paused)
+			this.g_secondsback++;
+	}
+
+	if (this.g_paused && !force)
+		return;
+
+	/*
+	 * If we don't know where the "present" is, we always ask the server for
+	 * the latest data and start from there.
+	 */
+	duration = gZoomOptions[this.g_zoom];
+
+	if (!this.g_present) {
+		this.retrieveDatum(duration);
+		return;
+	}
+
+	/*
+	 * For subsequent requests for a heatmap, we only ever need to get one
+	 * "datum" which represents the current visualization.
+	 */
+	start = this.g_present - this.g_secondsback - duration;
+	if (this.g_subtype == 'heatmap') {
+		this.retrieveDatum(duration, start);
+		return;
+	}
+
+	/*
+	 * For subsequent requests for a flot graph, we need to figure out which
+	 * data points to request from the server and request all of them to
+	 * fill in the entire graph.  We hope that most of the time we have most
+	 * of the points because we'll only have advanced one second, but in
+	 * some cases (as when we unpause or scroll back) we may not have many
+	 * of the data points.
+	 */
+	nretrieved = 0;
+	for (time = start; time < start + duration; time++) {
+		if (time in this.g_data)
+			continue;
+
+		++nretrieved;
+		this.retrieveDatum(duration, time);
+	}
+
+	/*
+	 * We call updateRaw to update the visual representation of the graph
+	 * now.  It's always safe to do this, but if we're going to update it
+	 * again when the next data point comes in, updating it here makes the
+	 * movement jerky.  So we only do this when we had all of the data
+	 * points and didn't need to make any server requests.
+	 */
+	if (nretrieved === 0)
+		this.updateRaw(null);
 };
 
 /*
@@ -980,23 +1077,27 @@ gGraph.prototype.updateHeatmap = function (value)
 
 /*
  * Given the value of a raw instrumentation, updates the flot visualization.
+ * Note: the data is stored in an object indexed by start_time.  When we redraw
+ * the graph (i.e. when we get a new data point), we prune any data we don't
+ * need right now and then construct the representation we give to flot based on
+ * what's there now.  It's a bit more expensive to recompute this every time,
+ * but this allows us to deal more easily with data coming in out-of-order,
+ * missing data points, scrolling back and forward in time, and pausing.
  */
 gGraph.prototype.updateRaw = function (value)
 {
-	var graph, datum, data;
+	var graph, data;
 
-	/*
-	 * XXX we could have received this data out of order.  It's
-	 * probably not worth fixing for this demo.
-	 */
 	graph = this;
-	datum = [ new Date(value.start_time * 1000), value.value ];
-	this.g_data.push(datum);
+
+	if (value)
+		this.g_data[value.start_time] = value.value;
+
 	data = this.rawRecompute();
 	this.g_plot = $.plot(this.g_elt_graph, data, this.g_options);
 
 	if (this.g_highlighted)
-		this.updateHighlighting(this.g_highlighted - 1);
+		this.updateHighlighting(this.g_highlighted);
 
 	if (!this.g_bound) {
 		$(this.g_elt_graph).bind('plotclick',
@@ -1011,21 +1112,36 @@ gGraph.prototype.updateRaw = function (value)
  */
 gGraph.prototype.rawRecompute = function ()
 {
-	var series, points, datum, row;
+	var series, points, datum, row, data;
 	var keytots, keys, colors;
-	var ii, jj, key, showother, othertot;
+	var ii, jj, key, time, timems, showother, othertot;
 	var ndatapoints = gZoomOptions[this.g_zoom];
+	var start = this.g_present - this.g_secondsback - ndatapoints;
 
 	/*
-	 * First, trim or pad g_data as necessary.
+	 * First, trim old data from g_data.  We could trim newer data too but
+	 * this is unlikely to accumulate too much and we'll only have to
+	 * refresh it again if the user scrolls forward or moves back to live.
+	 * We could be even less aggressive than this to avoid having to refetch
+	 * data when the user scrolls back but we don't want to accumulate
+	 * unbounded amounts of memory.
 	 */
-	while (ndatapoints < this.g_data.length)
-		this.g_data.shift();
-	while (ndatapoints > this.g_data.length)
-		this.g_data.unshift(null);
+	for (time in this.g_data) {
+		if (time < start)
+			delete (this.g_data[time]);
+	}
+
+	data = [];
+	for (time = start; time < start + ndatapoints; time++) {
+		timems = new Date(time * 1000);
+		if (time in this.g_data)
+			data.push([ timems, this.g_data[time] ]);
+		else
+			data.push([ timems, null ]);
+	}
 
 	if (this.g_type == 'scalar')
-		return ([ this.rawRecomputeOne(this.g_title, this.g_data,
+		return ([ this.rawRecomputeOne(this.g_title, data, start,
 		    ndatapoints) ]);
 
 	/*
@@ -1062,14 +1178,11 @@ gGraph.prototype.rawRecompute = function ()
 	 */
 	keytots = {};
 	for (ii = 0; ii < ndatapoints; ii++) {
-		if (this.g_data[ii] === null)
-			continue;
-
-		for (key in this.g_data[ii][1]) {
+		for (key in data[ii][1]) {
 			if (!(key in keytots))
 				keytots[key] = 0;
 
-			keytots[key] += this.g_data[ii][1][key];
+			keytots[key] += data[ii][1][key];
 		}
 	}
 
@@ -1115,9 +1228,9 @@ gGraph.prototype.rawRecompute = function ()
 		points = [];
 
 		for (jj = 0; jj < ndatapoints; jj++) {
-			datum = this.g_data[jj];
+			datum = data[jj];
 
-			if (datum === null) {
+			if (datum === null || datum[1] === null) {
 				points.push(null);
 				continue;
 			}
@@ -1126,7 +1239,7 @@ gGraph.prototype.rawRecompute = function ()
 			    key in datum[1] ? datum[1][key] : 0 ]);
 		}
 
-		row = this.rawRecomputeOne(key, points, ndatapoints);
+		row = this.rawRecomputeOne(key, points, start, ndatapoints);
 		row.stack = true;
 		row.color = gColors[ii].css();
 		series.push(row);
@@ -1135,7 +1248,7 @@ gGraph.prototype.rawRecompute = function ()
 	points = [];
 	showother = false;
 	for (ii = 0; ii < ndatapoints; ii++) {
-		datum = this.g_data[ii];
+		datum = data[ii];
 
 		if (datum === null) {
 			points.push(null);
@@ -1155,7 +1268,7 @@ gGraph.prototype.rawRecompute = function ()
 	}
 
 	if (showother) {
-		row = this.rawRecomputeOne('&lt;other&gt;', points,
+		row = this.rawRecomputeOne('&lt;other&gt;', points, start,
 		    ndatapoints);
 		row.stack = true;
 		row.color = gColors[gColors.length - 1].css();
@@ -1168,23 +1281,21 @@ gGraph.prototype.rawRecompute = function ()
 /*
  * See rawRecomputeData -- this recomputes a single row.
  */
-gGraph.prototype.rawRecomputeOne = function (label, rawdata, ndatapoints)
+gGraph.prototype.rawRecomputeOne = function (label, rawdata, start, ndatapoints)
 {
 	var points = [];
 	var ii;
 
 	/*
-	 * Iterate backwards to back-fill NULL values with zero.  This should
-	 * really be filled with some other pattern to indicate "no data".
+	 * Fill in empty points with undefined to indicate "no data".
 	 */
-	for (ii = ndatapoints - 1; ii >= 0; ii--) {
-		if (rawdata[ii] !== null || ii == ndatapoints - 1) {
+	for (ii = 0; ii < ndatapoints; ii++) {
+		if (rawdata[ii] !== null) {
 			points[ii] = rawdata[ii];
 			continue;
 		}
 
-		points[ii] =
-		    [ new Date(points[ii + 1][0].getTime() - 1000), undefined ];
+		points[ii] = [ new Date((start + ii) * 1000), undefined ];
 	}
 
 	return ({ label: label, data: points });
@@ -1196,57 +1307,59 @@ gGraph.prototype.rawRecomputeOne = function (label, rawdata, ndatapoints)
  */
 gGraph.prototype.clicked = function (pos)
 {
-	var graph = this;
-	var when = Math.round(pos.x / 1000) * 1000;
-	var ii, jj, key, keys, legend;
+	var when = Math.round(pos.x / 1000);
+	var datum = this.g_data[when];
+	var ii, key, keys, legend;
 
-	for (ii = 0; ii < this.g_data.length; ii++) {
-		if (this.g_data[ii] !== null &&
-		    this.g_data[ii][0].getTime() == when)
-			break;
-	}
-
-	if (ii == this.g_data.length)
+	if (!datum)
 		return;
 
 	if (this.g_type == 'scalar') {
-		legend = [
-		    { key: this.g_data[ii][1], val: this.g_data[ii][1] }
-		];
+		legend = [ { key: datum, val: datum } ];
 	} else {
 		keys = [];
-		for (key in this.g_data[ii][1])
+		for (key in datum)
 			keys.push(key);
 		keys.sort(function (k1, k2) {
-			return (graph.g_data[ii][1][k2] -
-			    graph.g_data[ii][1][k1]);
+			return (datum[k2] - datum[k1]);
 		});
 
 		legend = [];
-		for (jj = 0; jj < keys.length; jj++) {
-			legend.push({ key: keys[jj],
-			    val: [ keys[jj], this.g_data[ii][1][keys[jj]] ] });
+		for (ii = 0; ii < keys.length; ii++) {
+			legend.push({ key: keys[ii],
+			    val: [ keys[ii], datum[keys[ii]] ] });
 		}
 	}
 
 	this.updateTable(legend, true);
-	this.updateHighlighting(ii);
+	this.updateHighlighting(when * 1000);
 };
 
 /*
  * Highlights the specified point on a flot-based plot.
  */
-gGraph.prototype.updateHighlighting = function (yy)
+gGraph.prototype.updateHighlighting = function (when)
 {
-	var ii, data;
+	var ii, jj, data, start;
 
-	this.g_highlighted = yy;
+	this.g_highlighted = when;
 	this.g_plot.unhighlight();
 	data = this.g_plot.getData();
 
 	for (ii = 0; ii < data.length; ii++) {
-		if (data[ii].data[yy][1] !== 0)
-			this.g_plot.highlight(ii, yy);
+		for (jj = 0; jj < data[ii].data.length; jj++) {
+			if (data[ii].data[jj])
+				break;
+		}
+
+		if (!data[ii].data[jj])
+			continue;
+
+		start = data[ii].data[jj][0].getTime();
+		if (when - start < 0)
+			continue;
+
+		this.g_plot.highlight(ii, jj + (when - start) / 1000);
 	}
 };
 
@@ -1311,6 +1424,9 @@ gGraph.prototype.heatmapRowSelect = function (target, shift)
 	var table = this.g_table;
 	var hue, value, already;
 
+	if (this.g_subtype != 'heatmap')
+		return;
+
 	value = table.fnGetData(target.parentNode)[0];
 	already = value in this.g_selected;
 
@@ -1339,7 +1455,7 @@ gGraph.prototype.heatmapRowSelect = function (target, shift)
 	}
 
 	target.focus();
-	this.refresh();
+	this.refresh(true);
 };
 
 /*
@@ -1368,11 +1484,46 @@ gGraph.prototype.heatmapKeyPressed = function (event)
 	this.heatmapRowSelect(sibling.firstChild, event.shiftKey);
 };
 
+/*
+ * pauseInternal actually pauses the graph and toggles the toolbar button
+ * Toggling the toolbar button is what actually updates g_paused.  This function
+ * does nothing when the graph is already unpaused.
+ */
+gGraph.prototype.pauseInternal = function ()
+{
+	if (this.g_paused)
+		return;
+
+	this.g_pausebutton.caToggle();
+};
+
+/*
+ * unpauseInternal actually unpauses the graph and toggles the toolbar button.
+ * Toggling the toolbar button is what actually updates g_paused.  This function
+ * does nothing when the graph is already unpaused.
+ */
+gGraph.prototype.unpauseInternal = function ()
+{
+	if (!this.g_paused)
+		return;
+
+	this.g_pausebutton.caToggle();
+};
+
+/*
+ * unpaused is invoked by toggling the toolbar button and so happens both when
+ * the user clicks the button and when unpauseInternal is invoked.
+ */
+gGraph.prototype.unpaused = function ()
+{
+	this.g_secondsback = 0;
+};
+
 gGraph.prototype.zoomIn = function ()
 {
 	if (this.g_zoom - 1 >= 0) {
 		this.g_zoom--;
-		this.refresh();
+		this.refresh(true);
 	}
 };
 
@@ -1380,8 +1531,29 @@ gGraph.prototype.zoomOut = function ()
 {
 	if (this.g_zoom + 1 < gZoomOptions.length) {
 		this.g_zoom++;
-		this.refresh();
+		this.refresh(true);
 	}
+};
+
+gGraph.prototype.scrollBack = function ()
+{
+	this.pauseInternal();
+	this.g_secondsback += parseInt(gZoomOptions[this.g_zoom] / 4, 10);
+	this.refresh(true);
+};
+
+gGraph.prototype.scrollForward = function ()
+{
+	this.g_secondsback -= parseInt(gZoomOptions[this.g_zoom] / 4, 10);
+
+	if (this.g_secondsback <= 0) {
+		this.g_secondsback = 0;
+		this.unpauseInternal();
+		return;
+	}
+
+	this.pauseInternal();
+	this.refresh(true);
 };
 
 /*

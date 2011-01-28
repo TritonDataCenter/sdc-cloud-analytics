@@ -32,7 +32,7 @@ exports.insinit = function (ins, log)
 	    label: 'bytes read/written',
 	    type: 'size',
 	    fields: {
-		hostname: { label: 'hostname', type: 'string' }
+		hostname: { label: 'hostname', type: mod_ca.ca_type_string }
 	    },
 	    metric: inskMetric
 	});
@@ -42,7 +42,7 @@ exports.insinit = function (ins, log)
 	    label: 'operations',
 	    type: 'ops',
 	    fields: {
-		hostname: { label: 'hostname', type: 'string' }
+		hostname: { label: 'hostname', type: mod_ca.ca_type_string }
 	    },
 	    metric: inskMetric
 	});
@@ -54,7 +54,7 @@ exports.insinit = function (ins, log)
 	    label: 'bytes sent/received',
 	    type: 'size',
 	    fields: {
-		hostname: { label: 'hostname', type: 'string' }
+		hostname: { label: 'hostname', type: mod_ca.ca_type_string }
 	    },
 	    metric: inskMetric
 	});

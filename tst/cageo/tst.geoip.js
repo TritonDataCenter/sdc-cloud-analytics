@@ -1,4 +1,4 @@
-var mod_ca = require('../../lib/ca/ca-common');
+var mod_cageoip = require('../../lib/ca/ca-geo');
 var sys = require('sys');
 var assert = require('assert');
 
@@ -12,4 +12,4 @@ if (!process.env['GEOIP_DATABASE']) {
 	process.exit(0);
 }
 
-sys.puts(sys.inspect(mod_ca.caGeoIP('123.45.67.89')));
+sys.puts(sys.inspect(mod_cageoip.caGeoIP('138.16.60.2')));

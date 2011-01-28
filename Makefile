@@ -69,6 +69,8 @@ PKG_TARBALLS	 = $(PKGS:%=$(PKGROOT)/%.tar.gz)
 PKGDIRS_cabase := \
 	$(PKGROOT)/cabase			\
 	$(PKGROOT)/cabase/cmd			\
+	$(PKGROOT)/cabase/cmd/caagg		\
+	$(PKGROOT)/cabase/cmd/caagg/transforms	\
 	$(PKGROOT)/cabase/cmd/cainst		\
 	$(PKGROOT)/cabase/cmd/cainst/modules	\
 	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)	\
@@ -135,6 +137,8 @@ PKG_DIRS := \
 ROOT_DIRS = \
 	$(ROOT_CA)						\
 	$(ROOT_CA)/cmd						\
+	$(ROOT_CA)/cmd/caagg					\
+	$(ROOT_CA)/cmd/caagg/transforms				\
 	$(ROOT_CA)/cmd/cainst					\
 	$(ROOT_CA)/cmd/cainst/modules				\
 	$(ROOT_CA)/deps						\

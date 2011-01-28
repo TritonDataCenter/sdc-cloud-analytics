@@ -54,7 +54,7 @@ function check_stage_done()
  */
 function check_instrumentation(test, code, response, rv)
 {
-	var inp, exp, decomp, key, pred;
+	var inp, exp, decomp, key, pred, trans;
 
 	inp = test.input;
 	decomp = inp.decomposition || [];
@@ -63,6 +63,7 @@ function check_instrumentation(test, code, response, rv)
 	pred = inp.predicate || {};
 	if (pred.constructor != String)
 		pred = JSON.stringify(pred);
+	trans = inp.transformations || {};
 
 	ASSERT.equal(response.statusCode, code);
 	assertNoError(rv);
@@ -246,9 +247,9 @@ function check_global_uris()
 		ASSERT.ok(mod['label'] == 'test module description');
 		ASSERT.ok(stat['label'] == 'test ops 1');
 		ASSERT.ok(stat['type'] == 'ops');
-		ASSERT.ok(fields['hostname']['type'] == 'discrete');
+		ASSERT.ok(fields['hostname']['type'] == mod_ca.ca_type_string);
 		ASSERT.ok(fields['hostname']['label'] == 'server host name');
-		ASSERT.ok(fields['latency']['type'] == 'numeric');
+		ASSERT.ok(fields['latency']['type'] == mod_ca.ca_type_latency);
 		ASSERT.ok(fields['latency']['label'] ==
 		    'duration of operation');
 		check_stage_done();

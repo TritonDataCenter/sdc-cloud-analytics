@@ -32,6 +32,7 @@ var cfg_http_valraw = '/value/raw';		/* HTTP API to get raw data */
 var cfg_http_valheat = '/value/heatmap';	/* HTTP API to get heatmaps */
 
 var cfg_aggregators = {};	/* all aggregators, by hostname */
+var cfg_transformations = {};	/* all transformations, by name */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
@@ -143,6 +144,7 @@ function cfgStarted()
 function cfgHttpRouter(server)
 {
 	var metrics = '/metrics';
+	var transforms = '/transformations';
 	var instrumentations = '/instrumentations';
 	var instrumentations_id = instrumentations + '/:instid';
 	var infixes = [ '', '/customers/:custid' ];
@@ -151,6 +153,7 @@ function cfgHttpRouter(server)
 	for (ii = 0; ii < infixes.length; ii++) {
 		base = cfg_http_baseuri + infixes[ii];
 		server.get(base + metrics, cfgHttpMetricsList);
+		server.get(base + transforms, cfgHttpTransformsList);
 		server.get(base + instrumentations,
 		    cfgHttpInstrumentationsList);
 		server.post(base + instrumentations, cfgHttpInstCreate);
@@ -182,6 +185,15 @@ function cfgInstrumentations(custid)
 function cfgHttpMetricsList(request, response)
 {
 	response.send(HTTP.OK, cfg_statmods);
+}
+
+/*
+ * Handle the /ca/[customers/:id]/transformations GET request
+ */
+function cfgHttpTransformsList(request, response)
+{
+	var agg = cfgPickAggregator();
+	response.send(HTTP.OK, agg.cag_transformations);
 }
 
 function cfgHttpInstrumentationsList(request, response)
@@ -237,6 +249,12 @@ function cfgHttpInstCreate(request, response)
 		return;
 	}
 
+	/*
+	 * Now that we have our aggregator, create the list of supported
+	 * transformations.
+	 */
+	spec.transformations = cfgStatTransformations(spec);
+
 	if (custid === undefined) {
 		instid = cfg_inst_id++;  /* XXX should be unique across time. */
 		cfgHttpInstCreateFinish(response, custid, instid, spec,
@@ -287,7 +305,7 @@ function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
 	    cfg_http_insturi, instid);
 	uris = [];
 
-	if (spec.stattype.type == 'numeric-decomposition') {
+	if (spec.stattype.type == mod_ca.ca_arity_numeric) {
 		uris.push({
 		    uri: uri + cfg_http_valheat,
 		    name: 'value_heatmap'
@@ -444,6 +462,7 @@ function cfgHttpInstEmit(inst)
 	ret['retention-time'] = inst.options['retention-time'];
 	ret['uri'] = inst.uri;
 	ret['uris'] = inst.uris;
+	ret['transformations'] = inst.spec.transformations;
 
 	return (ret);
 }
@@ -533,9 +552,10 @@ function cfgHttpInstValue(request, response)
 function cfgAggEnable(aggregator, id)
 {
 	var statkey = mod_ca.caKeyForInst(id);
-	var stattype = cfg_insts[id]['spec']['stattype'];
+	var inst = cfg_insts[id];
+
 	cfg_cap.sendCmdEnableAgg(aggregator.cag_routekey, id, id, statkey,
-	    stattype['dimension'], cfg_insts[id]['options']);
+	    cfgHttpInstEmit(inst));
 }
 
 function cfgInstEnable(instrumenter, id)
@@ -690,12 +710,19 @@ function cfgCmdStatus(msg)
 
 function cfgNotifyAggregatorOnline(msg)
 {
-	var id, agg, action;
+	var id, agg, action, trans;
 
 	if (!('ag_http_port' in msg)) {
 		cfg_log.warn('ignoring aggonline msg with no port: %j', msg);
 		return;
 	}
+
+	if (!('ag_transformations' in msg)) {
+		cfg_log.warn('ignoring aggonline msg with no ' +
+		    'transformations: %j', msg);
+		return;
+	}
+
 
 	if (msg.ca_hostname in cfg_aggregators) {
 		agg = cfg_aggregators[msg.ca_hostname];
@@ -715,6 +742,13 @@ function cfgNotifyAggregatorOnline(msg)
 	agg.cag_os_release = msg.ca_os_release;
 	agg.cag_os_revision = msg.ca_os_revision;
 	agg.cag_http_port = msg.ag_http_port;
+	agg.cag_transformations = msg.ag_transformations;
+
+	for (trans in agg.cag_transformations) {
+		if (!(trans in cfg_transformations))
+			cfg_transformations[trans] =
+			    agg.cag_transformations[trans];
+	}
 
 	for (id in agg.cag_insts)
 		cfgAggEnable(agg, id);
@@ -868,7 +902,8 @@ function cfgStatType(modname, statname, decomp)
 	stat = mod['stats'][statname];
 	fields = stat['fields'];
 
-	type = decomp.length === 0 ? 'scalar' : 'discrete-decomposition';
+	type = decomp.length === 0 ? mod_ca.ca_arity_scalar :
+	    mod_ca.ca_arity_discrete;
 
 	for (ii = 0; ii < decomp.length; ii++) {
 		field = decomp[ii];
@@ -878,8 +913,8 @@ function cfgStatType(modname, statname, decomp)
 			    'module %s, stat %s: %s', modname, statname,
 			    field)));
 
-		if (fields[field].type == 'numeric') {
-			type = 'numeric-decomposition';
+		if (fields[field].type == mod_ca.ca_type_latency) {
+			type = mod_ca.ca_arity_numeric;
 			nnumeric++;
 		} else {
 			ndiscrete++;
@@ -895,6 +930,30 @@ function cfgStatType(modname, statname, decomp)
 		    'decomposition specified')));
 
 	return ({ dimension: decomp.length + 1, type: type });
+}
+
+/*
+ * Determines the list of valid transformations that can be applied to specified
+ * stat based on the transformations supported by the current aggregator.
+ */
+function cfgStatTransformations(spec)
+{
+	var ret = {};
+	var ii, tname, ttypes, fields, ftype, transform;
+	fields = cfg_statmods[spec.modname]['stats'][spec.statname]['fields'];
+
+	for (tname in cfg_transformations) {
+		transform = cfg_transformations[tname];
+		ttypes = transform['types'];
+		for (ii = 0; ii < spec.decomp.length; ii++) {
+			ftype = fields[spec.decomp[ii]]['type'];
+			if (mod_ca.caArrayContains(ttypes, ftype) &&
+			    !(tname in ret))
+				ret[tname] = transform;
+		}
+	}
+
+	return (ret);
 }
 
 main();

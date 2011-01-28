@@ -566,8 +566,14 @@ var startWorld = function ()
 var enableAgg = function (source)
 {
 	var key = mod_ca.caKeyForInst(id);
+	var inst = {
+	    'value-dimesion': dim,
+	    'enabled': true,
+	    'retention-time': 600,
+	    transformations: []
+	};
 	mod_tl.ctStdout.info('Sending enable agg message');
-	fakeConfig.sendCmdEnableAgg(source, id, id, key, dim);
+	fakeConfig.sendCmdEnableAgg(source, id, id, key, inst);
 };
 
 var sendData = function (source)

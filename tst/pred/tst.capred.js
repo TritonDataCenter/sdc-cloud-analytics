@@ -45,7 +45,7 @@ mod_assert.ok(mod_capred.caPredNonTrivial({eq: ['zonename', 'bar']}));
 pred = { eq: [ 'zonename', 'foo' ] };
 mod_assert.ok(mod_capred.caPredContainsField('zonename', pred));
 mod_assert.ok(!mod_capred.caPredContainsField('hostname', pred));
-pred = { and: [ { eq: [ 'zonename', 'foo' ] }, { ne: [ 'latency', 200 ] } ] };
+pred = { and: [ { eq: [ 'zonename', 'foo' ] }, { gt: [ 'latency', 200 ] } ] };
 mod_assert.ok(mod_capred.caPredContainsField('zonename', pred));
 mod_assert.ok(!mod_capred.caPredContainsField('hostname', pred));
 
@@ -56,8 +56,8 @@ var obj = {
 
 mod_capred.caPredReplaceFields(obj, pred);
 mod_assert.equal(mod_capred.caPredPrint(pred), '(zonename == "foo") && ' +
-    '(timestamp - now->ts != 200)');
+    '(timestamp - now->ts > 200)');
 
-pred = { and: [ { eq: [ 'zonename', 'foo' ] }, { ne: [ 'latency', 200 ] } ] };
+pred = { and: [ { eq: [ 'zonename', 'foo' ] }, { gt: [ 'latency', 200 ] } ] };
 fields = mod_capred.caPredFields(pred);
 compArrays(fields, [ 'zonename', 'latency' ]);

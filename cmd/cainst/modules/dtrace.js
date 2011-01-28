@@ -20,11 +20,12 @@ exports.insinit = function (ins, log)
 	    label: 'syscalls',
 	    type: 'ops',
 	    fields: {
-		hostname: { label: 'hostname', type: 'string' },
-		zonename: { label: 'zone name', type: 'string' },
-		syscall: { label: 'system call', type: 'string' },
-		execname: { label: 'application name', type: 'string' },
-		latency: { label: 'latency', type: 'numeric' }
+		hostname: { label: 'hostname', type: mod_ca.ca_type_string },
+		zonename: { label: 'zone name', type: mod_ca.ca_type_string },
+		syscall: { label: 'system call', type: mod_ca.ca_type_string },
+		execname: { label: 'application name',
+		    type: mod_ca.ca_type_string },
+		latency: { label: 'latency', type: mod_ca.ca_type_latency }
 	    },
 	    metric: insdSyscalls
 	});
@@ -36,11 +37,12 @@ exports.insinit = function (ins, log)
 	    label: 'operations',
 	    type: 'ops',
 	    fields: {
-		hostname: { label: 'hostname', type: 'string' },
-		zonename: { label: 'zone name', type: 'string' },
-		optype: { label: 'type', type: 'string' },
-		execname: { label: 'application name', type: 'string' },
-		latency: { label: 'latency', type: 'numeric' }
+		hostname: { label: 'hostname', type: mod_ca.ca_type_string },
+		zonename: { label: 'zone name', type: mod_ca.ca_type_string },
+		optype: { label: 'type', type: mod_ca.ca_type_string },
+		execname: { label: 'application name',
+		    type: mod_ca.ca_type_string },
+		latency: { label: 'latency', type: mod_ca.ca_type_latency }
 	    },
 	    metric: insdIops
 	});
@@ -52,11 +54,13 @@ exports.insinit = function (ins, log)
 	    label: 'HTTP server operations',
 	    type: 'ops',
 	    fields: {
-		method: { label: 'method', type: 'string' },
-		url: { label: 'URL', type: 'string' },
-		raddr: { label: 'remote IP address', type: 'string' },
-		rport: { label: 'remote TCP port', type: 'string' },
-		latency: { label: 'latency', type: 'numeric' }
+		method: { label: 'method', type: mod_ca.ca_type_string },
+		url: { label: 'URL', type: mod_ca.ca_type_string },
+		raddr: { label: 'remote IP address',
+		    type: mod_ca.ca_type_ipaddr },
+		rport: { label: 'remote TCP port',
+		    type: mod_ca.ca_type_string },
+		latency: { label: 'latency', type: mod_ca.ca_type_latency }
 	    },
 	    metric: insdNodeHttpd
 	});

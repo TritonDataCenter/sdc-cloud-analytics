@@ -98,7 +98,7 @@ var startWorld = function ()
 	fakeAgg.cap_amqp.start(function () {
 		mod_tl.ctStdout.info('Called agg online');
 		fakeAgg.sendNotifyAggOnline(mod_ca.ca_amqp_key_config,
-		    mod_ca.ca_http_port_agg_base);
+		    mod_ca.ca_http_port_agg_base, {});
 		fakeInst.cap_amqp.start(function () {
 			mod_tl.ctStdout.info('Called inst online');
 			fakeInst.sendNotifyInstOnline(mod_ca.ca_amqp_key_config,
@@ -149,7 +149,8 @@ var listInsts = function (id, inputExp)
 	    uris: [ {
 		name: 'value_raw',
 		uri: '/ca/instrumentations/1/value/raw'
-	    } ]
+	    } ],
+	    transformations: {}
 	}];
 
 	if (inputExp)

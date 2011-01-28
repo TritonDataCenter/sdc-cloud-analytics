@@ -7,6 +7,7 @@ var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
 var mod_log = require('../lib/ca/ca-log');
+var mod_cageoip = require('../lib/ca/ca-geo');
 var mod_heatmap = require('heatmap');
 var HTTP = require('../lib/ca/http-constants');
 var ASSERT = require('assert');
@@ -24,6 +25,8 @@ var agg_default_options = { 'enabled': true, 'retention-time': 600 };
 var agg_http;
 var agg_cap;			/* cap wrapper */
 var agg_log;			/* log handle */
+
+var agg_transforms = {};	/* available transformations by name */
 
 function main()
 {
@@ -62,6 +65,8 @@ function main()
 	agg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
 	agg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
 
+	aggInitBackends();
+
 	agg_http = new mod_cahttp.caHttpServer({
 	    log: agg_log,
 	    port_base: http_port_base,
@@ -79,7 +84,8 @@ function main()
 
 function aggNotifyConfig()
 {
-	agg_cap.sendNotifyAggOnline(mod_ca.ca_amqp_key_config, agg_http_port);
+	agg_cap.sendNotifyAggOnline(mod_ca.ca_amqp_key_config, agg_http_port,
+	    agg_transforms);
 }
 
 function aggStarted()
@@ -93,18 +99,16 @@ function aggCmdEnableAggregation(msg)
 {
 	var destkey = msg.ca_source;
 	var id, datakey;
-	var dimension;
 
 	if (!('ag_inst_id' in msg) || !('ag_key' in msg) ||
-	    !('ag_dimension' in msg)) {
+	    !('ag_instrumentation' in msg)) {
 		agg_cap.sendCmdAckEnableAggFail(destkey, msg.ca_id,
-		    'missing field');
+		    'missing field', msg.ag_inst_id);
 		return;
 	}
 
 	id = msg.ag_inst_id;
 	datakey = msg.ag_key;
-	dimension = msg.ag_dimension;
 
 	/*
 	 * This command is idempotent so if we're currently aggregating this
@@ -112,8 +116,7 @@ function aggCmdEnableAggregation(msg)
 	 */
 	if (id in agg_insts) {
 		/* XXX check against key */
-		agg_insts[id].agi_options = msg.ag_options ||
-		    agg_default_options;
+		agg_insts[id].agi_instrumentation = msg.ag_instrumentation;
 		agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 		return;
 	}
@@ -121,13 +124,12 @@ function aggCmdEnableAggregation(msg)
 	agg_cap.bind(datakey, function () {
 	    agg_log.info('aggregating instrumentation %s', id);
 	    agg_insts[id] = {
-		agi_dimension: dimension,
 		agi_since: new Date(),
 		agi_sources: { sources: {}, nsources: 0 },
 		agi_values: {},
 		agi_last: 0,
 		agi_requests: [],
-		agi_options: msg.ag_options || agg_default_options
+		agi_instrumentation: msg.ag_instrumentation
 	    };
 	    agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 	});
@@ -395,6 +397,8 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 		else if ((start + duration) * 1000 > now + agg_http_req_timeout)
 			throw (new mod_ca.caValidationError(
 			    'start_time + duration is in the future'));
+
+		aggHttpVerifyTransformations(fqid, request);
 	} catch (ex) {
 		if (!(ex instanceof mod_ca.caValidationError))
 			throw (ex);
@@ -437,8 +441,8 @@ function aggHttpValueRawDone(id, when, request, response, delay)
 {
 	var inst = agg_insts[id];
 	var record = inst.agi_values[when];
-	var zero = inst.agi_dimension > 1 ? {} : 0;
-	var ret;
+	var zero = inst.agi_instrumentation['value-dimension'] > 1 ? {} : 0;
+	var ret, transform;
 
 	ret = {};
 	ret.duration = 1;
@@ -452,6 +456,10 @@ function aggHttpValueRawDone(id, when, request, response, delay)
 		ret.value = zero;
 		ret.minreporting = 0;
 	}
+
+	transform = aggHttpValueTransform(id, request, ret.value);
+	if (transform != null)
+		ret.transformations = transform;
 
 	if (delay > 0)
 		ret.delayed = delay;
@@ -653,7 +661,7 @@ function aggHttpValueHeatmapDone(id, start, request, response, delay)
 	var height, width, ymin, ymax, nbuckets, duration, selected, isolate;
 	var weights, coloring;
 	var nhues, hues, hue;
-	var ii, ret;
+	var ii, ret, transforms;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
 	};
@@ -731,7 +739,8 @@ function aggHttpValueHeatmapDone(id, start, request, response, delay)
 		nsamples: duration
 	};
 
-	agg = aggExtractDatasets(rawdata, selected, inst.agi_dimension);
+	agg = aggExtractDatasets(rawdata, selected,
+	    inst.agi_instrumentation['value-dimension']);
 	datasets = [];
 	for (ii = 0; ii < agg.data.length; ii++)
 		datasets.push(mod_heatmap.bucketize(agg.data[ii], conf));
@@ -782,6 +791,10 @@ function aggHttpValueHeatmapDone(id, start, request, response, delay)
 	ret.total = Math.round(mod_heatmap.bucketize(agg.data[0], conf)[0][0]);
 	ret.present = agg.present;
 
+	transforms = aggHttpValueTransform(id, request, rawdata);
+	if (transforms != null)
+		ret.transformations = transforms;
+
 	if (delay > 0)
 		ret.delayed = delay;
 
@@ -814,14 +827,189 @@ function aggTick()
 		}
 
 		for (when in inst.agi_values) {
-			if (inst.agi_options['retention-time'] > 0 &&
+			if (inst.agi_instrumentation['retention-time'] > 0 &&
 			    now - (when * 1000) >
-			    inst.agi_options['retention-time'] * 1000)
+			    inst.agi_instrumentation['retention-time'] * 1000)
 				delete (inst.agi_values[when]);
 		}
 	}
 
 	setTimeout(aggTick, 1000);
+}
+
+/*
+ * Transformation modules:
+ *
+ * A transformation is a post processing action that can be applied to raw data.
+ * For example, one could perform geolocation or reverse DNS on data.
+ *
+ * A transformation module defines a single object which it uses to register
+ * with the aggregator. The object contains the following four fields:
+ *
+ *	name			The id for this transformation as a string
+ *
+ *	label			The human readable name for this transformation
+ *				as a string
+ *
+ *	types			An array of types that this transformation
+ *				supports operating on
+ *
+ *	transform		A function of the form object (*transform)(raw).
+ *				This takes the raw data and transforms it per
+ *				the module specific transformation. It then
+ *				returns the data in an object in a
+ *				module-specific format.
+ *
+ * Data from transformations is assembled into a larger object where each key is
+ * the name of the transformation and the value is the data returned from
+ * calling the transform function.
+ */
+
+function aggBackendInterface() {}
+
+/*
+ * Function called to register a transformation. Args should be an object as
+ * described above. We currently require that the name of each transformation be
+ * unique. To indicate an error we throw an exception.
+ */
+aggBackendInterface.prototype.registerTransformation = function (args)
+{
+	var name, label, types, transform;
+
+	name = mod_ca.caFieldExists(args, 'name', '');
+	label = mod_ca.caFieldExists(args, 'label', '');
+	types = mod_ca.caFieldExists(args, 'types', []);
+	transform = mod_ca.caFieldExists(args, 'transform',
+	    aggBackendInterface);
+
+	if (name in agg_transforms)
+		throw (new mod_ca.caValidationError('Transformation module "' +
+		    '" already declared'));
+
+	agg_transforms[name] = {
+	    label: label,
+	    types: types,
+	    transform: transform
+	};
+};
+
+/*
+ * Attempts to load the known transformations and add them to the set of
+ * available transformations. If no transformations load successfully, it
+ * barrels on. The lack of valid transformations should not stop the aggregator
+ * from initializing and doing what it needs to.
+ */
+function aggInitBackends()
+{
+	var backends = [ 'geolocate', 'reversedns' ];
+	var bemgr = new aggBackendInterface();
+	var plugin, ii;
+
+	for (ii = 0; ii < backends.length; ii++) {
+		try {
+			plugin = require('./caagg/transforms/' + backends[ii]);
+			plugin.agginit(bemgr, agg_log);
+			agg_log.warn('Loaded transformation: ' + backends[ii]);
+		} catch (ex) {
+			agg_log.warn(mod_ca.caSprintf('FAILED loading ' +
+			    'transformation "%s": %s', backends[ii],
+			    ex.toString()));
+		}
+	}
+
+	agg_log.info('Finished loading modules');
+}
+
+/*
+ * Verifies that the requested transformations exist and make sense for the
+ * specific aggregation.
+ */
+function aggHttpVerifyTransformations(id, request)
+{
+	var trans, ii, validtrans;
+
+	trans = mod_ca.caHttpParam({
+	    transformations: {
+		type: 'array',
+		default: []
+	    }
+	}, request.ca_params, 'transformations');
+
+	validtrans = agg_insts[id]['agi_instrumentation']['transformations'];
+
+	for (ii = 0; ii < trans.length; ii++) {
+		if (!(trans[ii] in agg_transforms))
+			throw (new mod_ca.caValidationError(mod_ca.caSprintf(
+			    'Requested non-existant transformation: %s',
+			    trans[ii])));
+
+
+		if (!(trans[ii] in validtrans))
+			throw (new mod_ca.caValidationError(mod_ca.caSprintf(
+			    'Requested incompatible transformation: %s',
+			    trans[ii])));
+	}
+}
+
+/*
+ * Handles fulfilling all the requested transformations. The request should
+ * have previously been validated by aggHttpVerifyTransformations. We iterate
+ * over each transformation and call the transform function it registered with
+ * the aggregator and combine all the results into one object.
+ *
+ * Input Parameters:
+ *
+ *	id		The id for the instrumentation
+ *
+ *	request		The HTTP request that we are processing
+ *
+ *	raw		The raw data
+ *
+ * Return values:
+ *
+ *	If 0 transformations requested: null
+ *
+ *	If >0 transformations:
+ *		An object where each key corresponds to a requested
+ *		transformation. It will have the data for that transformation,
+ *		if that transformation is valid and can be done for the specific
+ *		instrumentation. Otherwise, the key will be null.
+ */
+function aggHttpValueTransform(id, request, raw)
+{
+	var ret = null;
+	var trans, ii;
+
+	trans = mod_ca.caHttpParam({
+	    transformations: {
+		type: 'array',
+		default: []
+	    }
+	}, request.ca_params, 'transformations');
+
+	if (mod_ca.caIsEmpty(trans))
+		return (ret);
+
+	ret = {};
+
+	/*
+	 * If for some reason one of our transformation backends blow up, we
+	 * shouldn't abort everything because of that. We should log what
+	 * happened and set their return value to be the empty object. It's
+	 * important that the user still be able to get the data they requested.
+	 */
+	for (ii = 0; ii < trans.length; ii++) {
+		try {
+			ret[trans[ii]] =
+			    agg_transforms[trans[ii]].transform(raw);
+		} catch (ex) {
+			ret[trans[ii]] = {};
+			agg_log.error(mod_ca.caSprintf('EXCEPTION from ' +
+			    'transform %s: %s', trans[ii], ex.toString()));
+		}
+	}
+
+	return (ret);
 }
 
 main();

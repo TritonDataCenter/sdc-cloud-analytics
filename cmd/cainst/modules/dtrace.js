@@ -275,12 +275,9 @@ function insdIops(metric)
 		action = 'count();';
 	}
 
-	if (aggLatency) {
-		predicates.push('latencys[arg0]');
-	} else if (indexes.length > 0) {
-		if (decomps[0] != 'optype')
-			predicates.push(mod_ca.caSprintf('%ss[arg0] != NULL',
-			    decomps[0]));
+	if (before.length > 0) {
+		predicates.push(mod_ca.caSprintf('%ss[arg0] != NULL',
+		    before[0]));
 	}
 
 	if (hasPredicate) {
@@ -328,7 +325,7 @@ function insdNodeHttpd(metric)
 	    method: '(methods[args[0]->fd])',
 	    url: '(urls[args[0]->fd])',
 	    raddr: '(args[0]->remoteAddress)',
-	    rport: '(args[0]->remotePort)'
+	    rport: 'lltostr(args[0]->remotePort)'
 	};
 
 	predicates = [];
@@ -410,11 +407,9 @@ function insdNodeHttpd(metric)
 		action = 'count();';
 	}
 
-	if (aggLatency) {
-		predicates.push('latencys[args[0]->fd]');
-	} else if (indexes.length > 0) {
+	if (before.length > 0) {
 		predicates.push(mod_ca.caSprintf('%ss[args[0]->fd] != NULL',
-		    decomps[0]));
+		    before[0]));
 	}
 
 	if (hasPred) {

@@ -1658,6 +1658,16 @@ function gDrillSubmit(graphId, dialog)
 	op = opSel.options[opSel.selectedIndex].value;
 	val = valSel.value;
 
+	/* Potentially parse the value to a number if the field is numeric */
+	if (gGraphs[graphId].g_metric.fields[field].type == 'numeric') {
+		val = parseInt(val, 10);
+		if (isNaN(val)) {
+			alert('field is of type numeric, must specify a ' +
+			    'number');
+			return;
+		}
+	}
+
 	npred = {};
 	npred[op] = [ field, val];
 

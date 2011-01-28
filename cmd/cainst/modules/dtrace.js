@@ -54,8 +54,8 @@ exports.insinit = function (ins, log)
 	    fields: {
 		method: { label: 'method', type: 'string' },
 		url: { label: 'URL', type: 'string' },
-		raddr: { label: 'remote address', type: 'string' },
-		rport: { label: 'remote port', type: 'string' },
+		raddr: { label: 'remote IP address', type: 'string' },
+		rport: { label: 'remote TCP port', type: 'string' },
 		latency: { label: 'latency', type: 'numeric' }
 	    },
 	    metric: insdNodeHttpd
@@ -187,6 +187,13 @@ function insdIops(metric)
 	var ii, predicates, zones, indexes, zero, index;
 	var fields, before, hasPredicate, pred;
 	var aggLatency, action;
+	var transforms = {
+	    latency: '(timestamp - latencys[arg0])',
+	    zonename: 'zonenames[arg0]',
+	    hostname: 'hostnames[arg0]',
+	    execname: 'execnames[arg0]',
+	    optype: '(args[0]->b_flags & B_READ ? "read" : "write")'
+	};
 
 	predicates = [];
 	before = [];
@@ -220,19 +227,17 @@ function insdIops(metric)
 			continue;
 		}
 
-		ASSERT.ok(decomps[ii] in insdFields);
+		ASSERT.ok(decomps[ii] in transforms);
 		if (!mod_ca.caArrayContains(fields, decomps[ii]))
 			fields.push(decomps[ii]);
 
-		indexes.push(insdFields[decomps[ii]]);
+		indexes.push(transforms[decomps[ii]]);
 	}
 
 	ASSERT.ok(indexes.length < 2); /* could actually support more */
 
 	if (indexes.length > 0) {
-		index = '[' + decomps.map(function (elt) {
-			return (elt + 's[arg0]');
-		}).join(',') + ']';
+		index = '[' + indexes.join(',') + ']';
 		zero = {};
 	} else {
 		index = '';
@@ -240,45 +245,47 @@ function insdIops(metric)
 	}
 
 	for (ii = 0; ii < fields.length; ii++) {
-		if (fields[ii] != 'latency' && fields[ii] != 'optype')
+		if (fields[ii] != 'optype')
 			before.push(fields[ii]);
 	}
 
-	if (aggLatency || before.length > 0) {
+	if (before.length > 0) {
 		script += 'io:::start\n';
 		script += '{\n';
 
-		if (mod_ca.caArrayContains(fields, 'latency'))
-			script += '\tlatencys[arg0] = timestamp;\n';
-
-		for (ii = 0; ii < before.length; ii++)
-			script += mod_ca.caSprintf('\t%ss[arg0] = %s;\n',
-			    before[ii], insdFields[before[ii]]);
-
+		for (ii = 0; ii < before.length; ii++) {
+			switch (before[ii]) {
+			case 'latency':
+				script += '\tlatencys[arg0] = timestamp;\n';
+				break;
+			default:
+				script += mod_ca.caSprintf(
+				    '\t%ss[arg0] = %s;\n', before[ii],
+				    insdFields[before[ii]]);
+				break;
+			}
+		}
 		script += '}\n\n';
 	}
 
 	if (aggLatency) {
 		action = 'lquantize(timestamp - latencys[arg0]' +
 		    ', 0, 1000000, 1000);';
-		predicates.push('latencys[arg0]');
-	} else if (indexes.length > 0) {
-		action = 'count();';
-		predicates.push(mod_ca.caSprintf('%ss[arg0] != NULL',
-		    decomps[0]));
 	} else {
 		action = 'count();';
 	}
 
+	if (aggLatency) {
+		predicates.push('latencys[arg0]');
+	} else if (indexes.length > 0) {
+		if (decomps[0] != 'optype')
+			predicates.push(mod_ca.caSprintf('%ss[arg0] != NULL',
+			    decomps[0]));
+	}
+
 	if (hasPredicate) {
 		pred = mod_ca.caDeepCopy(metric.is_predicate);
-		mod_capred.caPredReplaceFields({
-		    latency: '(timestamp - latencys[arg0])',
-		    zonename: 'zonenames[arg0]',
-		    hostname: 'hostnames[arg0]',
-		    execname: 'execnames[arg0]',
-		    optype: '(args[0]->b_flags & B_READ ? "read" : "write")'
-		}, pred);
+		mod_capred.caPredReplaceFields(transforms, pred);
 		predicates.push(mod_capred.caPredPrint(pred));
 	}
 
@@ -288,13 +295,16 @@ function insdIops(metric)
 	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
 	script += '}\n\n';
 
-	script += 'io:::done\n';
-	script += '{\n';
+	if (before.length > 0 || mod_ca.caArrayContains(fields, 'latency')) {
+		script += 'io:::done\n';
+		script += '{\n';
 
-	for (ii = 0; ii < fields.length; ii++)
-		script += mod_ca.caSprintf('\t%ss[arg0] = 0;\n', fields[ii]);
+		for (ii = 0; ii < before.length; ii++)
+			script += mod_ca.caSprintf('\t%ss[arg0] = 0;\n',
+			    before[ii]);
 
-	script += '}\n';
+		script += '}\n';
+	}
 
 	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
 }

@@ -54,19 +54,22 @@ function check_stage_done()
  */
 function check_instrumentation(test, code, response, rv)
 {
-	var inp, exp, decomp, key;
+	var inp, exp, decomp, key, pred;
 
 	inp = test.input;
 	decomp = inp.decomposition || [];
 	if (decomp.constructor == String)
 		decomp = [ decomp ];
+	pred = inp.predicate || {};
+	if (pred.constructor != String)
+		pred = JSON.stringify(pred);
 
 	ASSERT.equal(response.statusCode, code);
 	assertNoError(rv);
 	ASSERT.equal(rv['module'], inp['module']);
 	ASSERT.equal(rv['stat'], inp['stat']);
 	ASSERT.deepEqual(rv['decomposition'], decomp);
-	ASSERT.equal(rv['predicate'], '{}');
+	ASSERT.equal(rv['predicate'], pred);
 	ASSERT.equal(rv['retention-time'], 600);
 	ASSERT.equal(rv['enabled'], true);
 
@@ -147,6 +150,24 @@ var http_test_cases = [ {
 	input: { module: 'test_module', stat: 'ops1',
 	    decomposition: ['hostname', 'latency'] },
 	expect: { 'value-dimension': 3, 'value-arity': 'numeric-decomposition' }
+},  {
+	name: 'create with simple metric and simple predicate',
+	input: {
+	    module: 'test_module',
+	    stat: 'ops1',
+	    predicate: { eq: ['hostname', 'foo' ] }
+	},
+	expect: { 'value-dimension': 1, 'value-arity': 'scalar' }
+},  {
+	name: 'create with simple metric and complex predicate',
+	input: {
+	    module: 'test_module',
+	    stat: 'ops1',
+	    predicate: { and:
+		[ { eq: ['hostname', 'foo' ] }, { gt: ['latency', 20 ] } ]
+	    }
+	},
+	expect: { 'value-dimension': 1, 'value-arity': 'scalar' }
 } ];
 
 /*

@@ -385,7 +385,8 @@ function cfgValidateMetric(params)
 
 	/* Validate the predicate */
 	if (pred !== '') {
-		pred = JSON.parse(pred);
+		if (typeof (pred) == 'string')
+			pred = JSON.parse(pred);
 		stat = cfg_statmods[spec.modname]['stats'][spec.statname];
 		mod_capred.caPredValidate(stat['fields'], pred);
 		spec.pred = pred;

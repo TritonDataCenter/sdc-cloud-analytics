@@ -10,9 +10,10 @@ shopt -s xpg_echo
 sh_arg0=$(basename $0)
 sh_tmpbase=/var/tmp/$sh_arg0.$$
 sh_urlbase="http://10.99.99.8:8080"
-sh_curl="curl -u admin:tot@ls3crit"
+sh_capi="http://10.99.99.11:8080"
 sh_zonetpl="bare_256"
 sh_user="$1"
+sh_curlcmd="curl -u admin:tot@ls3crit"
 
 sh_custuri=
 sh_conturi=
@@ -27,9 +28,14 @@ function fail
 	exit 1
 }
 
+function sh_curl
+{
+	$sh_curlcmd -H 'Accept: application/json' -s --url $1
+}
+
 function sh_extract
 {
-	grep "<$1>" | sed -e "s#.*<$1>\([^<]*\)</$1>.*#\1#"
+	nicerest | grep \"$1\" | cut -d\" -f4
 }
 
 function sh_extract_header
@@ -52,8 +58,7 @@ function sh_install_agents
 
 function sh_loadcust
 {
-        sh_custuri=$($sh_curl -s --url $sh_urlbase/customers | \
-	    sh_extract uri | head -1)
+	sh_custuri=/customers/$(sh_curl $sh_capi/customers | sh_extract uuid)
 }
 
 function sh_loadtpl
@@ -61,7 +66,7 @@ function sh_loadtpl
         local uris name
 
 	echo "Listing templates ... \c"
-        uris=$($sh_curl -s --url $sh_urlbase/templates | sh_extract uri)
+        uris=$(sh_curl $sh_urlbase/templates | sh_extract uri)
 	for uri in $uris; do
 		echo "$uri \c"
 	done
@@ -69,8 +74,7 @@ function sh_loadtpl
 
 	echo "Retrieving URI for template $sh_zonetpl ... \c"
         for uri in $uris; do
-                name=$($sh_curl -s --url $sh_urlbase$uri | sh_extract name | \
-                    head -1)
+                name=$(sh_curl $sh_urlbase$uri | sh_extract name)
                 if [[ $name = $sh_zonetpl ]]; then
                         sh_zonetpluri=$uri
 			echo $uri
@@ -86,7 +90,7 @@ function sh_provision
         local custuri=$1 tpluri=$2
 	local out turi
 
-        out=$($sh_curl -s -i -X POST -d template=$tpluri \
+        out=$($sh_curlcmd -s -i -X POST -d template=$tpluri \
 	    --url "$sh_urlbase$custuri/containers" 2>&1)
 
         [[ $? -eq 0 ]] || fail "failed to create zone: $out"
@@ -95,14 +99,14 @@ function sh_provision
 
 	while [[ -z $sh_conturi ]]; do
 		sleep 1
-		out=$($sh_curl -s -i --url $sh_urlbase$turi 2>&1)
+		out=$($sh_curlcmd -s -i --url $sh_urlbase$turi 2>&1)
         	[[ $? -eq 0 ]] || fail "failed to get transition: $out"
 		sh_conturi=$(echo "$out" | sh_extract_header Location)
 		echo ".\c"
 	done
 
-	out=$($sh_curl -s --url $sh_urlbase$sh_conturi)
-	sh_zonename=$(echo "$out" | sh_extract name | head -1)
+	out=$(sh_curl $sh_urlbase$sh_conturi)
+	sh_zonename=$(echo "$out" | sh_extract name | tail -1)
 	sh_zoneip=$(echo "$out" | sh_extract address)
 }
 

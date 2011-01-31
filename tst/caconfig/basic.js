@@ -73,6 +73,7 @@ function check_instrumentation(test, code, response, rv)
 	ASSERT.equal(rv['predicate'], pred);
 	ASSERT.equal(rv['retention-time'], 600);
 	ASSERT.equal(rv['enabled'], true);
+	ASSERT.deepEqual(rv['transformations'], trans);
 
 	exp = test.expect || {};
 	for (key in test.expect) {

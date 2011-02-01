@@ -9,6 +9,12 @@ var mod_sys = require('sys');
 var ASSERT = require('assert');
 
 var insd_log;
+var insd_dlibpath = [];		/* DTrace library Path (-L) */
+
+if (process.env['DTRACE_LIBPATH']) {
+	insd_dlibpath = process.env['DTRACE_LIBPATH'].split(':');
+}
+
 
 exports.insinit = function (ins, log)
 {
@@ -476,6 +482,7 @@ function insDTraceMetric(prog)
 
 insDTraceMetric.prototype.instrument = function (callback)
 {
+	var ii;
 	var sep = '----------------------------------------';
 
 	/*
@@ -486,6 +493,8 @@ insDTraceMetric.prototype.instrument = function (callback)
 
 	this.cad_dtr = new mod_dtrace.Consumer();
 	this.cad_dtr.setopt('zdefs');
+	for (ii = 0; ii < insd_dlibpath.length; ii++)
+		this.cad_dtr.setopt('libdir', insd_dlibpath[ii]);
 
 	try {
 		this.cad_dtr.strcompile(this.cad_prog);

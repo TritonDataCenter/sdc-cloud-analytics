@@ -95,6 +95,25 @@ function insdMakePredicate(predicates)
 	}).join(' &&\n') + '/\n');
 }
 
+/*
+ * Helper function to generate the xlate call. Arguments refer to the following:
+ *
+ *	outtype:	The type we should covert to
+ *
+ *	inttype:	The type we should convert from and arg%d should be
+ *			considered
+ *
+ *	argNo:		The arg number for this prove, i.e. arg0, arg1
+ *
+ *	arg:		The struct field to deference
+ */
+function insdXlate(outtype, inttype, argNo, arg)
+{
+	return (mod_ca.caSprintf('((xlate <%s *>((%s *)arg%d))->%s)',
+	    outtype, inttype, argNo, arg));
+}
+
+
 function insdSyscalls(metric)
 {
 	var decomps = metric.is_decomposition;
@@ -317,6 +336,14 @@ function insdNodeHttpd(metric)
 	var script = '';
 	var ii, predicates, hasPred, fields, zones, indexes, index;
 	var before, zero, aggLatency, action;
+	var arg0fd = insdXlate('node_connection_t', 'node_dtrace_connection_t',
+	    0, 'fd');
+	var arg1fd = insdXlate('node_connection_t', 'node_dtrace_connection_t',
+	    1, 'fd');
+	var arg0raddr = insdXlate('node_connection_t',
+	    'node_dtrace_connection_t', 0, 'remoteAddress');
+	var arg0port = insdXlate('node_connection_t',
+	    'node_dtrace_connection_t', 0, 'remotePort');
 
 	/*
 	 * We divide latency by the same amount that we do during the quantize,
@@ -325,11 +352,11 @@ function insdNodeHttpd(metric)
 	 * kind of equantize.
 	 */
 	var transforms = {
-	    latency: '((timestamp - latencys[args[0]->fd]) / 1000000)',
-	    method: '(methods[args[0]->fd])',
-	    url: '(urls[args[0]->fd])',
-	    raddr: '(args[0]->remoteAddress)',
-	    rport: 'lltostr(args[0]->remotePort)'
+	    latency: '((timestamp - latencys[' + arg0fd + ']) / 1000000)',
+	    method: '(methods['+ arg0fd + '])',
+	    url: '(urls['+ arg0fd + '])',
+	    raddr: '(' + arg0raddr + ')',
+	    rport: 'lltostr(' + arg0port + ')'
 	};
 
 	predicates = [];
@@ -384,15 +411,15 @@ function insdNodeHttpd(metric)
 		for (ii = 0; ii < before.length; ii++) {
 			switch (before[ii]) {
 			case 'latency':
-				script += '\tlatencys[args[1]->fd] = ' +
+				script += '\tlatencys[' + arg1fd + '] = ' +
 				    'timestamp;\n';
 				break;
 			case 'method':
-				script += '\tmethods[args[1]->fd] = ' +
+				script += '\tmethods[' + arg1fd + '] = ' +
 				    'args[0]->method;\n';
 				break;
 			case 'url':
-				script += '\turls[args[1]->fd] = ' +
+				script += '\turls[' + arg1fd + '] = ' +
 				    'args[0]->url;\n';
 				break;
 			default:
@@ -405,15 +432,15 @@ function insdNodeHttpd(metric)
 	}
 
 	if (aggLatency) {
-		action = 'lquantize((timestamp - latencys[args[0]->fd]) / ' +
-		    '1000000, 0, 10000, 10);';
+		action = 'lquantize(' + transforms['latency'] +
+		    ', 0, 10000, 10);';
 	} else {
 		action = 'count();';
 	}
 
 	if (before.length > 0) {
-		predicates.push(mod_ca.caSprintf('%ss[args[0]->fd] != NULL',
-		    before[0]));
+		predicates.push(mod_ca.caSprintf('%ss[%s] != NULL',
+		    before[0], arg0fd));
 	}
 
 	if (hasPred) {
@@ -433,8 +460,8 @@ function insdNodeHttpd(metric)
 		script += '{\n';
 
 		for (ii = 0; ii < before.length; ii++)
-			script += mod_ca.caSprintf('\t%ss[args[0]->fd] = 0;\n',
-			    before[ii]);
+			script += mod_ca.caSprintf('\t%ss[%s] = 0;\n',
+			    before[ii], arg0fd);
 
 		script += '}\n';
 	}
@@ -458,6 +485,7 @@ insDTraceMetric.prototype.instrument = function (callback)
 		insd_log.dbg('\n%s\n%s%s', sep, this.cad_prog, sep);
 
 	this.cad_dtr = new mod_dtrace.Consumer();
+	this.cad_dtr.setopt('zdefs');
 
 	try {
 		this.cad_dtr.strcompile(this.cad_prog);

@@ -29,7 +29,8 @@ var cfg_http_baseuri = '/ca';			/* base of HTTP API */
 var cfg_http_custuri = '/customers';		/* cust subset of HTTP API */
 var cfg_http_insturi = '/instrumentations';	/* Part of HTTP API for insts */
 var cfg_http_valraw = '/value/raw';		/* HTTP API to get raw data */
-var cfg_http_valheat = '/value/heatmap';	/* HTTP API to get heatmaps */
+var cfg_http_valheat = '/value/heatmap/image';	/* HTTP API to get heatmaps */
+var cfg_http_valheat_details = '/value/heatmap/details';
 
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_transformations = {};	/* all transformations, by name */
@@ -160,6 +161,8 @@ function cfgHttpRouter(server)
 		server.del(base + instrumentations_id, cfgHttpInstDelete);
 		server.get(base + instrumentations_id, cfgHttpInstGetOptions);
 		server.put(base + instrumentations_id, cfgHttpInstSetOptions);
+		server.get(base + instrumentations_id + '/value',
+		    cfgHttpInstValue);
 		server.get(base + instrumentations_id + '/value/*',
 		    cfgHttpInstValue);
 	}
@@ -309,6 +312,10 @@ function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
 		uris.push({
 		    uri: uri + cfg_http_valheat,
 		    name: 'value_heatmap'
+		});
+		uris.push({
+		    uri: uri + cfg_http_valheat_details,
+		    name: 'details_heatmap'
 		});
 	}
 

@@ -337,9 +337,13 @@ function aggHttpRouter(server)
 
 	for (ii = 0; ii < infixes.length; ii++) {
 		base = agg_http_baseuri + infixes[ii] +
-		    'instrumentations/:instid/value/';
-		server.get(base + 'raw', aggHttpValueRaw);
-		server.get(base + 'heatmap', aggHttpValueHeatmap);
+		    'instrumentations/:instid/value';
+		server.get(base, aggHttpValueList);
+		server.get(base + '/raw', aggHttpValueRaw);
+		server.get(base + '/heatmap', aggHttpValueHeatmapList);
+		server.get(base + '/heatmap/image', aggHttpValueHeatmapImage);
+		server.get(base + '/heatmap/details',
+		    aggHttpValueHeatmapDetails);
 	}
 }
 
@@ -357,8 +361,6 @@ var aggValueParams = {
 
 /*
  * Process the request to retrieve a metric's value.
- * XXX need some way of noticing when instrumenters are gone for a while --
- * putting them into a "don't wait for me" state.
  * XXX parameter for "don't wait" or "max time to wait"?
  */
 function aggHttpValueCommon(request, response, callback, default_duration,
@@ -432,6 +434,29 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 	});
 }
 
+function aggHttpValueList(request, response)
+{
+	var url = request.url;
+	var rv = {};
+
+	while (url[url.length - 1] === '/')
+		url = url.substring(0, url.length - 1);
+
+	rv = [ {
+		name: 'value_raw',
+		uri: url + '/raw'
+	} ];
+
+	if (aggHttpValueHeatmapCheck(request)) {
+		rv.push({
+			name: 'value_heatmap',
+			uri: url + '/heatmap'
+		});
+	}
+
+	response.send(HTTP.OK, rv);
+}
+
 function aggHttpValueRaw(request, response)
 {
 	aggHttpValueCommon(request, response, aggHttpValueRawDone, 1, true);
@@ -467,10 +492,70 @@ function aggHttpValueRawDone(id, when, request, response, delay)
 	response.send(HTTP.OK, ret);
 }
 
-function aggHttpValueHeatmap(request, response)
+/*
+ * Performs validity checks on the given heatmap request.  Currently we just
+ * verify that the instrumentation is of the proper type to support a heatmap.
+ */
+function aggHttpValueHeatmapCheck(request)
 {
-	/* XXX return 404 for non-heatmap stats? */
-	aggHttpValueCommon(request, response, aggHttpValueHeatmapDone, 60);
+	var custid = request.params['custid'];
+	var instid = request.params['instid'];
+	var fqid = mod_ca.caQualifiedId(custid, instid);
+	var inst;
+
+	if (!(fqid in agg_insts))
+		return (false);
+
+	inst = agg_insts[fqid];
+	if (inst.agi_instrumentation['value-arity'] === mod_ca.ca_arity_numeric)
+		return (true);
+
+	return (false);
+}
+
+function aggHttpValueHeatmapList(request, response)
+{
+	var url = request.url;
+	var rv = {};
+
+	if (!aggHttpValueHeatmapCheck(request)) {
+		response.send(HTTP.ENOTFOUND);
+		return;
+	}
+
+	while (url[url.length - 1] === '/')
+		url = url.substring(0, url.length - 1);
+
+	rv = [ {
+		name: 'image',
+		uri: url + '/image'
+	}, {
+		name: 'details',
+		uri: url + '/details'
+	} ];
+
+	response.send(HTTP.OK, rv);
+}
+
+function aggHttpValueHeatmapImage(request, response)
+{
+	if (!aggHttpValueHeatmapCheck(request)) {
+		response.send(HTTP.ENOTFOUND);
+		return;
+	}
+
+	aggHttpValueCommon(request, response, aggHttpValueHeatmapImageDone, 60);
+}
+
+function aggHttpValueHeatmapDetails(request, response)
+{
+	if (!aggHttpValueHeatmapCheck(request)) {
+		response.send(HTTP.ENOTFOUND);
+		return;
+	}
+
+	aggHttpValueCommon(request, response, aggHttpValueHeatmapDetailsDone,
+	    60);
 }
 
 /*
@@ -650,61 +735,93 @@ var aggValueHeatmapParams = {
 	    type: 'enum',
 	    default: 'rank',
 	    choices: { rank: true, linear: true }
+	},
+	x: {
+	    type: 'number',
+	    required: true,
+	    min: 0
+	},
+	y: {
+	    type: 'number',
+	    required: true,
+	    min: 0
 	}
 };
 
-function aggHttpValueHeatmapDone(id, start, request, response, delay)
+function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
+{
+	var conf, formals, actuals, nhues, hue, hues;
+	var ii;
+
+	formals = aggValueHeatmapParams;
+	actuals = request.ca_params;
+
+	conf = {};
+	conf.base = start;
+	conf.nsamples = duration;
+	conf.height = mod_ca.caHttpParam(formals, actuals, 'height');
+	conf.width = mod_ca.caHttpParam(formals, actuals, 'width');
+	conf.nbuckets = mod_ca.caHttpParam(formals, actuals, 'nbuckets');
+	conf.min = mod_ca.caHttpParam(formals, actuals, 'ymin');
+	conf.max = mod_ca.caHttpParam(formals, actuals, 'ymax');
+	conf.weighbyrange = mod_ca.caHttpParam(formals, actuals,
+	    'weights') == 'weight';
+	conf.linear = mod_ca.caHttpParam(formals, actuals,
+	    'coloring') == 'linear';
+	hues = mod_ca.caHttpParam(formals, actuals, 'hues');
+
+	if (conf.ymin >= conf.ymax)
+		throw (new mod_ca.caValidationError(
+		    '"ymax" must be greater than "ymin"'));
+
+	nhues = nselected + (isolate ? 0 : 1);
+
+	if (hues !== undefined) {
+		if (nhues > hues.length)
+			throw (new mod_ca.caValidationError(
+			    'need ' + nhues + ' hues'));
+
+		for (ii = 0; ii < hues.length; ii++) {
+			hue = hues[ii] = parseInt(hues[ii], 10);
+
+			if (isNaN(hue) || hue < 0 || hue >= 360)
+				throw (new mod_ca.caValidationError(
+				    'invalid hue'));
+		}
+
+		conf.hue = hues;
+		return (conf);
+	}
+
+	conf.hue = [ 21 ];
+
+	for (ii = 0; ii < nselected; ii++)
+		conf.hue.push((conf.hue[conf.hue.length - 1] + 91) % 360);
+
+	if (isolate)
+		conf.hue.shift();
+
+	ASSERT.ok(nhues == conf.hue.length);
+	return (conf);
+}
+
+function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 {
 	var inst = agg_insts[id];
-	var record, rawdata, agg, nreporting;
-	var datasets, png, conf, range;
-	var height, width, ymin, ymax, nbuckets, duration, selected, isolate;
-	var weights, coloring;
-	var nhues, hues, hue;
-	var ii, ret, transforms;
+	var conf, duration, selected, isolate, nreporting;
+	var record, rawdata, extracted, datasets;
+	var range, transforms, png;
+	var ii, timeidx, ret;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
 	};
 
 	try {
 		duration = param(aggValueParams, 'duration') || 60;
-		height = param(aggValueHeatmapParams, 'height');
-		width = param(aggValueHeatmapParams, 'width');
-		ymin = param(aggValueHeatmapParams, 'ymin');
-		ymax = param(aggValueHeatmapParams, 'ymax');
-		nbuckets = param(aggValueHeatmapParams, 'nbuckets');
 		selected = param(aggValueHeatmapParams, 'selected');
 		isolate = param(aggValueHeatmapParams, 'isolate');
-		hues = param(aggValueHeatmapParams, 'hues');
-		weights = param(aggValueHeatmapParams, 'weights');
-		coloring = param(aggValueHeatmapParams, 'coloring');
-
-		if (ymin >= ymax)
-			throw (new mod_ca.caValidationError(
-			    '"ymax" must be greater than "ymin"'));
-
-		nhues = selected.length + (isolate ? 0 : 1);
-
-		if (hues !== undefined) {
-			if (nhues > hues.length)
-				throw (new mod_ca.caValidationError(
-				    'need ' + nhues + ' hues'));
-
-			for (ii = 0; ii < hues.length; ii++) {
-				hue = hues[ii] = parseInt(hues[ii], 10);
-
-				if (isNaN(hue) || hue < 0 || hue >= 360)
-					throw (new mod_ca.caValidationError(
-					    'invalid hue'));
-			}
-		} else {
-			hues = [ 21 ];
-			for (ii = 0; ii < selected.length; ii++)
-				hues.push((hues[hues.length - 1] + 91) % 360);
-
-			if (isolate)
-				hues.shift();
-		}
+		conf = aggHttpHeatmapConf(request, start, duration, isolate,
+		    selected.length);
 	} catch (ex) {
 		if (!(ex instanceof mod_ca.caValidationError))
 			throw (ex);
@@ -713,44 +830,42 @@ function aggHttpValueHeatmapDone(id, start, request, response, delay)
 		return;
 	}
 
+	ret = {};
+	ret.start_time = start;
+	ret.duration = duration;
+	ret.nsources = inst.agi_sources.nsources;
+
+	if (delay > 0)
+		ret.delayed = delay;
+
 	rawdata = {};
 
-	for (ii = start; ii < start + duration; ii++) {
-		record = inst.agi_values[ii];
+	for (timeidx = start; timeidx < start + duration; timeidx++) {
+		record = inst.agi_values[timeidx];
 
-		if (!record)
+		if (!record || !record.value)
 			continue;
 
-		if (nreporting === undefined || record < nreporting)
+		if (nreporting === undefined || record.count < nreporting)
 			nreporting = record.count;
 
-		rawdata[ii] = record.value;
+		rawdata[timeidx] = record.value;
 	}
 
-	conf = {
-		weighbyrange: weights == 'weight',
-		linear: coloring == 'linear',
-		min: ymin,
-		max: ymax,
-		width: width,
-		height: height,
-		nbuckets: nbuckets,
-		base: start,
-		nsamples: duration
-	};
+	ret.minreporting = nreporting || 0;
 
-	agg = aggExtractDatasets(rawdata, selected,
+	extracted = aggExtractDatasets(rawdata, selected,
 	    inst.agi_instrumentation['value-dimension']);
 	datasets = [];
-	for (ii = 0; ii < agg.data.length; ii++)
-		datasets.push(mod_heatmap.bucketize(agg.data[ii], conf));
+	for (ii = 0; ii < extracted.data.length; ii++)
+		datasets.push(mod_heatmap.bucketize(extracted.data[ii], conf));
 
 	if (isolate) {
 		datasets.shift();
 
 		if (datasets.length === 0) {
 			datasets = [ mod_heatmap.bucketize({}, conf) ];
-			hues = [ 0 ];
+			conf.hue = [ 0 ];
 		}
 	} else {
 		for (ii = 1; ii < datasets.length; ii++)
@@ -762,46 +877,118 @@ function aggHttpValueHeatmapDone(id, start, request, response, delay)
 	 * won't always have entries for an empty dataset or because the user
 	 * simply provided more hues than were necessary.
 	 */
-	ASSERT.ok(hues.length >= datasets.length);
-	hues = hues.slice(0, datasets.length);
+	ASSERT.ok(conf.hue.length >= datasets.length);
+	conf.hue = conf.hue.slice(0, datasets.length);
 	mod_heatmap.normalize(datasets, conf);
 
-	conf.hue = hues;
 	conf.saturation = [ 0, 0.9 ];
 	conf.value = 0.95;
 
 	png = mod_heatmap.generate(datasets, conf);
-	range = mod_heatmap.samplerange(0, 0, conf);
-
-	conf = {
-		min: range[1][0],
-		max: range[1][1],
-		nbuckets: 1,
-		base: range[0],
-		nsamples: 1
-	};
-
-	ret = {};
-	ret.start_time = start;
-	ret.duration = duration;
-	ret.minreporting = nreporting;
-	ret.nsources = inst.agi_sources.nsources;
-	ret.ymin = conf.min;
-	ret.ymax = conf.max;
-	ret.total = Math.round(mod_heatmap.bucketize(agg.data[0], conf)[0][0]);
-	ret.present = agg.present;
 
 	transforms = aggHttpValueTransform(id, request, rawdata);
 	if (transforms != null)
 		ret.transformations = transforms;
 
-	if (delay > 0)
-		ret.delayed = delay;
+	ret.present = extracted.present;
+
+	conf.nbuckets = 1;
+	range = mod_heatmap.samplerange(0, 0, conf)[1];
+	ret.ymin = range[0];
+	ret.ymax = range[1];
 
 	png.encode(function (png_data) {
 		ret.image = png_data.toString('base64');
 		response.send(HTTP.OK, ret);
 	});
+}
+
+function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
+{
+	var inst = agg_insts[id];
+	var dimension = inst.agi_instrumentation['value-dimension'];
+	var conf, detconf, duration, xx, yy;
+	var record, rawdata, range, extracted, present;
+	var ii, ret, bb;
+	var param = function (formals, key) {
+		return (mod_ca.caHttpParam(formals, request.ca_params, key));
+	};
+
+	try {
+		duration = param(aggValueParams, 'duration') || 60;
+		conf = aggHttpHeatmapConf(request, start, duration, false, 0);
+		xx = param(aggValueHeatmapParams, 'x');
+		yy = param(aggValueHeatmapParams, 'y');
+
+		if (xx >= conf.width)
+			throw (new mod_ca.caValidationError(
+			    '"x" must be less than "width"'));
+
+		if (yy >= conf.height)
+			throw (new mod_ca.caValidationError(
+			    '"y" must be less than "height"'));
+	} catch (ex) {
+		if (!(ex instanceof mod_ca.caValidationError))
+			throw (ex);
+
+		response.send(HTTP.EBADREQUEST, { error: ex.message });
+		return;
+	}
+
+	ret = {};
+	ret.start_time = start;
+	ret.duration = duration;
+	ret.nsources = inst.agi_sources.nsources;
+
+	if (delay > 0)
+		ret.delayed = delay;
+
+	/*
+	 * Process the data first to get the list of values present.
+	 */
+	range = mod_heatmap.samplerange(xx, yy, conf);
+
+	rawdata = {};
+	record = inst.agi_values[range[0]];
+	if (record) {
+		ret.minreporting = record.count;
+		rawdata[range[0]] = record.value;
+	} else {
+		ret.minreporting = 0;
+	}
+
+	extracted = aggExtractDatasets(rawdata, [], dimension);
+	present = Object.keys(extracted.present);
+	extracted = aggExtractDatasets(rawdata, present, dimension);
+
+	detconf = {
+		base: range[0],
+		min: range[1][0],
+		max: range[1][1],
+		nbuckets: 1,
+		nsamples: 1
+	};
+
+	ret.total = Math.round(mod_heatmap.bucketize(
+	    extracted.data[0], detconf)[0][0]);
+	ret.present = {};
+
+	if (ret.total !== 0) {
+		for (ii = 0; ii < present.length; ii++) {
+			bb = mod_heatmap.bucketize(extracted.data[ii + 1],
+			    detconf);
+
+			if (bb.length === 0)
+				continue;
+
+			bb = Math.round(bb[0][0]);
+
+			if (bb > 0)
+				ret.present[present[ii]] = bb;
+		}
+	}
+
+	response.send(HTTP.OK, ret);
 }
 
 /*
@@ -909,7 +1096,7 @@ function aggInitBackends()
 		try {
 			plugin = require('./caagg/transforms/' + backends[ii]);
 			plugin.agginit(bemgr, agg_log);
-			agg_log.warn('Loaded transformation: ' + backends[ii]);
+			agg_log.info('Loaded transformation: ' + backends[ii]);
 		} catch (ex) {
 			agg_log.warn(mod_ca.caSprintf('FAILED loading ' +
 			    'transformation "%s": %s', backends[ii],

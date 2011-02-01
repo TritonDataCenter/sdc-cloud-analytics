@@ -184,7 +184,7 @@ function gInitInstrumentationsFini(instrumentations)
 			decomps: inst.decomposition,
 			predicate: JSON.parse(inst.predicate),
 			uri: inst.uri,
-			value_uri: inst.uris[0].uri
+			uris: inst.uris
 		});
 
 		container.appendChild(graph.getContainer());
@@ -387,7 +387,7 @@ function gDecompSelected()
  *	uri		Instrumentation's URI
  *			If undefined, instrumentation must not yet exist.
  *
- *	value_uri	URI to retrieve instrumentation's value
+ *	uris		List of instrumentation's value URIs.
  *			If undefined, instrumentation must not yet exist.
  */
 function gGraph(conf)
@@ -401,6 +401,7 @@ function gGraph(conf)
 	this.g_ymin = gyMin;
 	this.g_ymax = gyMax;
 	this.g_secondsback = 0;
+	this.g_legend_mode = 'summary';
 
 	this.g_title = conf.metric.modlabel + ': ' + conf.metric.statlabel;
 
@@ -422,14 +423,35 @@ function gGraph(conf)
 	if (conf.uri)
 		this.g_uri = conf.uri;
 
-	if (conf.value_uri)
-		this.g_uri_val = conf.value_uri;
-
 	this.initDetails();
+
+	if (conf.uris)
+		this.initUris(conf.uris);
+
 	this.initDom();
 }
 
 gGraph.gId = 0;
+
+gGraph.prototype.initUris = function (uris)
+{
+	var ii;
+
+	for (ii = 0; ii < uris.length; ii++) {
+		if (this.g_subtype != 'heatmap' &&
+		    uris[ii]['name'] == 'value_raw') {
+			this.g_uri_val = uris[ii]['uri'];
+			break;
+		}
+
+		if (this.g_subtype == 'heatmap') {
+			if (uris[ii]['name'] == 'value_heatmap')
+				this.g_uri_val = uris[ii]['uri'];
+			else if (uris[ii]['name'] == 'details_heatmap')
+				this.g_uri_details = uris[ii]['uri'];
+		}
+	}
+};
 
 /*
  * Examines the selected metric and decomposition to determine the type and
@@ -461,7 +483,7 @@ gGraph.prototype.initDetails = function ()
 	if (decomps.length === 0) {
 		this.g_type = 'scalar';
 		this.g_subtype = 'raw';
-		this.g_columns =  [ { sTitle: 'Selected value' } ];
+		this.g_columns =  [ { sTitle: '' }, { sTitle: 'value' } ];
 		this.g_options = gScalarOptions;
 	} else {
 		this.g_type = 'vector';
@@ -488,12 +510,11 @@ gGraph.prototype.initDetails = function ()
 
 		if (discrete_decomp) {
 			this.g_columns.push({ sTitle: discrete_decomp.label });
-
-			if (this.g_subtype != 'heatmap')
-				this.g_columns.push({ sTitle: 'value' });
 		} else {
-			this.g_columns.push({ sTitle: 'value' });
+			this.g_columns.push({ sTitle: '' });
 		}
+
+		this.g_columns.push({ sTitle: 'value' });
 	}
 
 	if (!isEmpty(this.g_predicate)) {
@@ -543,27 +564,8 @@ gGraph.prototype.initDom = function ()
 	tbody = legend.appendChild(document.createElement('tbody'));
 	legend.id = 'legend' + this.g_id;
 
-	this.g_table = $(legend).dataTable({
-		aaData: [],
-		bFilter: false,
-		bJQueryUI: true,
-		bAutoWidth: true,
-		sScrollY: '300px',
-		bPaginate: false,
-		bScrollInfinite: true,
-		aoColumns: this.g_columns,
-		fnRowCallback: function (node) {
-			if (node.firstChild.tabIndex === 0)
-				return (node);
-
-			node.firstChild.tabIndex = 0;
-			$(node.firstChild).keydown(function (event) {
-				graph.heatmapKeyPressed(event);
-			});
-
-			return (node);
-		}
-	});
+	this.g_legend = legend;
+	this.makeTable();
 
 	if (this.g_subtype == 'heatmap') {
 		td = tr.appendChild(document.createElement('td'));
@@ -885,7 +887,7 @@ gGraph.prototype.serverCreate = function (callback)
 
 		value = JSON.parse(request.responseText);
 		graph.g_uri = value.uri;
-		graph.g_uri_val = value.uris[0].uri;
+		graph.initUris(value.uris);
 
 		setTimeout(function () {
 			callback(null, value);
@@ -923,7 +925,7 @@ gGraph.prototype.serverDelete = function (callback)
  */
 gGraph.prototype.uriParams = function (duration, start)
 {
-	var url, value;
+	var url = '', value;
 
 	if (start)
 		url = 'start_time=' + start;
@@ -960,10 +962,10 @@ gGraph.prototype.uriParams = function (duration, start)
 gGraph.prototype.retrieveDatum = function (duration, start_time)
 {
 	var graph = this;
-	var request, url;
+	var request, url, params;
 
-	url = this.g_http + this.g_uri_val +
-	    this.uriParams(duration, start_time);
+	params = this.uriParams(duration, start_time);
+	url = this.g_http + this.g_uri_val + params;
 	request = new XMLHttpRequest();
 	request.open('GET', url, true);
 	request.send(null);
@@ -979,6 +981,8 @@ gGraph.prototype.retrieveDatum = function (duration, start_time)
 			graph.updateHeatmap(value);
 		else
 			graph.updateRaw(value);
+
+		graph.g_uri_params = params;
 	};
 
 };
@@ -1055,8 +1059,9 @@ gGraph.prototype.refresh = function (force)
  */
 gGraph.prototype.updateHeatmap = function (value)
 {
-	var div, img, present, key;
+	var graph, div, img, present, key;
 
+	graph = this;
 	div = this.g_elt_graph;
 	img = div.childNodes[0];
 
@@ -1064,15 +1069,22 @@ gGraph.prototype.updateHeatmap = function (value)
 		img = div.appendChild(document.createElement('img'));
 
 	img.src = 'data:image/png;base64,' + value.image;
+	if (!img.caClick) {
+		$(img).click(function (event) { graph.heatmapClicked(event); });
+		img.caClick = true;
+	}
 
 	present = [];
 	for (key in value.present)
 		present.push(key);
 	present.sort();
 
-	this.updateTable(present.map(function (elt) {
-		return ({ key: elt, val: [ elt ] });
-	}));
+	this.g_legend_summary = present.map(function (elt) {
+		return ({ key: elt, val: [ elt, '' ] });
+	});
+
+	if (this.g_legend_mode == 'summary')
+		this.updateTable(this.g_legend_summary);
 };
 
 /*
@@ -1315,7 +1327,7 @@ gGraph.prototype.clicked = function (pos)
 		return;
 
 	if (this.g_type == 'scalar') {
-		legend = [ { key: datum, val: datum } ];
+		legend = [ { key: datum, val: [ '', datum ] } ];
 	} else {
 		keys = [];
 		for (key in datum)
@@ -1364,10 +1376,48 @@ gGraph.prototype.updateHighlighting = function (when)
 };
 
 /*
+ * Create a new data table for the current graph's legend.  We do this rather
+ * than modify the existing one because the semantics of fnClearTable are
+ * dubious at best.  In particular, calling this function doesn't always cause
+ * the table to appear empty, but calling it on an empty table causes it to add
+ * another row that says "No data in table".  So it doesn't always work on an
+ * empty table, and it doesn't always work on a non-empty table.
+ */
+gGraph.prototype.makeTable = function ()
+{
+	var graph = this;
+
+	this.g_table = $(this.g_legend).dataTable({
+		aaData: [],
+		bDestroy: true,
+		bFilter: false,
+		bJQueryUI: true,
+		bAutoWidth: true,
+		sScrollY: '300px',
+		bPaginate: false,
+		bScrollInfinite: true,
+		aoColumns: this.g_columns,
+		fnRowCallback: function (node) {
+			if (node.firstChild.tabIndex === 0)
+				return (node);
+
+			node.firstChild.tabIndex = 0;
+			$(node.firstChild).keydown(function (event) {
+				graph.heatmapKeyPressed(event);
+			});
+
+			return (node);
+		}
+	});
+
+	this.g_table.fnSort([ [ 1, 'desc' ], [ 0, 'asc' ] ]);
+};
+
+/*
  * Populate the specified graph's side legend with additional details.
  * 'entries' is an array of objects with the following members:
  *
- *	value	Value to add to side legend (jquery data table)
+ *	val	Value to add to side legend (jquery data table)
  *
  *	key	Identifier.  An entry's value will only be added to the legend
  *		when no other entry with the same key has ever been added.
@@ -1378,7 +1428,7 @@ gGraph.prototype.updateTable = function (entries, clear)
 	var rows, ii;
 
 	if (clear)
-		this.g_table.fnClearTable();
+		this.makeTable();
 
 	if (clear || !this.g_legend_rows)
 		this.g_legend_rows = {};
@@ -1386,9 +1436,11 @@ gGraph.prototype.updateTable = function (entries, clear)
 	rows = this.g_legend_rows;
 
 	for (ii = 0; ii < entries.length; ii++) {
-		if (!(entries[ii].key in rows))
-			rows[entries[ii].key] =
-			    this.g_table.fnAddData([ entries[ii].val ]);
+		if (entries[ii].key in rows)
+			continue;
+
+		rows[entries[ii].key] =
+		    this.g_table.fnAddData([ entries[ii].val ]);
 	}
 
 	focused.focus();
@@ -1482,6 +1534,66 @@ gGraph.prototype.heatmapKeyPressed = function (event)
 		return;
 
 	this.heatmapRowSelect(sibling.firstChild, event.shiftKey);
+};
+
+/*
+ * Invoked when the user clicks on the heatmap itself.  Retrieve details about
+ * this particular bucket and show it in a dialog.
+ */
+gGraph.prototype.heatmapClicked = function (event)
+{
+	var graph = this;
+	var offset, xx, yy;
+	var request, url;
+
+	offset = $(event.target).offset();
+	xx = event.pageX - offset.left;
+	yy = event.pageY - offset.top;
+
+	url = this.g_http + this.g_uri_details + this.g_uri_params +
+	    '&x=' + xx + '&y=' + yy;
+	request = new XMLHttpRequest();
+	request.open('GET', url, true);
+	request.send(null);
+	request.onreadystatechange = function () {
+		if (request.readyState != 4)
+			return;
+
+		if (request.status != 200) {
+			alert('failed to load details');
+			return;
+		}
+
+		graph.showHeatmapDetails(JSON.parse(request.responseText));
+	};
+};
+
+gGraph.prototype.showHeatmapDetails = function (details)
+{
+	var keys, entries;
+	var key, ii;
+
+	entries = [];
+	keys = Object.keys(details.present);
+	for (ii = 0; ii < keys.length; ii++) {
+		key = keys[ii];
+
+		if (details.present[key] === 0)
+			continue;
+
+		entries.push({ key: key, val: [ key, details.present[key] ] });
+	}
+
+	this.g_legend_details = entries;
+
+	if (entries.length === 0) {
+		this.g_legend_mode = 'summary';
+		this.updateTable(this.g_legend_summary, true);
+		return;
+	}
+
+	this.g_legend_mode = 'details';
+	this.updateTable(entries, true);
 };
 
 /*

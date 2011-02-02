@@ -652,16 +652,31 @@ function aggExtractDatasets(data, selected, dimension)
 	/*
 	 * If there are zero fields selected, we're done.  Just return one
 	 * dataset representing the totals and the set of present fields we just
-	 * computed.
+	 * computed.  Note that an 'undefined' value of 'selected' actually
+	 * means "select all fields".
 	 */
-	if (selected.length === 0)
+	if (selected && selected.length === 0)
 		return ({ data: retdata, present: present });
 
 	/*
-	 * In this case the user has actually selected some values so we must
-	 * extract those as separate datasets.
+	 * In this case the user has actually selected some values (or
+	 * explicitly "all values") so we must extract those as separate
+	 * datasets.
 	 */
 	decomposed = {};
+
+	/*
+	 * Again, if 'selected' is undefined, we're in rainbow mode and
+	 * selecting all colors.  We just pretend that all fields are selected.
+	 * We sort the keys to make sure that similar requests result in the
+	 * same assignment of colors to keys, as long as the key set is static.
+	 * This isn't perfect -- if a new key shows up at the beginning of the
+	 * alphabet, for example, the color assignment gets completely changed.
+	 * But it's good enough for now.
+	 */
+	if (!selected)
+		selected = Object.keys(present).sort();
+
 	for (ii = 0; ii < selected.length; ii++)
 		decomposed[selected[ii]] = {};
 
@@ -722,6 +737,10 @@ var aggValueHeatmapParams = {
 	    type: 'boolean',
 	    default: false
 	},
+	exclude: {
+	    type: 'boolean',
+	    default: false
+	},
 	hues: {
 	    type: 'array',
 	    default: undefined
@@ -736,6 +755,10 @@ var aggValueHeatmapParams = {
 	    default: 'rank',
 	    choices: { rank: true, linear: true }
 	},
+	decompose_all: {
+	    type: 'boolean',
+	    default: false
+	},
 	x: {
 	    type: 'number',
 	    required: true,
@@ -747,6 +770,21 @@ var aggValueHeatmapParams = {
 	    min: 0
 	}
 };
+
+function aggHttpHeatmapHues(nselected, isolate)
+{
+	var hues, ii;
+
+	hues = [ 21 ];
+
+	for (ii = 0; ii < nselected; ii++)
+		hues.push((hues[hues.length - 1] + 91) % 360);
+
+	if (isolate)
+		hues.shift();
+
+	return (hues);
+}
 
 function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 {
@@ -790,26 +828,16 @@ function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 		}
 
 		conf.hue = hues;
-		return (conf);
 	}
 
-	conf.hue = [ 21 ];
-
-	for (ii = 0; ii < nselected; ii++)
-		conf.hue.push((conf.hue[conf.hue.length - 1] + 91) % 360);
-
-	if (isolate)
-		conf.hue.shift();
-
-	ASSERT.ok(nhues == conf.hue.length);
 	return (conf);
 }
 
 function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 {
 	var inst = agg_insts[id];
-	var conf, duration, selected, isolate, nreporting;
-	var record, rawdata, extracted, datasets;
+	var conf, duration, selected, isolate, exclude, rainbow, nreporting;
+	var record, rawdata, extracted, datasets, count;
 	var range, transforms, png;
 	var ii, timeidx, ret;
 	var param = function (formals, key) {
@@ -820,8 +848,26 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 		duration = param(aggValueParams, 'duration') || 60;
 		selected = param(aggValueHeatmapParams, 'selected');
 		isolate = param(aggValueHeatmapParams, 'isolate');
+		exclude = param(aggValueHeatmapParams, 'exclude');
+		rainbow = param(aggValueHeatmapParams, 'decompose_all');
 		conf = aggHttpHeatmapConf(request, start, duration, isolate,
 		    selected.length);
+
+		count = 0;
+		if (isolate)
+			count++;
+		if (exclude)
+			count++;
+		if (rainbow)
+			count++;
+
+		if (count > 1)
+			throw (new mod_ca.caValidationError(
+			    'only one of "isolate", "exclude", and ' +
+			    '"decompose_all" may be specified'));
+
+		if (rainbow)
+			selected = undefined;
 	} catch (ex) {
 		if (!(ex instanceof mod_ca.caValidationError))
 			throw (ex);
@@ -860,6 +906,9 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	for (ii = 0; ii < extracted.data.length; ii++)
 		datasets.push(mod_heatmap.bucketize(extracted.data[ii], conf));
 
+	if (!conf.hue)
+		conf.hue = aggHttpHeatmapHues(datasets.length - 1, isolate);
+
 	if (isolate) {
 		datasets.shift();
 
@@ -870,6 +919,9 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	} else {
 		for (ii = 1; ii < datasets.length; ii++)
 			mod_heatmap.deduct(datasets[0], datasets[ii]);
+
+		if (exclude)
+			datasets = datasets.slice(0, 1);
 	}
 
 	/*

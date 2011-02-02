@@ -529,7 +529,7 @@ gGraph.prototype.initDetails = function ()
 		this.g_ncreated = 0;
 		this.g_coloring = 'rank';
 		this.g_weights = 'count';
-		this.g_isolate = false;
+		this.g_show = 'all';
 	}
 };
 
@@ -638,17 +638,17 @@ gGraph.prototype.createToolbar = function ()
 	}, function () { graph.scrollBack(); }));
 
 	this.g_pausebutton = this.createToggleButton('paused', [ {
+	    onclick: function () { graph.unpaused(); },
 	    label: 'pause',
-	    value: true,
+	    value: false,
 	    options: {
 		text: false,
 		label: 'pause',
 		icons: { primary: 'ui-icon-pause' }
 	    }
 	}, {
-	    onclick: function () { graph.unpaused(); },
 	    label: 'resume',
-	    value: false,
+	    value: true,
 	    options: {
 		text: false,
 		label: 'resume',
@@ -755,19 +755,28 @@ gGraph.prototype.createToolbar = function ()
 
 	subdiv.className += ' gNumeric';
 
-	subdiv.appendChild(this.createToggleButton('isolate', [
-	    { label: 'isolate: off', value: true },
-	    { label: 'isolate: on', value: false }
-	]));
+	subdiv.appendChild(this.createToggleButton('show', [ {
+	    label: 'show: all, highlight selected',
+	    value: 'all'
+	}, {
+	    label: 'show: only selected (highlighted)',
+	    value: 'isolate'
+	}, {
+	    label: 'show: all but selected',
+	    value: 'exclude'
+	}, {
+	    label: 'show: all, highlight all',
+	    value: 'rainbow'
+	} ]));
 
 	subdiv.appendChild(this.createToggleButton('weights', [
-	    { label: 'values: by count', value: 'weight' },
-	    { label: 'values: by weight', value: 'count' }
+	    { label: 'values: by count', value: 'count' },
+	    { label: 'values: by weight', value: 'weight' }
 	]));
 
 	subdiv.appendChild(this.createToggleButton('coloring', [
-	    { label: 'color: by rank', value: 'linear' },
-	    { label: 'color: by value (linear)', value: 'rank' }
+	    { label: 'color: by rank', value: 'rank' },
+	    { label: 'color: by value (linear)', value: 'linear' }
 	]));
 
 	return (div);
@@ -783,15 +792,17 @@ gGraph.prototype.createToggleButton = function (field, choices)
 	var graph = this;
 	var button = document.createElement('button');
 	var label = choices[0].label;
+	var ii;
 
 	if (label)
 		button.appendChild(document.createTextNode(label));
 
-	if (!choices[0].options)
-		choices[0].options = { label: choices[0].label };
+	for (ii = 0; ii < choices.length; ii++) {
+		if (choices[ii].options)
+			continue;
 
-	if (!choices[1].options)
-		choices[1].options = { label: choices[1].label };
+		choices[ii].options = { label: choices[ii].label };
+	}
 
 	button.caToggle = function () {
 		graph.toggle(field, choices, button);
@@ -824,16 +835,21 @@ gGraph.prototype.createButton = function (options, callback)
 gGraph.prototype.toggle = function (field, choices, button)
 {
 	var options, callback, fieldval;
+	var text, current, next, ii;
 
-	if ($(button).text() == choices[0]['label']) {
-		options = choices[1]['options'];
-		fieldval = choices[0]['value'];
-		callback = choices[0]['onclick'];
-	} else {
-		options = choices[0]['options'];
-		fieldval = choices[1]['value'];
-		callback = choices[1]['onclick'];
+	text = $(button).text();
+
+	for (ii = 0; ii < choices.length; ii++) {
+		if (text == choices[ii]['label']) {
+			current = ii;
+			break;
+		}
 	}
+
+	next = (current + 1) % choices.length;
+	options = choices[next]['options'];
+	fieldval = choices[next]['value'];
+	callback = choices[next]['onclick'];
 
 	$(button).button('option', options);
 	this['g_' + field] = fieldval;
@@ -942,17 +958,33 @@ gGraph.prototype.uriParams = function (duration, start)
 	url += 'coloring=' + this.g_coloring + '&';
 	url += 'weights=' + this.g_weights;
 
-	if (this.g_isolate)
-		url += '&isolate=true';
-	else
-		url += '&hues=21';
+	switch (this.g_show) {
+	case 'rainbow':
+		url += '&decompose_all=true';
+		break;
 
-	for (value in this.g_selected) {
-		url += '&selected=' + value;
-		url += '&hues=' + this.g_selected[value];
+	case 'isolate':
+		url += '&isolate=true';
+		break;
+
+	case 'exclude':
+		url += '&exclude=true';
+		/*jsl:fallthru*/
+
+	case 'all':
+	default:
+		url += '&hues=21';
+		break;
 	}
 
-	return (url ? '?' + url : '');
+	if (this.g_show != 'rainbow') {
+		for (value in this.g_selected) {
+			url += '&selected=' + value;
+			url += '&hues=' + this.g_selected[value];
+		}
+	}
+
+	return ('?' + url);
 };
 
 /*

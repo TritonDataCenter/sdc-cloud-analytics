@@ -71,6 +71,23 @@ exports.insinit = function (ins, log)
 	    metric: insdNodeHttpd
 	});
 
+	ins.registerMetric({
+	    module: 'node',
+	    stat: 'httpc',
+	    label: 'HTTP client Operations',
+	    type: 'ops',
+	    fields: {
+		method: { label: 'method', type: mod_ca.ca_type_string },
+		url: { label: 'URL', type: mod_ca.ca_type_string },
+		raddr: { label: 'http server address',
+		    type: mod_ca.ca_type_string },
+		rport: { label: 'http server port',
+		    type: mod_ca.ca_type_string },
+		latency: { label: 'latency', type: mod_ca.ca_type_latency }
+	    },
+	    metric: insdNodeHttpc
+	});
+
 };
 
 var insdFields = {
@@ -335,7 +352,20 @@ function insdIops(metric)
 	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
 }
 
-function insdNodeHttpd(metric)
+/*
+ * The node http client and server probes are virutally identical. The only
+ * thigns that need to change are the names of the probes that we're firing.
+ *
+ *	metric:		The metric we were requested to build
+ *
+ *	entryp:		The first probe that we're going to fire
+ *
+ *	returnp:	The final probe that we're going to fire
+ *
+ * return:
+ * Returns the DTrace metric or thows an exception on error
+ */
+function insdNodeHttpCreate(metric, entryp, returnp)
 {
 	var decomps = metric.is_decomposition;
 	var pred = metric.is_predicate;
@@ -411,7 +441,7 @@ function insdNodeHttpd(metric)
 	}
 
 	if (before.length > 0) {
-		script += 'node*:::http-server-request\n';
+		script += 'node*:::' + entryp + '\n';
 		script += '{\n';
 
 		for (ii = 0; ii < before.length; ii++) {
@@ -455,14 +485,14 @@ function insdNodeHttpd(metric)
 		predicates.push(mod_capred.caPredPrint(pred));
 	}
 
-	script += 'node*:::http-server-response\n';
+	script += 'node*:::' + returnp + '\n';
 	script += insdMakePredicate(predicates);
 	script += '{\n';
 	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
 	script += '}\n\n';
 
 	if (before.length > 0) {
-		script += 'node*:::http-server-response\n';
+		script += 'node*:::' + returnp + '\n';
 		script += '{\n';
 
 		for (ii = 0; ii < before.length; ii++)
@@ -473,6 +503,17 @@ function insdNodeHttpd(metric)
 	}
 
 	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+
+}
+
+function insdNodeHttpd(metric)
+{
+	return (metric, 'http-server-request', 'http-server-response');
+}
+
+function insdNodeHttpc(metric)
+{
+	return (metric, 'http-client-request', 'http-client-response');
 }
 
 function insDTraceMetric(prog)

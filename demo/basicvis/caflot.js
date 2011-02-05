@@ -499,7 +499,8 @@ gGraph.prototype.initDetails = function ()
 					continue;
 
 				if (metric.fields[fieldname].type ==
-				    'latency') {
+				    'latency' || metric.fields[fieldname].type
+				    == 'number') {
 					this.g_subtype = 'heatmap';
 					continue;
 				}
@@ -1922,7 +1923,8 @@ function gDrillFieldChanged(graphId)
 	opt.value = 'ne';
 	opt.appendChild(document.createTextNode('!='));
 
-	if (metric.fields[field.value].type != 'latency')
+	if (metric.fields[field.value].type != 'latency' ||
+	    metric.fields[field.value].type != 'number')
 		return;
 
 	opt = opSel.appendChild(document.createElement('option'));
@@ -1975,7 +1977,8 @@ function gDrillSubmit(graphId, dialog)
 	val = valSel.value;
 
 	/* Potentially parse the value to a number if the field is numeric */
-	if (gGraphs[graphId].g_metric.fields[field].type == 'latency') {
+	if (gGraphs[graphId].g_metric.fields[field].type == 'latency' ||
+	    gGraphs[graphId].g_metric.fields[field].type == 'number') {
 		val = parseInt(val, 10);
 		if (isNaN(val)) {
 			alert('field is of type latency, must specify a ' +

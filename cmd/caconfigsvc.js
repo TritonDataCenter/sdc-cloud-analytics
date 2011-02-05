@@ -920,7 +920,8 @@ function cfgStatType(modname, statname, decomp)
 			    'module %s, stat %s: %s', modname, statname,
 			    field)));
 
-		if (fields[field].type == mod_ca.ca_type_latency) {
+		if (fields[field].type == mod_ca.ca_type_latency ||
+		    fields[field].type == mod_ca.ca_type_number) {
 			type = mod_ca.ca_arity_numeric;
 			nnumeric++;
 		} else {

@@ -88,6 +88,36 @@ exports.insinit = function (ins, log)
 	    metric: insdNodeHttpc
 	});
 
+	ins.registerMetric({
+	    module: 'node',
+	    stat: 'gc',
+	    label: 'Garbage Collection',
+	    type: 'ops',
+	    fields: {
+		type: { label: 'gc type', type: mod_ca.ca_type_string },
+		latency: { label: 'latency', type: mod_ca.ca_type_latency }
+	    },
+	    metric: insdNodeGC
+	});
+
+	ins.registerMetric({
+	    module: 'node',
+	    stat: 'socketops',
+	    type: 'ops',
+	    label: 'socket operations',
+	    fields: {
+		type: { label: 'type', type: mod_ca.ca_type_string },
+		addr: { label: 'host', type: mod_ca.ca_type_string },
+		port: { label: 'port', type: mod_ca.ca_type_string },
+		size: { label: 'size', type: mod_ca.ca_type_number },
+		buffered: {
+		    label: 'buffered data',
+		    type: mod_ca.ca_type_number
+		}
+	    },
+	    metric: insdNodeSocket
+	});
+
 };
 
 var insdFields = {
@@ -380,6 +410,10 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 	    'node_dtrace_connection_t', 0, 'remoteAddress');
 	var arg0port = insdXlate('node_connection_t',
 	    'node_dtrace_connection_t', 0, 'remotePort');
+	var arg0method = insdXlate('node_http_request_t',
+	    'node_dtrace_http_request_t', 0, 'method');
+	var arg0url = insdXlate('node_http_request_t',
+	    'node_dtrace_http_request_t', 0, 'url');
 
 	/*
 	 * We divide latency by the same amount that we do during the quantize,
@@ -452,11 +486,11 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 				break;
 			case 'method':
 				script += '\tmethods[' + arg1fd + '] = ' +
-				    'args[0]->method;\n';
+				    arg0method + ';\n';
 				break;
 			case 'url':
 				script += '\turls[' + arg1fd + '] = ' +
-				    'args[0]->url;\n';
+				    arg0url + ';\n';
 				break;
 			default:
 				throw (new Error('invalid field for ' +
@@ -508,18 +542,204 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 
 function insdNodeHttpd(metric)
 {
-	return (metric, 'http-server-request', 'http-server-response');
+	return (insdNodeHttpCreate(metric, 'http-server-request',
+	    'http-server-response'));
 }
 
 function insdNodeHttpc(metric)
 {
-	return (metric, 'http-client-request', 'http-client-response');
+	return (insdNodeHttpCreate(metric, 'http-client-request',
+	    'http-client-response'));
+}
+
+/*
+ * Notes on v8 GC implementation: As of v8 version 3.1.1 (Feb 4, 2011), v8 has
+ * two different types of garbage collection:
+ *	Scavenge
+ * 	Mark and Sweep
+ *
+ * When GC runs, the entire world stops, only one thread is running the GC
+ * itself. Furthermore, currently the GC prologue and epilogue callbacks are all
+ * done in the same thread, so we can use thread local variables.
+ */
+function insdNodeGC(metric)
+{
+	var decomps = metric.is_decomposition;
+	var script = '';
+	var predicates, zones, zero, hasPred, aggLatency, traceLatency;
+	var pred, fields, ii, indexes, index, action;
+	var transforms = {
+	    latency: '(timestamp - self->ts)',
+	    type: '(arg0 == 1 ? "scavenge" : (arg0 == 2 ? "mark and sweep" : ' +
+		'"scavenge and mark and sweep"))'
+	};
+
+	predicates = [];
+	hasPred = mod_capred.caPredNonTrivial(pred);
+	fields = mod_capred.caPredFields(pred);
+
+	if (metric.is_zones) {
+		zones = metric.is_zomes.map(function (elt) {
+			return ('zonename == "' + elt + '"');
+		});
+
+		predicates.push(zones.join(' ||\n'));
+	}
+
+	indexes = [];
+	for (ii = 0; ii < decomps.length; ii++) {
+		if (decomps[ii] == 'latency') {
+			aggLatency = true;
+			traceLatency = true;
+			if (!mod_ca.caArrayContains(fields, decomps[ii]))
+				fields.push(decomps[ii]);
+			decomps.splice(ii--, 1);
+			continue;
+		}
+
+		if (!mod_ca.caArrayContains(fields, decomps[ii]))
+			fields.push(decomps[ii]);
+
+		indexes.push(transforms[decomps[ii]]);
+	}
+
+	ASSERT.ok(indexes.length < 2); /* could actually support more */
+
+	if (indexes.length > 0) {
+		index = '[' + indexes.join(',') + ']';
+		zero = {};
+	} else {
+		index = '';
+		zero = aggLatency ? [] : 0;
+	}
+
+	if (mod_ca.caArrayContains(fields, 'latency'))
+		traceLatency = true;
+
+	if (traceLatency) {
+		script += 'node*:::gc-start\n';
+		script += '{\n';
+		script += '\tself->ts = timestamp;\n';
+		script += '}\n\n';
+
+		predicates.push('self->ts != NULL');
+	}
+
+	if (aggLatency) {
+		action = 'lquantize(' + transforms['latency'] +
+		    '/ 1000, 0, 100000, 100);';
+	} else {
+		action = 'count();';
+	}
+
+	if (hasPred) {
+		pred = mod_ca.caDeepCopy(metric.is_predicate);
+		mod_capred.caPredReplaceFields(transforms, pred);
+		predicates.push(mod_capred.caPredPrint(pred));
+	}
+
+	script += 'node*:::gc-done\n';
+	script += insdMakePredicate(predicates);
+	script += '{\n';
+	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
+	script += '}\n\n';
+
+	if (traceLatency) {
+		script += 'node*:::gc-done\n';
+		script += '{\n';
+		script += '\tself->ts = 0;\n';
+		script += '}\n';
+	}
+
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+}
+
+function insdNodeSocket(metric)
+{
+	var script = '';
+	var decomps = metric.is_decomposition;
+	var pred = metric.is_predicate;
+	var aggBuff = false;
+	var aggSize = false;
+	var ii, zones, predicates, hasPred, index, indexes, zero, action;
+	var arg0addr = insdXlate('node_connection_t',
+	    'node_dtrace_connection_t', 0, 'remoteAddress');
+	var arg0port = insdXlate('node_connection_t',
+	    'node_dtrace_connection_t', 0, 'remotePort');
+	var arg0buffer = insdXlate('node_connection_t',
+	    'node_dtrace_connection_t', 0, 'bufferSize');
+	var transforms = {
+	    type: '(probename == "net-socket-read" ? "read" : "write")',
+	    addr: arg0addr,
+	    port: 'lltostr( ' + arg0port + ')',
+	    size: 'arg1',
+	    buffered: arg0buffer
+	};
+
+	predicates = [];
+	hasPred = mod_capred.caPredNonTrivial(pred);
+
+	if (metric.is_zones) {
+		zones = metric.is_zomes.map(function (elt) {
+			return ('zonename == "' + elt + '"');
+		});
+
+		predicates.push(zones.join(' ||\n'));
+	}
+
+	indexes = [];
+	for (ii = 0; ii < decomps.length; ii++) {
+		if (decomps[ii] == 'size') {
+			aggSize = true;
+		} else if (decomps[ii] == 'buffered') {
+			aggBuff = true;
+		} else {
+			indexes.push(transforms[decomps[ii]]);
+		}
+	}
+
+	/* We may have both a numeric and discrete decomp at the same time */
+	ASSERT.ok(indexes.length < 2);
+
+	if (indexes.length > 0) {
+		index = '[' + indexes.join(',') + ']';
+		zero = {};
+	} else {
+		index = '';
+		zero = 0;
+	}
+
+	if (aggBuff) {
+		action = 'lquantize(' + transforms['buffered'] +
+		    ', 0, 100000, 10);';
+	} else if (aggSize) {
+		action = 'lquantize(' + transforms['size'] +
+		    ', 0, 100000, 10);';
+	} else {
+		action = 'count();';
+	}
+
+	if (hasPred) {
+		pred = mod_ca.caDeepCopy(metric.is_predicate);
+		mod_capred.caPredReplaceFields(transforms, pred);
+		predicates.push(mod_capred.caPredPrint(pred));
+	}
+
+	script += 'node*:::net-socket-read,\n';
+	script += 'node*:::net-socket-write\n';
+	script += insdMakePredicate(predicates);
+	script += '{\n';
+	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
+	script += '}\n\n';
+
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
 }
 
 function insDTraceMetric(prog)
 {
 	this.cad_prog = prog;
 }
+
 
 insDTraceMetric.prototype.instrument = function (callback)
 {

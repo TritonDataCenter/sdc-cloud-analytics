@@ -56,7 +56,7 @@ exports.insinit = function (ins, log)
 	ins.registerModule({ name: 'node', label: 'Node.js' });
 	ins.registerMetric({
 	    module: 'node',
-	    stat: 'httpd',
+	    stat: 'httpd_ops',
 	    label: 'HTTP server operations',
 	    type: 'ops',
 	    fields: {
@@ -73,8 +73,8 @@ exports.insinit = function (ins, log)
 
 	ins.registerMetric({
 	    module: 'node',
-	    stat: 'httpc',
-	    label: 'HTTP client Operations',
+	    stat: 'httpc_ops',
+	    label: 'HTTP Client Operations',
 	    type: 'ops',
 	    fields: {
 		method: { label: 'method', type: mod_ca.ca_type_string },
@@ -90,7 +90,7 @@ exports.insinit = function (ins, log)
 
 	ins.registerMetric({
 	    module: 'node',
-	    stat: 'gc',
+	    stat: 'gc_ops',
 	    label: 'Garbage Collection',
 	    type: 'ops',
 	    fields: {
@@ -102,13 +102,13 @@ exports.insinit = function (ins, log)
 
 	ins.registerMetric({
 	    module: 'node',
-	    stat: 'socketops',
+	    stat: 'socket_ops',
 	    type: 'ops',
 	    label: 'socket operations',
 	    fields: {
 		type: { label: 'type', type: mod_ca.ca_type_string },
-		addr: { label: 'host', type: mod_ca.ca_type_string },
-		port: { label: 'port', type: mod_ca.ca_type_string },
+		addr: { label: 'remote host', type: mod_ca.ca_type_string },
+		port: { label: 'remote port', type: mod_ca.ca_type_string },
 		size: { label: 'size', type: mod_ca.ca_type_number },
 		buffered: {
 		    label: 'buffered data',

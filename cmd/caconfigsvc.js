@@ -239,10 +239,13 @@ function cfgHttpInstCreate(request, response)
 	props = cfgHttpInstReadProps(request);
 	cfg_log.info('request to instrument:\n%j', props);
 	cfg_factory.create(custid, props, function (err, inst) {
-		var headers;
+		var headers, code;
 
 		if (err) {
-			response.send(HTTP.EBADREQUEST, { error: err.message });
+			code = err instanceof caError &&
+			    err.code() == ECA_INVAL ? HTTP.EBADREQUEST :
+			    HTTP.ESERVER;
+			response.send(code, { error: err.message });
 			return;
 		}
 

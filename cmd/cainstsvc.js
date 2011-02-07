@@ -442,7 +442,8 @@ function insCmdEnable(msg)
 				    mod_capred.caPredValidationError)
 					continue;
 
-				ins_log.exception(ex);
+				ins_log.error(
+				    'error validating predicate: %r', ex);
 				continue;
 			}
 		}

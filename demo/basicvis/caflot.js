@@ -182,7 +182,7 @@ function gInitInstrumentationsFini(instrumentations)
 		graph = new gGraph({
 			metric: metric,
 			decomps: inst.decomposition,
-			predicate: JSON.parse(inst.predicate),
+			predicate: inst.predicate,
 			uri: inst.uri,
 			uris: inst.uris
 		});

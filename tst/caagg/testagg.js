@@ -565,7 +565,7 @@ var startWorld = function ()
 
 var enableAgg = function (source)
 {
-	var key = mod_ca.caKeyForInst(id);
+	var key = mod_ca.caRouteKeyForInst(id);
 	var inst = {
 	    'value-dimesion': dim,
 	    'enabled': true,

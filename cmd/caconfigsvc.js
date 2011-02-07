@@ -10,9 +10,9 @@ var ASSERT = require('assert');
 
 var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
+var mod_cainst = require('../lib/ca/ca-inst');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
-var mod_capred = require('../lib/ca/ca-pred');
 var mod_log = require('../lib/ca/ca-log');
 var mod_mapi = require('../lib/ca/ca-mapi');
 var HTTP = require('../lib/ca/http-constants');
@@ -20,27 +20,18 @@ var HTTP = require('../lib/ca/http-constants');
 var cfg_http;			/* http server */
 var cfg_cap;			/* camqp CAP wrapper */
 var cfg_log;			/* log handle */
-var cfg_mapi;			/* mapi handle */
+var cfg_factory;		/* instrumentation factory */
 
 var cfg_name = 'configsvc';			/* component name */
 var cfg_vers = '0.0';				/* component version */
 var cfg_http_port = mod_ca.ca_http_port_config;	/* HTTP port for API endpoint */
 var cfg_http_baseuri = '/ca';			/* base of HTTP API */
-var cfg_http_custuri = '/customers';		/* cust subset of HTTP API */
-var cfg_http_insturi = '/instrumentations';	/* Part of HTTP API for insts */
-var cfg_http_valraw = '/value/raw';		/* HTTP API to get raw data */
-var cfg_http_valheat = '/value/heatmap/image';	/* HTTP API to get heatmaps */
-var cfg_http_valheat_details = '/value/heatmap/details';
 
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_transformations = {};	/* all transformations, by name */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
-
-var cfg_retain_min = 10;		/* max data retention time: 10 sec */
-var cfg_retain_max = 10 * 60 * 60;	/* max data retention time: 1 hour */
-var cfg_retain_default = 10 * 60;	/* default data retention: 10 min */
 
 /*
  * The following constants and data structures manage active instrumentations.
@@ -60,7 +51,6 @@ var cfg_retain_default = 10 * 60;	/* default data retention: 10 min */
  * is stored in cfg_customers[customer_id]['instrumentations'], and the set of
  * global instrumentations is stored in cfg_global_insts.
  */
-var cfg_inst_id = 1;		/* next available global id */
 var cfg_insts = {};		/* all instrumentations, by inst id */
 var cfg_customers = {};		/* all customers, by cust id */
 var cfg_global_insts = {};	/* global (non-customer) insts */
@@ -69,10 +59,10 @@ function main()
 {
 	var http_port = cfg_http_port;
 	var broker = mod_ca.caBroker();
-	var mapi = mod_ca.caMapiConfig();
+	var mapicfg = mod_ca.caMapiConfig();
 	var sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
 	var hostname = sysinfo.ca_hostname;
-	var amqp;
+	var amqp, mapi;
 
 	cfg_log = new mod_log.caLog({ out: process.stdout });
 
@@ -100,9 +90,6 @@ function main()
 	    cfgNotifyInstrumenterOnline);
 	cfg_cap.on('msg-notify-log', cfgNotifyLog);
 	cfg_cap.on('msg-notify-instrumenter_error', cfgNotifyInstrumenterError);
-	cfg_cap.on('msg-ack-enable_instrumentation', cfgAckEnable);
-	cfg_cap.on('msg-ack-disable_instrumentation', cfgAckDisable);
-	cfg_cap.on('msg-ack-enable_aggregation', cfgAckEnableAgg);
 
 	cfg_http = new mod_cahttp.caHttpServer({
 	    log: cfg_log,
@@ -116,13 +103,25 @@ function main()
 	cfg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
 	cfg_log.info('%-12s Port %d', 'HTTP server:', http_port);
 
-	if (mapi) {
-		cfg_log.info('%-12s %s:%s', 'MAPI host:', mapi.host, mapi.port);
-		cfg_mapi = new mod_mapi.caMapi(mapi);
+	if (mapicfg) {
+		cfg_log.info('%-12s %s:%s', 'MAPI host:', mapicfg.host,
+		    mapicfg.port);
+		mapi = new mod_mapi.caMapi(mapicfg);
 	} else {
 		cfg_log.warn('MAPI_HOST, MAPI_PORT, MAPI_USER, or ' +
 		    'MAPI_PASSWORD not set.  Per-customer use disabled.');
 	}
+
+	cfg_factory = new mod_cainst.caInstrumentationFactory({
+	    cap: cfg_cap,
+	    log: cfg_log,
+	    modules: cfg_statmods,
+	    transformations: cfg_transformations,
+	    aggregators: cfg_aggregators,
+	    instrumenters: cfg_instrumenters,
+	    uri_base: cfg_http_baseuri,
+	    mapi: mapi
+	});
 
 	amqp.start(function () {
 		cfg_log.info('AMQP broker connected.');
@@ -159,8 +158,10 @@ function cfgHttpRouter(server)
 		    cfgHttpInstrumentationsList);
 		server.post(base + instrumentations, cfgHttpInstCreate);
 		server.del(base + instrumentations_id, cfgHttpInstDelete);
-		server.get(base + instrumentations_id, cfgHttpInstGetOptions);
-		server.put(base + instrumentations_id, cfgHttpInstSetOptions);
+		server.get(base + instrumentations_id,
+		    cfgHttpInstGetProperties);
+		server.put(base + instrumentations_id,
+		    cfgHttpInstSetProperties);
 		server.get(base + instrumentations_id + '/value',
 		    cfgHttpInstValue);
 		server.get(base + instrumentations_id + '/value/*',
@@ -171,8 +172,7 @@ function cfgHttpRouter(server)
 /*
  * Given a customer identifier, return the set of instrumentations.  If custid
  * is undefined, returns the set of global instrumentations.  This function
- * always returns a valid object even if we've never seen this customer
- * before.
+ * always returns a valid object even if we've never seen this customer before.
  */
 function cfgInstrumentations(custid)
 {
@@ -180,25 +180,30 @@ function cfgInstrumentations(custid)
 		return (cfg_global_insts);
 
 	if (!(custid in cfg_customers))
-		return ({});
+		cfg_customers[custid] = {};
 
-	return (cfg_customers[custid].instrumentations);
+	return (cfg_customers[custid]);
 }
 
+/*
+ * Handle GET /ca/metrics
+ */
 function cfgHttpMetricsList(request, response)
 {
 	response.send(HTTP.OK, cfg_statmods);
 }
 
 /*
- * Handle the /ca/[customers/:id]/transformations GET request
+ * Handle GET /ca/[customers/:custid]/transformations
  */
 function cfgHttpTransformsList(request, response)
 {
-	var agg = cfgPickAggregator();
-	response.send(HTTP.OK, agg.cag_transformations);
+	response.send(HTTP.OK, cfg_transformations);
 }
 
+/*
+ * Handle GET /ca/[customers/:custid]/instrumentations
+ */
 function cfgHttpInstrumentationsList(request, response)
 {
 	var custid = request.params['custid'];
@@ -220,266 +225,106 @@ function cfgInstrumentationsListCustomer(rv, insts)
 	var instid;
 
 	for (instid in insts)
-		rv.push(cfgHttpInstEmit(cfg_insts[instid]));
+		rv.push(cfg_insts[instid].inst.properties());
 }
 
+/*
+ * Handle POST /ca/[customers/:custid]/instrumentations
+ */
 function cfgHttpInstCreate(request, response)
 {
-	var custid = request.params['custid'];
-	var params, spec, instid, aggregator;
+	var custid, props;
+
+	custid = request.params['custid'];
+	props = cfgHttpInstReadProps(request);
+	cfg_log.info('request to instrument:\n%j', props);
+	cfg_factory.create(custid, props, function (err, inst) {
+		var headers;
+
+		if (err) {
+			response.send(HTTP.EBADREQUEST, { error: err.message });
+			return;
+		}
+
+		props = inst.properties();
+		headers = { 'Location': props['uri'] };
+		cfg_insts[inst.fqid()] = { inst: inst };
+		cfgInstrumentations(inst.custid())[inst.fqid()] = true;
+		response.send(HTTP.CREATED, props, headers);
+	});
+}
+
+/*
+ * Read instrumentation properties from either form fields or the body (JSON).
+ */
+function cfgHttpInstReadProps(request)
+{
+	var actuals, props, fields, ii;
 
 	/*
 	 * If the user specified a JSON object, we use that.  Otherwise, we
 	 * assume they specified parameters in form fields.
 	 */
-	params = request.ca_json || request.ca_params;
+	if (request.ca_json && typeof (request.ca_json) == typeof ({}))
+		actuals = request.ca_json;
+	else
+		actuals = request.ca_params;
 
-	cfg_log.info('request to instrument:\n%j', params);
+	props = {};
+	fields = [ 'module', 'stat', 'predicate', 'decomposition', 'enabled',
+	    'retention-time' ];
 
-	try {
-		spec = cfgValidateMetric(params);
-	} catch (ex) {
-		response.send(HTTP.EBADREQUEST,
-		    { error: 'failed to validate request: ' + ex.message });
-		return;
+	for (ii = 0; ii < fields.length; ii++) {
+		if (fields[ii] in actuals)
+			props[fields[ii]] = actuals[fields[ii]];
 	}
 
-	aggregator = cfgPickAggregator();
-
-	if (!aggregator) {
-		response.send(HTTP.ESERVER,
-		    { error: 'no aggregators available' });
-		return;
-	}
-
-	/*
-	 * Now that we have our aggregator, create the list of supported
-	 * transformations.
-	 */
-	spec.transformations = cfgStatTransformations(spec);
-
-	if (custid === undefined) {
-		instid = cfg_inst_id++;  /* XXX should be unique across time. */
-		cfgHttpInstCreateFinish(response, custid, instid, spec,
-		    aggregator, null);
-		return;
-	}
-
-	if (!cfg_mapi) {
-		response.send(HTTP.ESERVER, { error: 'mapi not in use' });
-		return;
-	}
-
-	cfg_mapi.listContainers(custid, function (err, zonesbyhost) {
-		if (err) {
-			cfg_log.warn('failed to list customer zones for %s: %s',
-			    custid, err.toString());
-			response.send(HTTP.ESERVER,
-			    { error: 'failed to list customer zones' });
-			return;
-		}
-
-		if (!(custid in cfg_customers)) {
-			cfg_customers[custid] = {
-				next_id: 1,
-				instrumentations: {}
-			};
-		}
-
-		instid = cfg_customers[custid].next_id++;
-
-		cfgHttpInstCreateFinish(response, custid, instid, spec,
-		    aggregator, zonesbyhost);
-	});
-}
-
-function cfgHttpInstCreateFinish(response, custid, instid, spec, aggregator,
-    zonesbyhost)
-{
-	var fqid, instrumenter, hosts, hostname, uri, uris;
-
-	fqid = mod_ca.caQualifiedId(custid, instid);
-	cfgInstrumentations(custid)[fqid] = true;
-	aggregator.cag_insts[fqid] = true;
-	aggregator.cag_ninsts++;
-
-	uri = mod_ca.caSprintf('%s%s%s/%s', cfg_http_baseuri,
-	    (custid ? cfg_http_custuri + '/' + custid : ''),
-	    cfg_http_insturi, instid);
-	uris = [];
-
-	if (spec.stattype.type == mod_ca.ca_arity_numeric) {
-		uris.push({
-		    uri: uri + cfg_http_valheat,
-		    name: 'value_heatmap'
-		});
-		uris.push({
-		    uri: uri + cfg_http_valheat_details,
-		    name: 'details_heatmap'
-		});
-	}
-
-	uris.push({ uri: uri + cfg_http_valraw, name: 'value_raw'});
-
-	cfg_insts[fqid] = {
-		options: {
-		    enabled: true,
-		    'retention-time': cfg_retain_default
-		},
-		agg_done: undefined,
-		insts_failed: 0,
-		insts_ok: 0,
-		insts_total: 0,
-		response: response,
-		spec: spec,
-		aggregator: aggregator,
-		custid: custid,
-		uri: uri,
-		uris: uris
-	};
-
-	if (zonesbyhost)
-		cfg_insts[fqid]['zonesbyhost'] = zonesbyhost;
-
-	cfgAggEnable(aggregator, fqid);
-
-	/*
-	 * XXX wait for agg to complete
-	 */
-	hosts = zonesbyhost ? zonesbyhost : cfg_instrumenters;
-	for (hostname in hosts) {
-		cfg_insts[fqid].insts_total++;
-		instrumenter = cfg_instrumenters[hostname];
-		instrumenter.ins_insts[fqid] = true;
-		instrumenter.ins_ninsts++;
-		cfgInstEnable(instrumenter, fqid);
-	}
-
-	/* XXX timeout HTTP request */
+	return (props);
 }
 
 /*
- * Pick an aggregator for collecting data for this instrumentation.  This
- * algorithm could be smarter.  We currently just compare the number of stats an
- * aggregator is already aggregating.  We should also try other ones if the one
- * we pick seems down.
+ * Handle DELETE /ca/[customers/:custid]/instrumentation/:instid
  */
-function cfgPickAggregator()
-{
-	var key, mincount, minkey;
-
-	for (key in cfg_aggregators) {
-		if (mincount === undefined ||
-		    cfg_aggregators[key].cag_ninsts < mincount) {
-			mincount = cfg_aggregators[key].cag_ninsts;
-			minkey = key;
-		}
-	}
-
-	if (mincount === undefined)
-		return (undefined);
-
-	return (cfg_aggregators[minkey]);
-}
-
-/*
- * Validate the metric and retrieve its type.  We send the type information to
- * both the client and the aggregator so they know what kind of data to expect.
- */
-function cfgValidateMetric(params)
-{
-	var decomp, pred, stat;
-	var spec = {};
-	var check = function (obj, field, required) {
-		if (required && !obj[field])
-			throw (new Error('missing required field: ' + field));
-
-		return (obj[field] || '');
-	};
-
-	spec.modname = check(params, 'module', true);
-	spec.statname = check(params, 'stat', true);
-	decomp = check(params, 'decomposition', false);
-	pred = check(params, 'predicate', false);
-
-	if (typeof (decomp) == typeof (''))
-		decomp = decomp.length > 0 ? decomp.split(',') : [];
-
-	spec.decomp = decomp;
-	spec.stattype = cfgStatType(spec.modname, spec.statname, spec.decomp);
-
-	/* Validate the predicate */
-	if (pred !== '') {
-		if (typeof (pred) == 'string')
-			pred = JSON.parse(pred);
-		stat = cfg_statmods[spec.modname]['stats'][spec.statname];
-		mod_capred.caPredValidate(stat['fields'], pred);
-		spec.pred = pred;
-	} else {
-		spec.pred = {};
-	}
-
-	return (spec);
-}
-
 function cfgHttpInstDelete(request, response)
 {
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var instrumenter, aggregator, hostid;
+	var inst;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND);
 		return;
 	}
 
-	aggregator = cfg_insts[fqid].aggregator;
-	aggregator.cag_ninsts--;
-	delete (aggregator.cag_insts[fqid]);
-
-	for (hostid in cfg_instrumenters) {
-		instrumenter = cfg_instrumenters[hostid];
-
-		if (!(fqid in instrumenter.ins_insts))
-			continue;
-
-		instrumenter.ins_ninsts--;
-		delete (instrumenter.ins_insts[fqid]);
-		cfg_cap.sendCmdDisableInst(instrumenter.ins_routekey, fqid,
-			fqid);
-	}
-
+	/*
+	 * We always complete this request immediately and successfully since we
+	 * can always pretend we don't have this thing any more even if we
+	 * failed to disable some instrumenters.  We don't even need to wait for
+	 * the commands to complete.
+	 */
+	inst = cfg_insts[fqid];
 	delete (cfgInstrumentations(custid)[fqid]);
 	delete (cfg_insts[fqid]);
 	response.send(HTTP.OK);
+
+	cfg_factory.destroy(inst.inst, function (err) {
+		if (!err)
+			return;
+
+		cfg_log.error('failure during instrumentation delete: %r', err);
+	});
 }
 
-function cfgHttpInstEmit(inst)
-{
-	var ret = {};
-
-	ret['module'] = inst.spec.modname;
-	ret['stat'] = inst.spec.statname;
-	ret['predicate'] = JSON.stringify(inst.spec.pred);
-	ret['decomposition'] = inst.spec.decomp;
-	ret['value-dimension'] = inst.spec.stattype.dimension;
-	ret['value-arity'] = inst.spec.stattype.type;
-	ret['enabled'] = inst.options['enabled'];
-	ret['retention-time'] = inst.options['retention-time'];
-	ret['uri'] = inst.uri;
-	ret['uris'] = inst.uris;
-	ret['transformations'] = inst.spec.transformations;
-
-	return (ret);
-}
-
-function cfgHttpInstSetOptions(request, response)
+/*
+ * Handle PUT /ca/[customers/:custid]/instrumentation/:instid
+ */
+function cfgHttpInstSetProperties(request, response)
 {
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst, retain, options;
+	var inst, props;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND);
@@ -487,44 +332,19 @@ function cfgHttpInstSetOptions(request, response)
 	}
 
 	inst = cfg_insts[fqid];
-
-	if (request.ca_json === undefined) {
-		response.send(HTTP.EBADREQUEST, { error: 'no JSON specified' });
-		return;
-	}
-
-	/* Validate and apply options. */
-	options = request.ca_json;
-	if (options.constructor !== Object) {
-		response.send(HTTP.EBADREQUEST, { error: 'invalid options' });
-		return;
-	}
-
-	if ('enabled' in options && options['enabled'] !== true) {
-		response.send(HTTP.EBADREQUEST,
-		    { error: 'unsupported value for "enabled"' });
-		return;
-	}
-
-	if ('retention-time' in options) {
-		retain = parseInt(options['retention-time'], 10);
-		if (isNaN(retain))
-			response.send(HTTP.EBADREQUEST, { error:
-			    'unsupported value for "retention-time"' });
-		retain = Math.max(retain, cfg_retain_min);
-		retain = Math.min(retain, cfg_retain_max);
-
-		if (retain != inst.options['retention-time']) {
-			inst.options['retention-time'] = retain;
-			cfgAggEnable(inst.aggregator, fqid);
-			/* XXX wait for response? */
-		}
-	}
-
-	response.send(HTTP.OK, cfgHttpInstEmit(inst));
+	props = cfgHttpInstReadProps(request);
+	cfg_factory.setProperties(inst.inst, props, function (err) {
+		if (err)
+			return (response.send(
+			    HTTP.EBADREQUEST, { error: err.message }));
+		return (response.send(HTTP.OK, inst.inst.properties()));
+	});
 }
 
-function cfgHttpInstGetOptions(request, response)
+/*
+ * Handle GET /ca/[customers/:custid]/instrumentation/:instid
+ */
+function cfgHttpInstGetProperties(request, response)
 {
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
@@ -535,9 +355,12 @@ function cfgHttpInstGetOptions(request, response)
 		return;
 	}
 
-	response.send(HTTP.OK, cfgHttpInstEmit(cfg_insts[fqid]));
+	response.send(HTTP.OK, cfg_insts[fqid].inst.properties());
 }
 
+/*
+ * Handle GET /ca/[customers/:custid]/instrumentation/:instid/value...
+ */
 function cfgHttpInstValue(request, response)
 {
 	var custid = request.params['custid'];
@@ -551,141 +374,22 @@ function cfgHttpInstValue(request, response)
 	}
 
 	inst = cfg_insts[fqid];
-	port = inst.aggregator.cag_http_port;
+	port = inst.inst.aggregator().cag_http_port;
 	ASSERT.ok(port);
 	mod_cahttp.caHttpForward(request, response, '127.0.0.1', port, cfg_log);
 }
 
-function cfgAggEnable(aggregator, id)
-{
-	var statkey = mod_ca.caKeyForInst(id);
-	var inst = cfg_insts[id];
-
-	cfg_cap.sendCmdEnableAgg(aggregator.cag_routekey, id, id, statkey,
-	    cfgHttpInstEmit(inst));
-}
-
-function cfgInstEnable(instrumenter, id)
-{
-	var hostname, statkey, inst, spec;
-	var zonesbyhost, zones;
-
-	hostname = instrumenter.ins_hostname;
-	statkey = mod_ca.caKeyForInst(id);
-
-	inst = cfg_insts[id];
-	spec = inst['spec'];
-	zonesbyhost = inst['zonesbyhost'];
-
-	if (zonesbyhost) {
-		ASSERT.ok(hostname in zonesbyhost);
-		zones = zonesbyhost[hostname];
-	}
-
-	cfg_cap.sendCmdEnableInst(instrumenter.ins_routekey, id, id, statkey,
-	    spec, zones);
-}
-
-function cfgCheckNewInstrumentation(id)
-{
-	var inst = cfg_insts[id];
-	var response, headers;
-
-	if (!('response' in inst))
-		return;
-
-	if (inst.agg_done === undefined ||
-	    inst.insts_failed + inst.insts_ok < inst.insts_total)
-		return;
-
-	/*
-	 * We may get here multiple times if an aggregator restarts, but we
-	 * don't want to try to answer the original response again after the
-	 * first time.
-	 */
-	response = inst.response;
-	delete (inst['response']);
-
-	if (inst.agg_done === false) {
-		/* XXX could try another aggregator. */
-		response.send(HTTP.ESERVER,
-		    { error: 'failed to enable aggregator' });
-		return;
-	}
-
-	if (inst.insts_failed > 0) {
-		response.send(HTTP.ESERVER,
-		    { error: 'failed to enable some instrumenters' });
-		return;
-	}
-
-	headers = { 'Location': inst.uri };
-	response.send(HTTP.CREATED, cfgHttpInstEmit(inst), headers);
-}
-
-function cfgAckEnableAgg(msg)
-{
-	var id;
-
-	if (!('ag_inst_id' in msg)) {
-		cfg_log.warn('dropped ack-enable_aggregation message with ' +
-		    'missing id');
-		return;
-	}
-
-	id = msg.ag_inst_id;
-
-	if (msg.ag_status != 'enabled') {
-		/* XXX in restart case this should do something. */
-		cfg_insts[id].agg_done = false;
-	} else {
-		cfg_insts[id].agg_done = true;
-	}
-
-	cfgCheckNewInstrumentation(id);
-}
-
-function cfgAckEnable(msg)
-{
-	var id, result;
-
-	if (!('is_inst_id' in msg)) {
-		cfg_log.warn('dropped ack-enable_instrumentation message ' +
-		    'with missing id');
-		return;
-	}
-
-	id = msg.is_inst_id;
-	result = msg.is_status;
-	if (msg.is_status != 'enabled') {
-		cfg_insts[id].insts_failed++;
-		result += ' (' + msg.is_error + ')';
-	} else {
-		cfg_insts[id].insts_ok++;
-	}
-
-	cfg_log.info('host %s instrument %s: %s', msg.ca_hostname,
-	    msg.is_inst_id, result);
-	cfgCheckNewInstrumentation(id);
-}
-
-function cfgAckDisable(msg)
-{
-	var result;
-
-	result = msg.is_status;
-	if (msg.is_status != 'disabled')
-		result += ' (' + msg.is_error + ')';
-
-	cfg_log.info('host %s deinstrument %s: %s', msg.ca_hostname,
-	    msg.is_inst_id, result);
-}
-
+/*
+ * Handle AMQP "ping" message
+ */
 function cfgCmdPing(msg)
 {
 	cfg_cap.sendCmdAckPing(msg.ca_source, msg.ca_id);
 }
 
+/*
+ * Handle AMQP "status" message
+ */
 function cfgCmdStatus(msg)
 {
 	var key, inst, agg;
@@ -715,6 +419,9 @@ function cfgCmdStatus(msg)
 	cfg_cap.sendCmdAckStatus(msg.ca_source, msg.ca_id, sendmsg);
 }
 
+/*
+ * Handle AMQP "aggregator online" message
+ */
 function cfgNotifyAggregatorOnline(msg)
 {
 	var id, agg, action, trans;
@@ -758,11 +465,14 @@ function cfgNotifyAggregatorOnline(msg)
 	}
 
 	for (id in agg.cag_insts)
-		cfgAggEnable(agg, id);
+		cfg_factory.reenableAggregator(cfg_insts[id].inst);
 
 	cfg_log.info('aggregator %s: %s', action, msg.ca_hostname);
 }
 
+/*
+ * Handle AMQP "instrumenter online" message
+ */
 function cfgNotifyInstrumenterOnline(msg)
 {
 	var inst, action;
@@ -826,12 +536,22 @@ function cfgNotifyInstrumenterOnline(msg)
 		}
 	}
 
-	for (id in inst.ins_insts)
-		cfgInstEnable(inst, id);
+	for (id in inst.ins_insts) {
+		cfg_factory.enableInstrumenter(cfg_insts[id].inst,
+		    inst, function (err) {
+			if (err) {
+				cfg_log.error('failed to reenable "%s" on ' +
+				    '"%s": %r', id, inst.ins_hostname, err);
+			}
+		    });
+	}
 
 	cfg_log.info('instrumenter %s: %s', action, msg.ca_hostname);
 }
 
+/*
+ * Handle AMQP "log" message
+ */
 function cfgNotifyLog(msg)
 {
 	if (!('l_message' in msg)) {
@@ -843,6 +563,9 @@ function cfgNotifyLog(msg)
 	    msg.l_message);
 }
 
+/*
+ * Handle AMQP "asynchronous instrumenter error" message
+ */
 function cfgNotifyInstrumenterError(msg)
 {
 	if (!('ins_inst_id' in msg) || !('ins_error' in msg) ||
@@ -859,109 +582,6 @@ function cfgNotifyInstrumenterError(msg)
 	}
 
 	/* XXX */
-}
-
-/*
- * Given an instrumentation specification (with 'module', 'stat', 'predicate',
- * and 'decomposition' fields), validate the stat and return the type of one of
- * the resulting data points.  This is specified as an object with the following
- * member:
- *
- *	dimension	Describes the dimensionality of each datum as an
- *			integer.  For simple scalar metrics, the dimension is 1.
- *			The dimensionality increases with each decomposition.
- *
- *	type		Describes the datum itself.  If dimension is 1, then
- *			type is always 'scalar'.  If any decompositions use a
- *			numeric field (e.g., latency), then type is
- *			'numeric-decomposition'.  Otherwise, type is
- *			'discrete-decomposition'.
- *
- * Combined, this information allows clients to know whether to visualize the
- * result as a simple line graph, a line graph with multiple series, or a
- * heatmap.  For examples:
- *
- *	METRIC				DIM	type		VISUAL
- *	i/o ops				1	scalar		line
- *	i/o ops by disk			2	discrete 	multi-line
- *	i/o ops by latency		2	numeric		heatmap
- *	i/o ops by latency and disk	3	numeric		heatmap
- *
- * If the given instrumentation does not specify a valid stat, this function
- * throws an exception whose message describes why.
- */
-function cfgStatType(modname, statname, decomp)
-{
-	var sprintf = mod_ca.caSprintf;
-	var mod, stat, fields, field, type, ii;
-	var ndiscrete = 0;
-	var nnumeric = 0;
-
-	if (!(modname in cfg_statmods))
-		throw (new Error('module does not exist: ' + modname));
-
-	mod = cfg_statmods[modname];
-
-	if (!(statname in mod['stats']))
-		throw (new Error(sprintf('stat does not exist in ' +
-		    'module "%s": %s', modname, statname)));
-
-	stat = mod['stats'][statname];
-	fields = stat['fields'];
-
-	type = decomp.length === 0 ? mod_ca.ca_arity_scalar :
-	    mod_ca.ca_arity_discrete;
-
-	for (ii = 0; ii < decomp.length; ii++) {
-		field = decomp[ii];
-
-		if (!(field in fields))
-			throw (new Error(sprintf('field does not exist in ' +
-			    'module %s, stat %s: %s', modname, statname,
-			    field)));
-
-		if (fields[field].type == mod_ca.ca_type_latency ||
-		    fields[field].type == mod_ca.ca_type_number) {
-			type = mod_ca.ca_arity_numeric;
-			nnumeric++;
-		} else {
-			ndiscrete++;
-		}
-	}
-
-	if (ndiscrete > 1)
-		throw (new Error(sprintf('more than one discrete ' +
-		    'decomposition specified')));
-
-	if (nnumeric > 1)
-		throw (new Error(sprintf('more than one numeric ' +
-		    'decomposition specified')));
-
-	return ({ dimension: decomp.length + 1, type: type });
-}
-
-/*
- * Determines the list of valid transformations that can be applied to specified
- * stat based on the transformations supported by the current aggregator.
- */
-function cfgStatTransformations(spec)
-{
-	var ret = {};
-	var ii, tname, ttypes, fields, ftype, transform;
-	fields = cfg_statmods[spec.modname]['stats'][spec.statname]['fields'];
-
-	for (tname in cfg_transformations) {
-		transform = cfg_transformations[tname];
-		ttypes = transform['types'];
-		for (ii = 0; ii < spec.decomp.length; ii++) {
-			ftype = fields[spec.decomp[ii]]['type'];
-			if (mod_ca.caArrayContains(ttypes, ftype) &&
-			    !(tname in ret))
-				ret[tname] = transform;
-		}
-	}
-
-	return (ret);
 }
 
 main();

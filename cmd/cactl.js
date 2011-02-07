@@ -212,7 +212,7 @@ function ccAckStatus(msg)
 			decomp = elts[ii].s_decomposition.join(', ');
 			if (!decomp)
 				decomp = 'None';
-			printf('%6d  %-20s  %-5s  %s\n', elts[ii].s_inst_id,
+			printf('%6s  %-20s  %-5s  %s\n', elts[ii].s_inst_id,
 			    metric, elts[ii].s_predicate.length > 0 ?
 			    'Yes' : 'No',
 			    decomp);

@@ -140,7 +140,7 @@ var listInsts = function (id, inputExp)
 	    module: 'cpu',
 	    stat: 'utilization',
 	    decomposition: [],
-	    predicate: '{}',
+	    predicate: {},
 	    'value-dimension': 1,
 	    'value-arity': 'scalar',
 	    enabled: true,

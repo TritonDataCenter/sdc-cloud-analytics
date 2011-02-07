@@ -764,8 +764,7 @@ insDTraceMetric.prototype.instrument = function (callback)
 		if (callback)
 			callback();
 	} catch (ex) {
-		insd_log.error('instrumentation failed; exception follows');
-		insd_log.exception(ex);
+		insd_log.error('instrumentation failed: %r', ex);
 		this.cad_dtr = null;
 		if (callback)
 			callback(ex);
@@ -817,8 +816,7 @@ insDTraceMetric.prototype.value = function ()
 		 * configuration service for debugging?
 		 */
 		insd_log.error('re-enabling instrumentation due to error ' +
-		    'reading aggregation. exception follows:');
-		insd_log.exception(ex);
+		    'reading aggregation: %r', ex);
 		this.instrument();
 		return (undefined);
 	}

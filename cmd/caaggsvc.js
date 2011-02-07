@@ -4,6 +4,7 @@
 
 var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
+var mod_caerr = require('../lib/ca/ca-error');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
 var mod_log = require('../lib/ca/ca-log');
@@ -388,7 +389,7 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 
 		if (duration !== undefined && exact &&
 		    duration != default_duration)
-			throw (new mod_ca.caValidationError(
+			throw (new caValidationError(
 			    'unsupported value for "duration"'));
 
 		if (duration === undefined)
@@ -397,12 +398,12 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 		if (start === undefined)
 			start = parseInt(now / 1000, 10) - duration - 1;
 		else if ((start + duration) * 1000 > now + agg_http_req_timeout)
-			throw (new mod_ca.caValidationError(
+			throw (new caValidationError(
 			    'start_time + duration is in the future'));
 
 		aggHttpVerifyTransformations(fqid, request);
 	} catch (ex) {
-		if (!(ex instanceof mod_ca.caValidationError))
+		if (!(ex instanceof caValidationError))
 			throw (ex);
 
 		response.send(HTTP.EBADREQUEST, { error: ex.message });
@@ -809,21 +810,21 @@ function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 	hues = mod_ca.caHttpParam(formals, actuals, 'hues');
 
 	if (conf.ymin >= conf.ymax)
-		throw (new mod_ca.caValidationError(
+		throw (new caValidationError(
 		    '"ymax" must be greater than "ymin"'));
 
 	nhues = nselected + (isolate ? 0 : 1);
 
 	if (hues !== undefined) {
 		if (nhues > hues.length)
-			throw (new mod_ca.caValidationError(
+			throw (new caValidationError(
 			    'need ' + nhues + ' hues'));
 
 		for (ii = 0; ii < hues.length; ii++) {
 			hue = hues[ii] = parseInt(hues[ii], 10);
 
 			if (isNaN(hue) || hue < 0 || hue >= 360)
-				throw (new mod_ca.caValidationError(
+				throw (new caValidationError(
 				    'invalid hue'));
 		}
 
@@ -862,14 +863,14 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 			count++;
 
 		if (count > 1)
-			throw (new mod_ca.caValidationError(
+			throw (new caValidationError(
 			    'only one of "isolate", "exclude", and ' +
 			    '"decompose_all" may be specified'));
 
 		if (rainbow)
 			selected = undefined;
 	} catch (ex) {
-		if (!(ex instanceof mod_ca.caValidationError))
+		if (!(ex instanceof caValidationError))
 			throw (ex);
 
 		response.send(HTTP.EBADREQUEST, { error: ex.message });
@@ -973,14 +974,14 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 		yy = param(aggValueHeatmapParams, 'y');
 
 		if (xx >= conf.width)
-			throw (new mod_ca.caValidationError(
+			throw (new caValidationError(
 			    '"x" must be less than "width"'));
 
 		if (yy >= conf.height)
-			throw (new mod_ca.caValidationError(
+			throw (new caValidationError(
 			    '"y" must be less than "height"'));
 	} catch (ex) {
-		if (!(ex instanceof mod_ca.caValidationError))
+		if (!(ex instanceof caValidationError))
 			throw (ex);
 
 		response.send(HTTP.EBADREQUEST, { error: ex.message });
@@ -1122,7 +1123,7 @@ aggBackendInterface.prototype.registerTransformation = function (args)
 	    aggBackendInterface);
 
 	if (name in agg_transforms)
-		throw (new mod_ca.caValidationError('Transformation module "' +
+		throw (new caValidationError('Transformation module "' +
 		    '" already declared'));
 
 	agg_transforms[name] = {
@@ -1178,13 +1179,13 @@ function aggHttpVerifyTransformations(id, request)
 
 	for (ii = 0; ii < trans.length; ii++) {
 		if (!(trans[ii] in agg_transforms))
-			throw (new mod_ca.caValidationError(mod_ca.caSprintf(
+			throw (new caValidationError(mod_ca.caSprintf(
 			    'Requested non-existant transformation: %s',
 			    trans[ii])));
 
 
 		if (!(trans[ii] in validtrans))
-			throw (new mod_ca.caValidationError(mod_ca.caSprintf(
+			throw (new caValidationError(mod_ca.caSprintf(
 			    'Requested incompatible transformation: %s',
 			    trans[ii])));
 	}

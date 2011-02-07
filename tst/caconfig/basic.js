@@ -61,8 +61,6 @@ function check_instrumentation(test, code, response, rv)
 	if (decomp.constructor == String)
 		decomp = [ decomp ];
 	pred = inp.predicate || {};
-	if (pred.constructor != String)
-		pred = JSON.stringify(pred);
 	trans = inp.transformations || {};
 
 	ASSERT.equal(response.statusCode, code);
@@ -70,7 +68,7 @@ function check_instrumentation(test, code, response, rv)
 	ASSERT.equal(rv['module'], inp['module']);
 	ASSERT.equal(rv['stat'], inp['stat']);
 	ASSERT.deepEqual(rv['decomposition'], decomp);
-	ASSERT.equal(rv['predicate'], pred);
+	ASSERT.deepEqual(rv['predicate'], pred);
 	ASSERT.equal(rv['retention-time'], 600);
 	ASSERT.equal(rv['enabled'], true);
 	ASSERT.deepEqual(rv['transformations'], trans);
@@ -287,6 +285,8 @@ mod_tl.ctPushFunc(check_global_uris);
  */
 function walk_create(test, callback)
 {
+	var rawpredicate;
+
 	var handler = function (err, response, rv) {
 		log.info('received POST response for test: %s', test.name);
 		ASSERT.ok(!err);
@@ -314,8 +314,10 @@ function walk_create(test, callback)
 	 */
 	http.sendAsJson('POST', url_create, test.input, true, handler);
 
+	rawpredicate = test.input.predicate;
 	test.input.predicate = JSON.stringify(test.input.predicate);
 	http.sendAsForm('POST', url_create, test.input, true, handler);
+	test.input.predicate = rawpredicate;
 }
 
 mod_tl.ctPushFunc(walk_testcases(walk_create));

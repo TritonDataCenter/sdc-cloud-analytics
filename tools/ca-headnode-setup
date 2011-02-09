@@ -106,7 +106,7 @@ function sh_provision
 	done
 
 	out=$(sh_curl $sh_urlbase$sh_conturi)
-	sh_zonename=$(echo "$out" | sh_extract name | head -1)
+	sh_zonename=$(echo "$out" | sh_extract name | grep -v joyent.us | head -1)
 	sh_zoneip=$(echo "$out" | sh_extract address)
 }
 

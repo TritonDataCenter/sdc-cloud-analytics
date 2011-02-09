@@ -387,17 +387,17 @@ $(DIST)/ca-pkg.tar.bz2: install $(ROOT)/pkg
 # "clean" target removes created files -- we currently have none
 #
 clean:
-	rm -f lib/ca/errno.js
-	rm -f $(WEBREV)/bin/codereview 
+	-rm -f lib/ca/errno.js
+	-rm -f $(WEBREV)/bin/codereview 
 
 #
 # "dist-clean" target removes installed root and built dependencies
 #
 dist-clean: clean
-	(cd deps/node-kstat && $(NODE_WAF) distclean)
-	(cd deps/node-libdtrace && $(NODE_WAF) distclean)
-	(cd deps/node-png && $(NODE_WAF) distclean)
-	(cd deps/node-uname && $(NODE_WAF) distclean)
-	(cd deps/node-libGeoIP && $(NODE_WAF) distclean)
-	(cd deps/node && $(MAKE) distclean)
-	$(RMTREE) $(BUILD) deps/node-install
+	-(cd deps/node-kstat && $(NODE_WAF) distclean)
+	-(cd deps/node-libdtrace && $(NODE_WAF) distclean)
+	-(cd deps/node-png && $(NODE_WAF) distclean)
+	-(cd deps/node-uname && $(NODE_WAF) distclean)
+	-(cd deps/node-libGeoIP && $(NODE_WAF) distclean)
+	-(cd deps/node && $(MAKE) distclean)
+	-$(RMTREE) $(BUILD) deps/node-install

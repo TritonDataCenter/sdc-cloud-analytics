@@ -28,7 +28,7 @@ XMLLINT		 = xmllint --noout
 TAR		 = tar
 RMTREE		 = rm -rf
 NODE_WAF	:= $(NODEDIR)/node-waf
-NPM		:= npm
+NPM		:= PATH=$(NODEDIR):$$PATH npm
 MKERRNO		 = $(TOOLSDIR)/mkerrno
 CC		 = gcc
 
@@ -291,10 +291,10 @@ install-caaggsvc: install-cabase $(PKGFILES_caaggsvc) $(PKGDEPS_caaggsvc)
 install-cainstsvc: install-cabase $(PKGFILES_cainstsvc) $(PKGDEPS_cainstsvc)
 
 $(PKGROOT)/cabase/node_modules/%: deps/%
-	cd $(PKGROOT)/cabase && PATH=$$PATH:$(NODEDIR) $(NPM) bundle install $(SRC)/$^
+	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/$^
 
 $(PKGROOT)/cabase/node_modules/%: deps/node-%
-	cd $(PKGROOT)/cabase && PATH=$$PATH:$(NODEDIR) $(NPM) bundle install $(SRC)/$^
+	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/$^
 
 $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)

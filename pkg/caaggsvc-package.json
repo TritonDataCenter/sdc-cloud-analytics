@@ -9,7 +9,7 @@
 		"postdeactivate":	"pkg/pkg-svc-postdeactivate.sh"
 	},
 	"engines": {
-		"node":	">=0.2.4 <0.3.0"
+		"node":	"*"
 	},
 	"dependencies": {
 		"cabase": 	"1.x"

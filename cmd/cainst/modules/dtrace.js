@@ -579,7 +579,7 @@ function insdNodeGC(metric)
 	fields = mod_capred.caPredFields(pred);
 
 	if (metric.is_zones) {
-		zones = metric.is_zomes.map(function (elt) {
+		zones = metric.is_zones.map(function (elt) {
 			return ('zonename == "' + elt + '"');
 		});
 
@@ -680,7 +680,7 @@ function insdNodeSocket(metric)
 	hasPred = mod_capred.caPredNonTrivial(pred);
 
 	if (metric.is_zones) {
-		zones = metric.is_zomes.map(function (elt) {
+		zones = metric.is_zones.map(function (elt) {
 			return ('zonename == "' + elt + '"');
 		});
 

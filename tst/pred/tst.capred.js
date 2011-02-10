@@ -36,6 +36,13 @@ function compArrays(arr0, arr1)
 	}
 }
 
+/*
+ * Test that we a non-object won't validate as a predicate
+ */
+mod_assert.throws(function () { mod_capred.caPredValidate(null, 23); });
+mod_assert.throws(function () { mod_capred.caPredValidate(null, '23'); });
+mod_assert.throws(function () { mod_capred.caPredValidate(null, ['foo']); });
+
 mod_assert.ok(!mod_capred.caPredNonTrivial({}));
 mod_assert.ok(mod_capred.caPredNonTrivial({eq: ['zonename', 'bar']}));
 

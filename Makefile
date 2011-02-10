@@ -200,7 +200,7 @@ $(SRC)/deps/node-install:
 	mkdir -p $(SRC)/deps/node-install
 
 deps/node/build/default/node:
-	(cd deps/node && ./configure --with-dtrace --prefix=$(SRC)/deps/node-install && make install)
+	(cd deps/node && ./configure --prefix=$(SRC)/deps/node-install && make install)
 
 %.node: $(NODE_WAF)
 	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)

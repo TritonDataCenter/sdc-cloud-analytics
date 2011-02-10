@@ -714,15 +714,15 @@ var aggValueHeatmapParams = {
 	},
 	ymin: {
 	    type: 'number',
-	    default: 0,
+	    default: 1000,		/* 1us */
 	    min: 0,
-	    max: 100000
+	    max: 1000000000000		/* 1000s */
 	},
 	ymax: {
 	    type: 'number',
-	    default: 100000,
+	    default: 10000000000,	/* 10s */
 	    min: 0,
-	    max: 10000000000
+	    max: 1000000000000		/* 1000s */
 	},
 	nbuckets: {
 	    type: 'number',

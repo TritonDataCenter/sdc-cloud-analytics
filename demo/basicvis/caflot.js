@@ -13,8 +13,8 @@ var gMetrics = [];		/* all available metrics */
 var gGraphs = {};		/* currently active graphs */
 var gZoomOptions = [ 10, 30, 60, 300, 600, 3600 ];	/* seconds */
 var gZoomDefault = 1;		/* default is 30 seconds */
-var gyMin = 0;			/* global/default ymin for heatmaps */
-var gyMax = 100000;		/* global/default ymax for heatmaps */
+var gyMin = 1000;		/* global/default ymin for heatmaps 1us */
+var gyMax = 10000000000;	/* global/default ymax for heatmaps 10s */
 
 /*
  * Color management

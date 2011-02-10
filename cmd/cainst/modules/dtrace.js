@@ -166,6 +166,13 @@ function insdXlate(outtype, inttype, argNo, arg)
 	    outtype, inttype, argNo, arg));
 }
 
+/*
+ * Return the default llquantize
+ */
+function insdLlquantize(arg)
+{
+	return (mod_ca.caSprintf('llquantize((%s), 10, 3, 11, 100)', arg));
+}
 
 function insdSyscalls(metric)
 {
@@ -223,7 +230,7 @@ function insdSyscalls(metric)
 	}
 
 	if (aggLatency) {
-		action = 'lquantize(timestamp - self->ts, 0, 100000, 100);';
+		action = insdLlquantize('timestamp - self->ts') + ';';
 	} else {
 		action = 'count();';
 	}
@@ -345,8 +352,7 @@ function insdIops(metric)
 	}
 
 	if (aggLatency) {
-		action = 'lquantize(timestamp - latencys[arg0]' +
-		    ', 0, 1000000, 1000);';
+		action = insdLlquantize('(timestamp - latencys[arg0]') + ';';
 	} else {
 		action = 'count();';
 	}
@@ -422,7 +428,7 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 	 * kind of equantize.
 	 */
 	var transforms = {
-	    latency: '((timestamp - latencys[' + arg0fd + ']) / 1000000)',
+	    latency: '((timestamp - latencys[' + arg0fd + ']))',
 	    method: '(methods['+ arg0fd + '])',
 	    url: '(urls['+ arg0fd + '])',
 	    raddr: '(' + arg0raddr + ')',
@@ -502,8 +508,7 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 	}
 
 	if (aggLatency) {
-		action = 'lquantize(' + transforms['latency'] +
-		    ', 0, 10000, 10);';
+		action = insdLlquantize(transforms['latency']) + ';';
 	} else {
 		action = 'count();';
 	}
@@ -626,8 +631,7 @@ function insdNodeGC(metric)
 	}
 
 	if (aggLatency) {
-		action = 'lquantize(' + transforms['latency'] +
-		    '/ 1000, 0, 100000, 100);';
+		action = insdLlquantize(transforms['latency']) + ';';
 	} else {
 		action = 'count();';
 	}
@@ -710,11 +714,9 @@ function insdNodeSocket(metric)
 	}
 
 	if (aggBuff) {
-		action = 'lquantize(' + transforms['buffered'] +
-		    ', 0, 100000, 10);';
+		action = insdLlquantize(transforms['buffered']) + ';';
 	} else if (aggSize) {
-		action = 'lquantize(' + transforms['size'] +
-		    ', 0, 100000, 10);';
+		action = insdLlquantize(transforms['size']) + ';';
 	} else {
 		action = 'count();';
 	}

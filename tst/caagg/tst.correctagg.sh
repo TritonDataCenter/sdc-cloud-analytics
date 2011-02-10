@@ -11,7 +11,7 @@ AGG_JS="testagg.js"
 
 function runtest
 {
-	printf "Running test %s with %d hosts" $1 $2
+	printf "Running test %s with %d hosts\n" $1 $2
 	tl_launchsvc agg
 	$NODE_EXEC $AGG_JS $1 $2
 	RET=$?

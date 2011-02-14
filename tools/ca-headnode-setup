@@ -166,7 +166,6 @@ mkdir -p /home/$sh_user/.ssh || fail "failed to create /home/$sh_user"
 useradd -c $sh_user -d /home/$sh_user -G staff -s /bin/bash \
     -K defaultpriv=basic,dtrace_user,dtrace_proc,dtrace_kernel $sh_user || \
     fail "failed to create user"
-chown -R $sh_user:staff /home/$sh_user || fail "failed to chmod"
 cat > /home/$sh_user/.npmrc << NPMRC
 root = ~/.node_modules
 tar = gtar
@@ -176,6 +175,7 @@ cat > /home/$sh_user/.profile << PROFILE
 export PATH=/usr/bin:/usr/sbin:/opt/local/bin:/opt/local/sbin:/usr/sfw/bin:/usr/openwin/bin:/usr/ccs/bin:/usr/xpg4/bin:/opt/local/gcc34/bin
 export MANPATH=/opt/local/man:/opt/local/share/man:/usr/share/man:/usr/sfw/share/man:/usr/openwin/share/man
 PROFILE
+chown -R $sh_user:staff /home/$sh_user || fail "failed to chmod"
 
 echo "done."
 fi

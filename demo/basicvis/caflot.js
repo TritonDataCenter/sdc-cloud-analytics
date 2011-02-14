@@ -1092,7 +1092,7 @@ gGraph.prototype.refresh = function (force)
  */
 gGraph.prototype.updateHeatmap = function (value)
 {
-	var graph, div, img, present, key;
+	var graph, div, img, present;
 
 	graph = this;
 	div = this.g_elt_graph;
@@ -1107,9 +1107,7 @@ gGraph.prototype.updateHeatmap = function (value)
 		img.caClick = true;
 	}
 
-	present = [];
-	for (key in value.present)
-		present.push(key);
+	present = value.present;
 	present.sort();
 
 	this.g_legend_summary = present.map(function (elt) {

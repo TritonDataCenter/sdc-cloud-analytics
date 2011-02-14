@@ -20,6 +20,8 @@
 # - Tests return 0 to indicate success, non-zero to indicate failure
 #
 
+shopt -s xpg_echo
+
 #
 # Canoncial name
 #
@@ -225,7 +227,7 @@ function execute-test
 	ext=$(echo $test_name | cut -d. -f 3)
 	EXEC=""
 
-	echo "Executing test: $test_name"
+	echo "Executing test $(echo $1 | sed -e s#^$SRC/tst/.#tst#) ... \c"
 
 	mkdir "$test_odir" >/dev/null || fail "Can't make directory"
 
@@ -254,16 +256,19 @@ function execute-test
 
 	case "$result" in
 	0) 
+		echo "success."
 		mv $test_odir "$OUTPUT_DIR/success.$CURRENT_PASSES"
 		((CURRENT_PASSES++))
 		;;
 	1)
+		echo "FAILED."
 		printf ">>>Failure: details in failure.%d\n\n" $CURRENT_FAILURES
-		cp "$test_path" "$test_odir/test"
+		cp "$test_path" "$test_odir/$test_name"
 		mv "$test_odir" "$OUTPUT_DIR/failure.$CURRENT_FAILURES"
 		((CURRENT_FAILURES++))
 		;;
 	2)
+		echo "FAILED."
 		mv $test_odir "$OUTPUT_DIR/error.$CURRENT_ERRORS"
 		((CURRENT_ERRORS++))
 		;;
@@ -357,7 +362,7 @@ fi
 welcome
 setup-output
 
-for t in $TESTS; do
+for t in $(echo $TESTS | sort); do
 	execute-test $t
 	((TESTS_RUN++))
 done

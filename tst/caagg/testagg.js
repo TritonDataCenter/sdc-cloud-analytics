@@ -13,8 +13,6 @@ var mod_tl = require('../../lib/tst/ca-test');
  *	i.e. data = 42
  * 'key-scalar' - Denotes that we should use a mapping of keys to scalars
  *	i.e. data = { foo: 42, bar: 43 }
- * 'key-key-scalar' - Denotes that we have a mapping of keys->(keys->scalar)
- *	i.e. data = { rm: { foo: 42, bar: 43 }, dap: { foo: 23, bar: 24 }}
  * 'simple-dist' - Denotes that the data is a distribution sans overlap
  *	i.e. data = [ [ [ 0, 10 ], 10 ] ]
  * 'hole-dist' - Donotes that instrumenters have different ranges of data
@@ -97,6 +95,7 @@ var createExpOutKeyScalar = function (nhosts, baseVal)
 };
 
 var keyScalarDim = 2;
+var keyScalarArity = mod_ca.ca_arity_discrete;
 
 var getDataScalar = function (hostid, baseVal)
 {
@@ -109,64 +108,7 @@ var createExpOutScalar = function (nhosts, baseVal)
 };
 
 var scalarDim = 1;
-
-var getDataKeyKeyScalar = function (hostid, baseVal)
-{
-	var ret = {};
-
-	ret[hostid] = {};
-	ret[hostid][hostid] = baseVal;
-	ret[hostid][hostid+1] = baseVal + hostid;
-	ret[hostid+1] = {};
-	ret[hostid+1][hostid] = baseVal;
-	ret[hostid+1][hostid+1] = baseVal + hostid;
-
-	return (ret);
-};
-
-/*
- * What we have created above is that every object instrumenter is going to send
- * something that looks like for say instrumenter 1:
- * {
- *     1: { 1: 42, 2: 43},
- *     2: { 1: 42, 2: 43}
- * }
- *
- * Therefore, we'll have to sum each of the individual keys up
- */
-var createExpOutKeyKeyScalar = function (nhosts, baseVal)
-{
-	var ret = {};
-	var ii;
-
-	/* Initialize everything */
-	for (ii = 0; ii < nhosts; ii++) {
-		if (!ret[ii]) {
-			ret[ii] = {};
-		}
-
-		ret[ii][ii] = 0;
-		ret[ii][ii+1] = 0;
-
-		if (!ret[ii+1]) {
-			ret[ii+1] = {};
-		}
-
-		ret[ii+1][ii] = 0;
-		ret[ii+1][ii+1] = 0;
-	}
-
-	for (ii = 0; ii < nhosts; ii++) {
-		ret[ii][ii] += baseVal;
-		ret[ii][ii+1] += baseVal+ii;
-		ret[ii+1][ii] += baseVal;
-		ret[ii+1][ii+1] += baseVal+ii;
-	}
-
-	return (ret);
-};
-
-var keyKeyScalarDim = 3;
+var scalarArity = mod_ca.ca_arity_scalar;
 
 /*
  * By default we populate 10 buckets in incs of 10
@@ -198,6 +140,7 @@ var createExpOutSimpleDist = function (nhosts, baseVal)
 };
 
 var simpleDistDim = 2;
+var simpleDistArity = mod_ca.ca_arity_numeric;
 
 /*
  * Here, we are testing distributions where all of the data has the same
@@ -276,6 +219,8 @@ var createExpOutHoleDist = function (nhosts, baseVal)
 };
 
 var holeDistDim = 2;
+var holeDistArity = mod_ca.ca_arity_numeric;
+
 
 /*
  * We want to handle non-trivial overlapping. Thus hosts with an even hostid
@@ -434,6 +379,7 @@ var createExpOutKeyDist = function (nhosts, baseVal)
 };
 
 var keyDistDim = 3;
+var keyDistArity = mod_ca.ca_arity_numeric;
 
 var getDataUndefined = function (hostid, baseVal)
 {
@@ -446,6 +392,7 @@ var createExpOutUndefined = function (nhosts, baseVal)
 };
 
 var undefinedDim = 1;
+var undefinedArity = mod_ca.ca_arity_scalar;
 
 /*
  * Variables that we want to use for the test
@@ -455,7 +402,7 @@ var cid = 1;
 var id = mod_tl.ctGetQualId(undefined, cid);
 var baseValue = 42;
 var insts = [];
-var nsources, exp, createExpOut, getData, dim;
+var nsources, exp, createExpOut, getData, dim, arity;
 
 if (process.argv.length != 4) {
 	mod_tl.ctStdout.error('testagg.js: test-type nhosts');
@@ -474,36 +421,37 @@ switch (process.argv[2]) {
 		getData = getDataScalar;
 		createExpOut = createExpOutScalar;
 		dim = scalarDim;
+		arity = scalarArity;
 		break;
 	case 'key-scalar':
 		getData = getDataKeyScalar;
 		createExpOut = createExpOutKeyScalar;
 		dim = keyScalarDim;
-		break;
-	case 'key-key-scalar':
-		getData = getDataKeyKeyScalar;
-		createExpOut = createExpOutKeyKeyScalar;
-		dim = keyKeyScalarDim;
+		arity = keyScalarArity;
 		break;
 	case 'simple-dist':
 		getData = getDataSimpleDist;
 		createExpOut = createExpOutSimpleDist;
 		dim = simpleDistDim;
+		arity = simpleDistArity;
 		break;
 	case 'hole-dist':
 		getData = getDataHoleDist;
 		createExpOut = createExpOutHoleDist;
 		dim = holeDistDim;
+		arity = holeDistArity;
 		break;
 	case 'key-dist':
 		getData = getDataKeyDist;
 		createExpOut = createExpOutKeyDist;
 		dim = keyDistDim;
+		arity = keyDistArity;
 		break;
 	case 'undefined':
 		getData = getDataUndefined;
 		createExpOut = createExpOutUndefined;
 		dim = undefinedDim;
+		arity = undefinedArity;
 		break;
 	default:
 		mod_tl.ctStdout.error('testagg.js: Invalid test type: ' +
@@ -567,7 +515,8 @@ var enableAgg = function (source)
 {
 	var key = mod_ca.caRouteKeyForInst(id);
 	var inst = {
-	    'value-dimesion': dim,
+	    'value-arity': arity,
+	    'value-dimension': dim,
 	    'enabled': true,
 	    'retention-time': 600,
 	    transformations: []

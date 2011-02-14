@@ -40,27 +40,15 @@ exports.agginit = function (agg, log)
  *	172.16.0.0/12
  *	169.254.0.0/16	(Though if you get something on this, that would be bad)
  */
-function transGeoIpProcess(raw)
+function transGeoIpProcess(keys)
 {
 	var ret = {};
-	var key, data;
+	var ii, data;
 
-	/*
-	 * Assumptions about data format:
-	 *
-	 * Currently we only support one discrete decomposition and one numeric
-	 * decomposition. The discrete decomposition in this case must support
-	 * the geolocation transformation. If it does not, we will return an
-	 * empty object. Furthermore, because of the nature of the discrete
-	 * decomposition, the keys of the raw object should be the keys to feed
-	 * into the geoip module. If we end up supporting more than one discrete
-	 * decomposition, which would be reasonable, we will need to know how to
-	 * get the list of values to post process.
-	 */
-	for (key in raw) {
-		data = mod_cageoip.caGeoIP(key);
+	for (ii = 0; ii < keys.length; ii++) {
+		data = mod_cageoip.caGeoIP(keys[ii]);
 		if (data !== undefined)
-			ret[key] = data;
+			ret[keys[ii]] = data;
 	}
 
 	return (ret);

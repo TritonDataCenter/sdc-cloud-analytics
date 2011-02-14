@@ -37,13 +37,15 @@ exports.agginit = function (agg, log)
 /*
  * Transform IP Addresses into the reverse DNS name.
  */
-function transReverseDNS(raw)
+function transReverseDNS(keys)
 {
 	var ret = {};
 	var key, addr, ii;
 	var lookup = [];
 
-	for (key in raw) {
+	for (ii = 0; ii < keys.length; ii++) {
+		key = keys[ii];
+
 		if (!(key in dns_cache)) {
 			lookup.push(key);
 			continue;

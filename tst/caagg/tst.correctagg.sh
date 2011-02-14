@@ -23,8 +23,6 @@ runtest 'scalar' 1
 runtest 'scalar' 10
 runtest 'key-scalar' 1
 runtest 'key-scalar' 10
-runtest 'key-key-scalar' 1
-runtest 'key-key-scalar' 10
 runtest 'simple-dist' 10
 runtest 'hole-dist' 10
 runtest 'key-dist' 10

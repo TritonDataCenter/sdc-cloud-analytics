@@ -3,6 +3,7 @@
  */
 
 var mod_ca = require('../lib/ca/ca-common');
+var mod_caagg = require('../lib/ca/ca-agg.js');
 var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_caerr = require('../lib/ca/ca-error');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
@@ -21,8 +22,6 @@ var agg_http_port_base = mod_ca.ca_http_port_agg_base;
 var agg_http_port;			/* actual http port */
 
 var agg_insts = {};		/* active instrumentations by id */
-var agg_default_options = { 'enabled': true, 'retention-time': 600 };
-
 var agg_http;
 var agg_cap;			/* cap wrapper */
 var agg_log;			/* log handle */
@@ -123,14 +122,14 @@ function aggCmdEnableAggregation(msg)
 	}
 
 	agg_cap.bind(datakey, function () {
+	    var inst = msg.ag_instrumentation;
 	    agg_log.info('aggregating instrumentation %s', id);
 	    agg_insts[id] = {
 		agi_since: new Date(),
-		agi_sources: { sources: {}, nsources: 0 },
-		agi_values: {},
+		agi_dataset: mod_caagg.caDatasetForInstrumentation(inst),
 		agi_last: 0,
 		agi_requests: [],
-		agi_instrumentation: msg.ag_instrumentation
+		agi_instrumentation: inst
 	    };
 	    agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 	});
@@ -160,9 +159,9 @@ function aggCmdStatus(msg)
 		sendmsg.s_instrumentations.push({
 		    s_inst_id: id,
 		    s_since: inst.agi_since,
-		    s_nsources: inst.agi_sources.nsources,
+		    s_nsources: inst.agi_dataset.nsources(),
 		    s_last: inst.agi_last,
-		    s_data: inst.agi_values[inst.agi_last]
+		    s_data: undefined /* XXX */
 		});
 	}
 
@@ -174,19 +173,27 @@ function aggCmdStatus(msg)
  */
 function aggData(msg)
 {
-	var id = msg.d_inst_id;
-	var value = msg.d_value;
-	var time = msg.d_time;
-	var hostname = msg.ca_hostname;
-	var inst, rq, ii;
+	var id, time, hostname, value;
+	var inst, dataset, rq, ii;
+
+	id = msg.d_inst_id;
+	time = msg.d_time;
 
 	if (id === undefined || time === undefined) {
 		agg_log.warn('dropped data message with missing field');
 		return;
 	}
 
-	inst = agg_insts[id];
 	time = parseInt(time / 1000, 10);
+
+	if (isNaN(time)) {
+		agg_log.warn('invalid number for time: %s', msg.d_time);
+		return;
+	}
+
+	inst = agg_insts[id];
+	value = msg.d_value;
+	hostname = msg.ca_hostname;
 
 	if (inst === undefined) {
 		agg_log.warn('dropped data message for unknown id: %s', id);
@@ -196,19 +203,7 @@ function aggData(msg)
 	if (inst.agi_last < time)
 		inst.agi_last = time;
 
-	if (!(hostname in inst.agi_sources.sources)) {
-		inst.agi_sources.sources[hostname] = {};
-		inst.agi_sources.nsources++;
-	}
-
-	inst.agi_sources.sources[hostname].ags_last = time;
-
-	if (!(time in inst.agi_values)) {
-		inst.agi_values[time] = { value: value, count: 1};
-	} else {
-		inst.agi_values[time].count++;
-		aggAggregateValue(inst.agi_values[time], 'value', value);
-	}
+	inst.agi_dataset.update(hostname, time, value);
 
 	/*
 	 * If we have all the data we're expecting for this time index, wake up
@@ -219,8 +214,9 @@ function aggData(msg)
 	 * data from all instrumenters for this time, we won't some time later
 	 * get data from any of them for some previous time index.
 	 */
-	ASSERT.ok(inst.agi_values[time].count <= inst.agi_sources.nsources);
-	if (inst.agi_values[time].count != inst.agi_sources.nsources)
+	dataset = inst.agi_dataset;
+	ASSERT.ok(dataset.nreporting(time) <= dataset.nsources());
+	if (dataset.nreporting(time) != dataset.nsources())
 		return;
 
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
@@ -230,93 +226,6 @@ function aggData(msg)
 			inst.agi_requests.splice(ii--, 1);
 			rq.callback(id, rq.datatime, rq.request, rq.response);
 		}
-	}
-}
-
-function aggAggregateScalar(map, key, value)
-{
-	if (!(key in map) || map[key] === undefined)
-		map[key] = 0;
-
-	map[key] += value;
-	ASSERT.ok(typeof (map[key]) == 'number');
-	ASSERT.ok(typeof (value) == 'number');
-}
-
-function aggAggregateDistribution(map, key, newdist)
-{
-	var olddist, oo, nn;
-
-	ASSERT.ok(newdist.constructor == Array);
-
-	if (!(key in map) || map[key] === undefined)
-		map[key] = [];
-
-	olddist = map[key];
-	ASSERT.ok(olddist.constructor == Array);
-
-	/*
-	 * We assume here that the ranges from both distributions exactly align
-	 * (which is currently true since we use fixed lquantize() parameters on
-	 * the backend) and that the ranges are sorted in both distributions.
-	 */
-	for (oo = 0, nn = 0; nn < newdist.length; nn++) {
-		/*
-		 * Scan the old distribution until we find a range not before
-		 * the current range from the new distribution.
-		 */
-		while (oo < olddist.length &&
-		    olddist[oo][0][0] < newdist[nn][0][0]) {
-			ASSERT.ok(olddist[oo][0][1] < newdist[nn][0][1]);
-			oo++;
-		}
-
-		/*
-		 * If we found a range that matched exactly, just add the
-		 * values. XXX should this be aggAggregateValue instead?
-		 */
-		if (oo < olddist.length &&
-		    olddist[oo][0][0] == newdist[nn][0][0]) {
-			ASSERT.ok(olddist[oo][0][1] == newdist[nn][0][1]);
-			olddist[oo][1] += newdist[nn][1];
-			continue;
-		}
-
-		/*
-		 * The current range in the new distribution doesn't match any
-		 * existing range in the old distribution, so just insert the
-		 * new data point wherever we are (which may be the end of the
-		 * old distribution).  We create a new data point consisting of
-		 * a reference to the range in the new distribution (ranges are
-		 * immutable) and a copy of the range's value.
-		 */
-		olddist.splice(oo, 0, [ newdist[nn][0], newdist[nn][1] ]);
-	}
-}
-
-function aggAggregateValue(map, key, value)
-{
-	var subkey;
-
-	if (value === undefined)
-		return;
-
-	if (typeof (value) == 'number') {
-		aggAggregateScalar(map, key, value);
-		return;
-	}
-
-	if (value.constructor == Array) {
-		aggAggregateDistribution(map, key, value);
-		return;
-	}
-
-	ASSERT.ok(value.constructor == Object);
-
-	for (subkey in value) {
-		if (!(key in map) || map[key] === undefined)
-			map[key] = {};
-		aggAggregateValue(map[key], subkey, value[subkey]);
 	}
 }
 
@@ -370,7 +279,7 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst, now, lastrecord, start, duration, since;
+	var inst, dataset, now, start, duration, since;
 
 	if (!(fqid in agg_insts)) {
 		response.send(HTTP.ENOTFOUND);
@@ -410,10 +319,9 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 		return;
 	}
 
-	lastrecord = inst.agi_values[start + duration];
-
+	dataset = inst.agi_dataset;
 	if ((start + duration) * 1000 < since ||
-	    (lastrecord && lastrecord.count == inst.agi_sources.nsources)) {
+	    dataset.nreporting(start + duration - 1) == dataset.nsources()) {
 		callback(fqid, start, request, response, 0);
 		return;
 	}
@@ -466,24 +374,19 @@ function aggHttpValueRaw(request, response)
 function aggHttpValueRawDone(id, when, request, response, delay)
 {
 	var inst = agg_insts[id];
-	var record = inst.agi_values[when];
-	var zero = inst.agi_instrumentation['value-dimension'] > 1 ? {} : 0;
-	var ret, transform;
+	var dataset = inst.agi_dataset;
+	var ret, keys, transform;
 
 	ret = {};
 	ret.duration = 1;
 	ret.start_time = when;
-	ret.nsources = inst.agi_sources.nsources;
+	ret.nsources = dataset.nsources();
+	ret.value = dataset.dataForTime(when);
+	ret.minreporting = dataset.nreporting(when);
 
-	if (record) {
-		ret.value = record.value !== undefined ? record.value : zero;
-		ret.minreporting = record.count;
-	} else {
-		ret.value = zero;
-		ret.minreporting = 0;
-	}
-
-	transform = aggHttpValueTransform(id, request, ret.value);
+	keys = (typeof (ret.value) == 'object' &&
+	    ret.value.constructor == Object) ?  Object.keys(ret.value) : [];
+	transform = aggHttpValueTransform(id, request, keys);
 	if (transform != null)
 		ret.transformations = transform;
 
@@ -557,146 +460,6 @@ function aggHttpValueHeatmapDetails(request, response)
 
 	aggHttpValueCommon(request, response, aggHttpValueHeatmapDetailsDone,
 	    60);
-}
-
-/*
- * This complex helper function deserves some explanation.  aggExtractDatasets
- * converts raw data from an instrumentation into a list of datasets to be shown
- * on the heatmap and a set of values present in the heatmap.
- *
- * The input parameters are:
- *
- *	data		Represents the raw data for a heatmap-capable
- *			instrumentation over a particular period of time
- *			corresponding to a user request.
- *
- *	selected	An array of selected values.  This can only be non-empty
- *			if the instrumentation contains a decomposition by a
- *			discrete field, in which case the members of 'selected'
- *			are particular values of the field that the user wants
- *			broken out separately.
- *
- *	dimension	Dimensionality of the instrumentation.  Tells us whether
- *			there's a discrete decomposition or not.
- *
- * This function returns an object with the following fields:
- *
- *	data		An array of datasets that's a precursor to the heatmap
- *			input. Basically, each element corresponds to a set of
- *			data points that will be drawn with a unique hue on the
- *			heatmap.  The first element represents all points on the
- *			heatmap, and subsequent elements represents points
- *			corresponding to selected fields.  (The caller will
- *			deduct these from the first element when it actually
- *			draws the heatmap.)
- *
- *	present		If the instrumentation contains no discrete
- *			decomposition, this object is empty.  If it does, this
- *			object's keys represent the set of values for the
- *			discrete decomposed field which have non-zero components
- *			anywhere in the resulting heatmap.
- */
-function aggExtractDatasets(data, selected, dimension)
-{
-	var totals, decomposed, present;
-	var retdata, time, ii, key;
-
-	/*
-	 * We can only be invoked for heatmaps (implies dimension >= 2) and we
-	 * don't support more than 2 decompositions (implies dimension <= 3).
-	 */
-	ASSERT.ok(dimension == 2 || dimension == 3);
-
-	/*
-	 * Regardless of anything else, if there's no data for this
-	 * instrumentation then there's exactly one dataset which is empty and
-	 * no fields are present.
-	 */
-	if (mod_ca.caIsEmpty(data))
-		return ({ data: [ {} ], present: {} });
-
-	/*
-	 * The next simplest case is where there's no additional discrete
-	 * decomposition.  Recall that this function is only ever invoked in the
-	 * heatmap case, so the instrumentation must be a numeric decomposition,
-	 * so it has dimension at least 2.  If there's no discrete
-	 * decomposition, then dimension == 2.  In that case, there's exactly
-	 * one dataset containing all of the points and no broken-out values are
-	 * present.
-	 */
-	if (dimension == 2)
-		return ({ data: [ data ], present: {} });
-
-	/*
-	 * We have a discrete decomposition field.  If the user has selected
-	 * particular values of that field, we'll have to go extract their
-	 * components and return them as separate datasets.  But whether or not
-	 * any values are selected we must calculate the totals and present
-	 * values by looking at the component values for each field.
-	 */
-	retdata = [];
-	totals = {};
-	present = {};
-
-	for (time in data) {
-		totals[time] = [];
-
-		for (key in data[time]) {
-			present[key] = true;
-			aggAggregateDistribution(totals, time,
-			    data[time][key]);
-		}
-	}
-
-	retdata.push(totals);
-
-	/*
-	 * If there are zero fields selected, we're done.  Just return one
-	 * dataset representing the totals and the set of present fields we just
-	 * computed.  Note that an 'undefined' value of 'selected' actually
-	 * means "select all fields".
-	 */
-	if (selected && selected.length === 0)
-		return ({ data: retdata, present: present });
-
-	/*
-	 * In this case the user has actually selected some values (or
-	 * explicitly "all values") so we must extract those as separate
-	 * datasets.
-	 */
-	decomposed = {};
-
-	/*
-	 * Again, if 'selected' is undefined, we're in rainbow mode and
-	 * selecting all colors.  We just pretend that all fields are selected.
-	 * We sort the keys to make sure that similar requests result in the
-	 * same assignment of colors to keys, as long as the key set is static.
-	 * This isn't perfect -- if a new key shows up at the beginning of the
-	 * alphabet, for example, the color assignment gets completely changed.
-	 * But it's good enough for now.
-	 */
-	if (!selected)
-		selected = Object.keys(present).sort();
-
-	for (ii = 0; ii < selected.length; ii++)
-		decomposed[selected[ii]] = {};
-
-	for (time in data) {
-		for (key in decomposed) {
-			if (key in data[time])
-				decomposed[key][time] = data[time][key];
-		}
-	}
-
-	for (ii = 0; ii < selected.length; ii++) {
-		key = selected[ii];
-		if (key in decomposed) {
-			retdata.push(decomposed[key]);
-			delete (decomposed[key]);
-		}
-	}
-
-	return ({ data: retdata, present: present });
 }
 
 var aggValueHeatmapParams = {
@@ -836,14 +599,15 @@ function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 
 function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 {
-	var inst = agg_insts[id];
-	var conf, duration, selected, isolate, exclude, rainbow, nreporting;
-	var record, rawdata, extracted, datasets, count;
-	var range, transforms, png;
-	var ii, timeidx, ret;
+	var conf, duration, selected, isolate, exclude, rainbow;
+	var inst, dataset, datasets, count;
+	var ii, ret, range, transforms, png;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
 	};
+
+	inst = agg_insts[id];
+	dataset = inst.agi_dataset;
 
 	try {
 		duration = param(aggValueParams, 'duration') || 60;
@@ -866,9 +630,6 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 			throw (new caValidationError(
 			    'only one of "isolate", "exclude", and ' +
 			    '"decompose_all" may be specified'));
-
-		if (rainbow)
-			selected = undefined;
 	} catch (ex) {
 		if (!(ex instanceof caValidationError))
 			throw (ex);
@@ -880,32 +641,24 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	ret = {};
 	ret.start_time = start;
 	ret.duration = duration;
-	ret.nsources = inst.agi_sources.nsources;
+	ret.nsources = dataset.nsources();
+	ret.minreporting = dataset.nreporting(start, duration);
+	ret.present = dataset.keysForTime(start, duration);
+
+	if (rainbow)
+		selected = ret.present.sort();
 
 	if (delay > 0)
 		ret.delayed = delay;
 
-	rawdata = {};
-
-	for (timeidx = start; timeidx < start + duration; timeidx++) {
-		record = inst.agi_values[timeidx];
-
-		if (!record || !record.value)
-			continue;
-
-		if (nreporting === undefined || record.count < nreporting)
-			nreporting = record.count;
-
-		rawdata[timeidx] = record.value;
-	}
-
-	ret.minreporting = nreporting || 0;
-
-	extracted = aggExtractDatasets(rawdata, selected,
-	    inst.agi_instrumentation['value-dimension']);
 	datasets = [];
-	for (ii = 0; ii < extracted.data.length; ii++)
-		datasets.push(mod_heatmap.bucketize(extracted.data[ii], conf));
+	datasets.push(dataset.total());
+
+	for (ii = 0; ii < selected.length; ii++)
+		datasets.push(dataset.dataForKey(selected[ii]));
+
+	for (ii = 0; ii < datasets.length; ii++)
+		datasets[ii] = mod_heatmap.bucketize(datasets[ii], conf);
 
 	if (!conf.hue)
 		conf.hue = aggHttpHeatmapHues(datasets.length - 1, isolate);
@@ -922,7 +675,7 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 			mod_heatmap.deduct(datasets[0], datasets[ii]);
 
 		if (exclude)
-			datasets = datasets.slice(0, 1);
+			datasets = [ datasets[0] ];
 	}
 
 	/*
@@ -934,38 +687,34 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	conf.hue = conf.hue.slice(0, datasets.length);
 	mod_heatmap.normalize(datasets, conf);
 
+	conf.base = 0;
 	conf.saturation = [ 0, 0.9 ];
 	conf.value = 0.95;
 
 	png = mod_heatmap.generate(datasets, conf);
 
-	transforms = aggHttpValueTransform(id, request, rawdata);
+	transforms = aggHttpValueTransform(id, request, ret.present);
 	if (transforms != null)
 		ret.transformations = transforms;
-
-	ret.present = extracted.present;
 
 	conf.nbuckets = 1;
 	range = mod_heatmap.samplerange(0, 0, conf)[1];
 	ret.ymin = range[0];
 	ret.ymax = range[1];
-
-	png.encode(function (png_data) {
-		ret.image = png_data.toString('base64');
-		response.send(HTTP.OK, ret);
-	});
+	ret.image = png.encodeSync().toString('base64');
+	response.send(HTTP.OK, ret);
 }
 
 function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 {
-	var inst = agg_insts[id];
-	var dimension = inst.agi_instrumentation['value-dimension'];
-	var conf, detconf, duration, xx, yy;
-	var record, rawdata, range, extracted, present;
-	var ii, ret, bb;
+	var inst, conf, detconf, duration, xx, yy;
+	var dataset, range, present, ii, ret, bb;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
 	};
+
+	inst = agg_insts[id];
+	dataset = inst.agi_dataset;
 
 	try {
 		duration = param(aggValueParams, 'duration') || 60;
@@ -988,31 +737,16 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 		return;
 	}
 
+	range = mod_heatmap.samplerange(xx, yy, conf);
+
 	ret = {};
 	ret.start_time = start;
 	ret.duration = duration;
-	ret.nsources = inst.agi_sources.nsources;
+	ret.nsources = dataset.nsources();
+	ret.minreporting = dataset.nreporting(range[0]);
 
 	if (delay > 0)
 		ret.delayed = delay;
-
-	/*
-	 * Process the data first to get the list of values present.
-	 */
-	range = mod_heatmap.samplerange(xx, yy, conf);
-
-	rawdata = {};
-	record = inst.agi_values[range[0]];
-	if (record) {
-		ret.minreporting = record.count;
-		rawdata[range[0]] = record.value;
-	} else {
-		ret.minreporting = 0;
-	}
-
-	extracted = aggExtractDatasets(rawdata, [], dimension);
-	present = Object.keys(extracted.present);
-	extracted = aggExtractDatasets(rawdata, present, dimension);
 
 	detconf = {
 		base: range[0],
@@ -1023,13 +757,15 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 	};
 
 	ret.total = Math.round(mod_heatmap.bucketize(
-	    extracted.data[0], detconf)[0][0]);
+	    dataset.total(), detconf)[0][0]);
 	ret.present = {};
 
 	if (ret.total !== 0) {
+		present = dataset.keysForTime(range[0], 1);
+
 		for (ii = 0; ii < present.length; ii++) {
-			bb = mod_heatmap.bucketize(extracted.data[ii + 1],
-			    detconf);
+			bb = mod_heatmap.bucketize(
+			    dataset.dataForKey(present[ii]), detconf);
 
 			if (bb.length === 0)
 				continue;
@@ -1049,11 +785,12 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
  */
 function aggTick()
 {
-	var id, inst, ii, rq, when;
+	var id, inst, ii, rq;
 	var now = new Date().getTime();
 
 	for (id in agg_insts) {
 		inst = agg_insts[id];
+
 		for (ii = 0; ii < inst.agi_requests.length; ii++) {
 			rq = inst.agi_requests[ii];
 
@@ -1066,12 +803,11 @@ function aggTick()
 			}
 		}
 
-		for (when in inst.agi_values) {
-			if (inst.agi_instrumentation['retention-time'] > 0 &&
-			    now - (when * 1000) >
-			    inst.agi_instrumentation['retention-time'] * 1000)
-				delete (inst.agi_values[when]);
-		}
+		if (!inst.agi_instrumentation['retention-time'])
+			continue;
+
+		inst.agi_dataset.expireBefore(parseInt(now / 1000, 10) -
+		    inst.agi_instrumentation['retention-time']);
 	}
 
 	setTimeout(aggTick, 1000);
@@ -1203,7 +939,7 @@ function aggHttpVerifyTransformations(id, request)
  *
  *	request		The HTTP request that we are processing
  *
- *	raw		The raw data
+ *	raw		Array of keys to be transformed
  *
  * Return values:
  *

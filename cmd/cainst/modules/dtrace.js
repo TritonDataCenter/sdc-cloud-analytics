@@ -74,7 +74,7 @@ exports.insinit = function (ins, log)
 	ins.registerMetric({
 	    module: 'node',
 	    stat: 'httpc_ops',
-	    label: 'HTTP Client Operations',
+	    label: 'HTTP client operations',
 	    type: 'ops',
 	    fields: {
 		method: { label: 'method', type: mod_ca.ca_type_string },
@@ -91,7 +91,7 @@ exports.insinit = function (ins, log)
 	ins.registerMetric({
 	    module: 'node',
 	    stat: 'gc_ops',
-	    label: 'Garbage Collection',
+	    label: 'garbage collection operations',
 	    type: 'ops',
 	    fields: {
 		type: { label: 'gc type', type: mod_ca.ca_type_string },

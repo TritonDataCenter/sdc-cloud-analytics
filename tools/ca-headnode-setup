@@ -129,6 +129,28 @@ sh_provision $sh_custuri $sh_zonetpluri || fail "failed"
 [[ -n $sh_zoneip ]] || fail "no zone IP found"
 echo "$sh_zonename ($sh_zoneip)"
 
+cat > /zones/ca/root/root/setup_zone.sh <<EOF
+#!/bin/bash
+shopt -s xpg_echo
+
+function fail
+{
+	echo "$*"
+	exit 1
+}
+
+echo "Enabling root login via ssh for CA zone ... \c"
+sed -e 's#^PermitRootLogin no\$#PermitRootLogin yes#' /etc/ssh/sshd_config > \
+    /etc/ssh/sshd_config_new && mv /etc/ssh/sshd_config_new /etc/ssh/sshd_config \
+    || fail "failed"
+svcadm disable -s ssh || fail "failed to disable service"
+svcadm enable -s ssh || fail "failed to enable service"
+echo "done."
+EOF
+
+chmod +x /zones/ca/root/root/setup_zone.sh
+zlogin ca /root/setup_zone.sh || fail
+
 cat > /zones/${sh_zonename}/root/root/setup_zone.sh <<EOF
 #!/bin/bash
 shopt -s xpg_echo
@@ -138,6 +160,11 @@ function fail
 	echo "$*"
 	exit 1
 }
+
+echo "Setting nodename to 'devel' ... \c"
+hostname devel || fail "failed to set hostname"
+echo devel > /etc/nodename || fail "failed to write to /etc/nodename"
+echo "done."
 
 echo "Updating DNS ... \c"
 cat > /etc/resolv.conf << DNS

@@ -486,7 +486,7 @@ function insCmdEnable(msg)
 	inst.is_decomposition = mod_ca.caDeepCopy(msg.is_decomposition);
 	if (msg.is_zones)
 		inst.is_zones = mod_ca.caDeepCopy(msg.is_zones);
-	inst.is_impl = metric.metric(inst);
+	inst.is_impl = metric.metric(mod_ca.caDeepCopy(inst));
 	inst.is_inst_key = msg.is_inst_key;
 	inst.is_since = new Date();
 
@@ -495,7 +495,7 @@ function insCmdEnable(msg)
 		if (err) {
 			delete ins_insts[id];
 			ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
-			    'instrumenter error: ' + err.message, id);
+			    'instrumenter error: ' + err, id);
 			return;
 		}
 
@@ -529,7 +529,7 @@ function insCmdDisable(msg)
 	ins_insts[id].is_impl.deinstrument(function (err) {
 		if (err) {
 			ins_cap.sendCmdAckDisableInstFail(destkey, msg.ca_id,
-			    'instrumenter error: ' + err.message, id);
+			    'instrumenter error: ' + err, id);
 			return;
 		}
 

@@ -5,6 +5,7 @@
 var mod_ca = require('../../../lib/ca/ca-common');
 var mod_dtrace = require('libdtrace');
 var mod_capred = require('../../../lib/ca/ca-pred');
+var mod_caagg = require('../../../lib/ca/ca-agg');
 var mod_sys = require('sys');
 var ASSERT = require('assert');
 
@@ -178,6 +179,11 @@ function insdXlate(outtype, inttype, argNo, arg)
 	    outtype, inttype, argNo, arg));
 }
 
+function insdPragmaZone(zone)
+{
+	return (mod_ca.caSprintf('#pragma D option zone=%s\n\n', zone));
+}
+
 /*
  * Return the default llquantize
  */
@@ -272,7 +278,15 @@ function insdSyscalls(metric)
 		script += '}\n';
 	}
 
-	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,
+	    aggLatency));
+
+}
+
+function insdCheckZonesMetric(zones)
+{
+	ASSERT.ok(zones instanceof Array);
+	ASSERT.ok(zones.length > 0);
 }
 
 function insdIops(metric)
@@ -397,7 +411,8 @@ function insdIops(metric)
 		script += '}\n';
 	}
 
-	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,
+	    aggLatency));
 }
 
 /*
@@ -453,6 +468,8 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 	fields = mod_capred.caPredFields(pred);
 
 	if (metric.is_zones) {
+		ASSERT.ok(metric.is_zones.length == 1);
+		script += insdPragmaZone(metric.is_zones[0]);
 		zones = metric.is_zones.map(function (elt) {
 			return ('zonename == "' + elt + '"');
 		});
@@ -553,20 +570,57 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 		script += '}\n';
 	}
 
-	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,
+	    aggLatency));
 
 }
 
 function insdNodeHttpd(metric)
 {
-	return (insdNodeHttpCreate(metric, 'http-server-request',
-	    'http-server-response'));
+	var ii;
+	var zones = metric.is_zones;
+	var progs = [];
+
+	if (zones !== undefined) {
+		insdCheckZonesMetric(zones);
+
+		for (ii = 0; ii < zones.length; ii++) {
+			metric.is_zones = [ zones[ii] ];
+			progs.push(insdNodeHttpCreate(mod_ca.caDeepCopy(metric),
+			    'http-server-request',
+			    'http-server-response'));
+		}
+
+		metric.is_zones = zones;
+		return (new insDTraceMetricArray(progs));
+	} else {
+		return (insdNodeHttpCreate(metric, 'http-server-request',
+		    'http-server-response'));
+	}
 }
 
 function insdNodeHttpc(metric)
 {
-	return (insdNodeHttpCreate(metric, 'http-client-request',
-	    'http-client-response'));
+	var ii;
+	var zones = metric.is_zones;
+	var progs = [];
+
+	if (zones !== undefined) {
+		insdCheckZonesMetric(zones);
+
+		for (ii = 0; ii < zones.length; ii++) {
+			metric.is_zones = [ zones[ii] ];
+			progs.push(insdNodeHttpCreate(mod_ca.caDeepCopy(metric),
+			    'http-client-request',
+			    'http-client-response'));
+		}
+
+		metric.is_zones = zones;
+		return (new insDTraceMetricArray(progs));
+	} else {
+		return (insdNodeHttpCreate(metric, 'http-client-request',
+		    'http-client-response'));
+	}
 }
 
 /*
@@ -579,7 +633,7 @@ function insdNodeHttpc(metric)
  * itself. Furthermore, currently the GC prologue and epilogue callbacks are all
  * done in the same thread, so we can use thread local variables.
  */
-function insdNodeGC(metric)
+function insdNodeGCImpl(metric)
 {
 	var decomps = metric.is_decomposition;
 	var script = '';
@@ -596,6 +650,8 @@ function insdNodeGC(metric)
 	fields = mod_capred.caPredFields(pred);
 
 	if (metric.is_zones) {
+		ASSERT.ok(metric.is_zones.length == 1);
+		script += insdPragmaZone(metric.is_zones[0]);
 		zones = metric.is_zones.map(function (elt) {
 			return ('zonename == "' + elt + '"');
 		});
@@ -667,10 +723,33 @@ function insdNodeGC(metric)
 		script += '}\n';
 	}
 
-	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,
+	    aggLatency));
 }
 
-function insdNodeSocket(metric)
+function insdNodeGC(metric)
+{
+	var ii;
+	var zones = metric.is_zones;
+	var progs = [];
+
+	if (zones !== undefined) {
+		insdCheckZonesMetric(zones);
+
+		for (ii = 0; ii < zones.length; ii++) {
+			metric.is_zones = [ zones[ii] ];
+			progs.push(insdNodeGCImpl(mod_ca.caDeepCopy(metric)));
+		}
+
+		metric.is_zones = zones;
+		return (new insDTraceMetricArray(progs));
+	} else {
+		return (insdNodeGCImpl(metric));
+	}
+}
+
+
+function insdNodeSocketImpl(metric)
 {
 	var script = '';
 	var decomps = metric.is_decomposition;
@@ -696,6 +775,8 @@ function insdNodeSocket(metric)
 	hasPred = mod_capred.caPredNonTrivial(pred);
 
 	if (metric.is_zones) {
+		ASSERT.ok(metric.is_zones.length == 1);
+		script += insdPragmaZone(metric.is_zones[0]);
 		zones = metric.is_zones.map(function (elt) {
 			return ('zonename == "' + elt + '"');
 		});
@@ -746,7 +827,30 @@ function insdNodeSocket(metric)
 	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
 	script += '}\n\n';
 
-	return (new insDTraceVectorMetric(script, indexes.length > 0, zero));
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,
+	    action != 'count();'));
+}
+
+function insdNodeSocket(metric)
+{
+	var ii;
+	var zones = metric.is_zones;
+	var progs = [];
+
+	if (zones !== undefined) {
+		insdCheckZonesMetric(zones);
+
+		for (ii = 0; ii < zones.length; ii++) {
+			metric.is_zones = [ zones[ii] ];
+			progs.push(insdNodeSocketImpl(
+			    mod_ca.caDeepCopy(metric)));
+		}
+
+		metric.is_zones = zones;
+		return (new insDTraceMetricArray(progs));
+	} else {
+		return (insdNodeSocketImpl(metric));
+	}
 }
 
 function insDTraceMetric(prog)
@@ -840,10 +944,22 @@ insDTraceMetric.prototype.value = function ()
 	return (this.reduce(agg));
 };
 
-function insDTraceVectorMetric(prog, hasdecomps, zero)
+function insDTraceVectorMetric(prog, hasdecomps, zero, hasdists)
 {
 	this.cadv_decomps = hasdecomps;
 	this.cadv_zero = zero;
+	if (!hasdecomps && zero === 0)
+		this.cadv_adder = mod_caagg.caAddScalars;
+	else if (!hasdecomps)
+		this.cadv_adder = mod_caagg.caAddDistributions;
+	else if (!hasdists)
+		this.cadv_adder = mod_caagg.caAddDecompositions;
+	else
+		this.cadv_adder = function (lhs, rhs) {
+			return (mod_caagg.caAddDecompositions(lhs, rhs,
+			    mod_caagg.caAddDistributions));
+		};
+
 	insDTraceMetric.call(this, prog);
 }
 
@@ -861,4 +977,80 @@ insDTraceVectorMetric.prototype.reduce = function (agg)
 	}
 
 	return (this.cadv_zero);
+};
+
+/*
+ * This object is designed to hide the fact that we may be doing multiple
+ * enablings under the hood. It itself has an array of insDTraceMetrics and
+ * presents itself as an insDTraceMetric, though it is not an instance of one.
+ *
+ *	progs		An array of insDTraceMetrics
+ */
+function insDTraceMetricArray(progs)
+{
+	ASSERT.ok(progs !== undefined, 'missing progs arg');
+
+	ASSERT.ok(progs instanceof Array, 'progs must be an array');
+
+	ASSERT.ok(progs.length >= 1, 'progs must be an array with at least ' +
+	    'one entry');
+
+	this.cad_progs = progs;
+}
+
+insDTraceMetricArray.prototype.instrument = function (callback)
+{
+	var ii = 0;
+	var funcs = this.cad_progs.map(function (x) {
+		return (caWrapMethod(x, x.instrument));
+	});
+
+	mod_ca.caRunParallel(funcs, function (res) {
+		if (res.nerrors === 0) {
+			callback();
+			return;
+		}
+
+		for (ii = 0; ii < res.length; ii++) {
+			if ('result' in res.results[ii])
+				this.cad_progs[ii].deinstrument();
+		}
+
+		var foo = new caError(ECA_REMOTE,
+		    res.results[res.errlocs[0]]['error'],
+		    'failed to enable %d DTrace enablings; saving first error',
+		    res.nerrors);
+		callback(foo);
+	});
+};
+
+insDTraceMetricArray.prototype.deinstrument = function (callback)
+{
+	var funcs = this.cad_progs.map(function (x) {
+		return (caWrapMethod(x, x.deinstrument));
+	});
+
+	mod_ca.caRunParallel(funcs, function (res) {
+		if (res.nerrors === 0) {
+			callback();
+			return;
+		}
+
+		callback(new caError(ECA_REMOTE, res.results[res.errlocs[0]],
+		    'failed to disable %d DTrace enablings; saving first error',
+		    res.nerrors));
+	});
+};
+
+insDTraceMetricArray.prototype.value = function ()
+{
+	var adder = this.cad_progs[0].cadv_adder;
+	var data = this.cad_progs.map(function (x) {
+		var val = x.value();
+		if (val === undefined)
+			return (x.cadv_zero);
+		else
+			return (val);
+	});
+	return (data.reduce(adder));
 };

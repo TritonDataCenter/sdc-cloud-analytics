@@ -1,0 +1,31 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd"> 
+<html> 
+ <head> 
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+    <title>Cloud Analytics Monitoring</title> 
+    <link href="camon.css" rel="stylesheet" type="text/css"></link> 
+    <link type="text/css" href="css/ui-lightness/jquery-ui-1.8.6.custom.css" rel="stylesheet" />	
+    <script language="javascript" type="text/javascript" src="flot/jquery-1.4.4.min.js"></script> 
+    <script language="javascript" type="text/javascript" src="flot/jquery-ui-1.8.8.custom.min.js"></script>
+    <script language="javascript" type="text/javascript" src="camon.js"></script> 
+ </head> 
+    <body> 
+    <h1>Cloud Analytics Monitoring</h1> 
+ 
+    <div id="form">
+	Config service or aggregator host/port:
+	<input type='text' id='camHost'></input>
+	<input type='button' onclick='javascript:camAddMonitor()' value="Monitor Service" />
+	<ul>
+		<li>Specify a server as the <strong>host:port</strong> of a
+		config service or aggregator.  The <strong>host</strong> must
+		be reachable by your browser.</li>
+		<li>Config service port: 23181</li>
+		<li>First aggregator's port: 23184</li>
+		<li>Nth aggregator's port: 23184 + N - 1</li>
+	</ul>
+    </div>
+    <hr />
+    <div id="camContainer"></div>
+ </body> 
+</html> 

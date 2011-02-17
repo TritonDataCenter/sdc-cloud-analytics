@@ -1,0 +1,28 @@
+body {
+	font-family: sans-serif;
+	margin: 50px;
+	font-size: x-small;
+}
+
+tr {
+	vertical-align: top;
+}
+
+td {
+	padding-right: 20px;
+}
+
+th {
+	text-align: left;
+}
+
+div.camMonitorControl {
+	font-size: medium;
+	font-weight: bold;
+}
+
+div.camMonitorControl .camButton {
+	font-size: x-small;
+	margin-left: 10px;
+	margin-right: 10px;
+}

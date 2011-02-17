@@ -20,39 +20,42 @@ var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
 var agg_http_baseuri = '/ca/';
 var agg_http_port_base = mod_ca.ca_http_port_agg_base;
 var agg_http_port;			/* actual http port */
+var agg_profile = false;
 
 var agg_insts = {};		/* active instrumentations by id */
-var agg_http;
+var agg_start;			/* start time (in ms) */
+var agg_http;			/* http server */
+var agg_amqp;			/* AMQP handle */
 var agg_cap;			/* cap wrapper */
 var agg_log;			/* log handle */
+var agg_sysinfo;		/* system info config */
+var agg_broker;			/* AMQP broker config */
 
 var agg_transforms = {};	/* available transformations by name */
 
 function main()
 {
-	var http_port_base = agg_http_port_base;
-	var broker = mod_ca.caBroker();
-	var sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
-	var hostname = sysinfo.ca_hostname;
-	var amqp;
+	agg_start = new Date().getTime();
+	agg_sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
+	agg_broker = mod_ca.caBroker();
 
 	agg_log = new mod_log.caLog({ out: process.stdout });
 
-	amqp = new mod_caamqp.caAmqp({
-	    broker: broker,
+	agg_amqp = new mod_caamqp.caAmqp({
+	    broker: agg_broker,
 	    exchange: mod_ca.ca_amqp_exchange,
 	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
 	    basename: mod_ca.ca_amqp_key_base_aggregator,
-	    hostname: hostname,
+	    hostname: agg_sysinfo.ca_hostname,
 	    bindings: [ mod_ca.ca_amqp_key_all ]
 	});
-	amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
-	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
+	agg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
+	agg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
 
 	agg_cap = new mod_cap.capAmqpCap({
-	    amqp: amqp,
+	    amqp: agg_amqp,
 	    log: agg_log,
-	    sysinfo: sysinfo
+	    sysinfo: agg_sysinfo
 	});
 	agg_cap.on('msg-cmd-ping', aggCmdPing);
 	agg_cap.on('msg-cmd-status', aggCmdStatus);
@@ -61,15 +64,15 @@ function main()
 	agg_cap.on('msg-notify-configsvc_online', aggNotifyConfigRestarted);
 
 	agg_log.info('Aggregator starting up (%s/%s)', agg_name, agg_vers);
-	agg_log.info('%-12s %s', 'Hostname:', hostname);
-	agg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
-	agg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
+	agg_log.info('%-12s %s', 'Hostname:', agg_sysinfo.ca_hostname);
+	agg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(agg_broker));
+	agg_log.info('%-12s %s', 'Routing key:', agg_amqp.routekey());
 
 	aggInitBackends();
 
 	agg_http = new mod_cahttp.caHttpServer({
 	    log: agg_log,
-	    port_base: http_port_base,
+	    port_base: agg_http_port_base,
 	    router: aggHttpRouter
 	});
 
@@ -77,7 +80,7 @@ function main()
 	    agg_http_port = agg_http.port();
 	    agg_log.info('%-12s Port %d (started)',
 		'HTTP server:', agg_http_port);
-	    amqp.start(aggStarted);
+	    agg_amqp.start(aggStarted);
 	    setTimeout(aggTick, 1000);
 	});
 }
@@ -152,6 +155,7 @@ function aggCmdStatus(msg)
 	var id, inst;
 
 	sendmsg.s_component = 'aggregator';
+	sendmsg.s_status = aggAdminStatus();
 	sendmsg.s_instrumentations = [];
 
 	for (id in agg_insts) {
@@ -245,6 +249,8 @@ function aggHttpRouter(server)
 	var infixes = [ '', 'customers/:custid/' ];
 	var ii, base;
 
+	server.get(agg_http_baseuri + 'admin/status', aggHttpAdminStatus);
+
 	for (ii = 0; ii < infixes.length; ii++) {
 		base = agg_http_baseuri + infixes[ii] +
 		    'instrumentations/:instid/value';
@@ -255,6 +261,62 @@ function aggHttpRouter(server)
 		server.get(base + '/heatmap/details',
 		    aggHttpValueHeatmapDetails);
 	}
+}
+
+function aggAdminStatus()
+{
+	var start, ret, key, obj, ntotal;
+
+	start = new Date().getTime();
+
+	ret = {};
+	ret['amqp_broker'] = agg_broker;
+	ret['amqp_routekey'] = agg_amqp.routekey();
+	ret['heap'] = process.memoryUsage();
+	ret['http'] = agg_http.info();
+	ret['sysinfo'] = agg_sysinfo;
+	ret['started'] = agg_start;
+	ret['uptime'] = start - agg_start;
+
+	ret['agg_http_req_timeout'] = agg_http_req_timeout;
+	ret['agg_http_port'] = agg_http_port;
+	ret['agg_profile'] = agg_profile;
+	ret['agg_transforms'] = {};
+
+	for (key in agg_transforms) {
+		obj = agg_transforms[key];
+		ret['agg_transforms'][key] = {
+			label: obj['label'],
+			types: obj['types']
+		};
+	}
+
+	ntotal = 0;
+	ret['agg_insts'] = {};
+	for (key in agg_insts) {
+		obj = agg_insts[key];
+
+		ret['agg_insts'][key] = {
+		    since: obj.agi_since,
+		    uptime: start - obj.agi_since.getTime(),
+		    type: obj.agi_dataset.constructor.name,
+		    nsources: obj.agi_dataset.nsources(),
+		    last: obj.agi_last,
+		    pending_requests: obj.agi_requests,
+		    inst: obj.agi_instrumentation
+		};
+
+		ntotal++;
+	}
+
+	ret['agg_ninsts'] = ntotal;
+	ret['request_latency'] = new Date().getTime() - start;
+	return (ret);
+}
+
+function aggHttpAdminStatus(request, response)
+{
+	response.send(HTTP.OK, aggAdminStatus());
 }
 
 var aggValueParams = {
@@ -601,10 +663,12 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 {
 	var conf, duration, selected, isolate, exclude, rainbow;
 	var inst, dataset, datasets, count;
-	var ii, ret, range, transforms, png;
+	var ii, ret, range, transforms, buffer, png;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
 	};
+
+	var tk = new mod_ca.caTimeKeeper();
 
 	inst = agg_insts[id];
 	dataset = inst.agi_dataset;
@@ -683,6 +747,7 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	 * won't always have entries for an empty dataset or because the user
 	 * simply provided more hues than were necessary.
 	 */
+	tk.step('up to bucketize + deduction');
 	ASSERT.ok(conf.hue.length >= datasets.length);
 	conf.hue = conf.hue.slice(0, datasets.length);
 	mod_heatmap.normalize(datasets, conf);
@@ -691,8 +756,10 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	conf.saturation = [ 0, 0.9 ];
 	conf.value = 0.95;
 
+	tk.step('normalize');
 	png = mod_heatmap.generate(datasets, conf);
 
+	tk.step('generate');
 	transforms = aggHttpValueTransform(id, request, ret.present);
 	if (transforms != null)
 		ret.transformations = transforms;
@@ -701,8 +768,15 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	range = mod_heatmap.samplerange(0, 0, conf)[1];
 	ret.ymin = range[0];
 	ret.ymax = range[1];
-	ret.image = png.encodeSync().toString('base64');
+	tk.step('transform + samplerange');
+	buffer = png.encodeSync();
+	tk.step('png encoding');
+	ret.image = buffer.toString('base64');
 	response.send(HTTP.OK, ret);
+	tk.step('response sent');
+
+	if (agg_profile)
+		agg_log.dbg('%s', tk);
 }
 
 function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)

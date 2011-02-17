@@ -5,6 +5,7 @@
  * analytics service, including instrumenters and aggregators.
  */
 
+var mod_http = require('http');
 var mod_sys = require('sys');
 var ASSERT = require('assert');
 
@@ -18,15 +19,20 @@ var mod_mapi = require('../lib/ca/ca-mapi');
 var HTTP = require('../lib/ca/http-constants');
 
 var cfg_http;			/* http server */
+var cfg_amqp;			/* AMQP handle */
 var cfg_cap;			/* camqp CAP wrapper */
 var cfg_log;			/* log handle */
 var cfg_factory;		/* instrumentation factory */
+var cfg_mapi;			/* mapi config */
+var cfg_broker;			/* AMQP broker config */
+var cfg_sysinfo;		/* system config */
 
 var cfg_name = 'configsvc';			/* component name */
 var cfg_vers = '0.0';				/* component version */
 var cfg_http_port = mod_ca.ca_http_port_config;	/* HTTP port for API endpoint */
 var cfg_http_baseuri = '/ca';			/* base of HTTP API */
 
+var cfg_start;			/* start time */
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_transformations = {};	/* all transformations, by name */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
@@ -57,30 +63,29 @@ var cfg_global_insts = {};	/* global (non-customer) insts */
 
 function main()
 {
-	var http_port = cfg_http_port;
-	var broker = mod_ca.caBroker();
-	var mapicfg = mod_ca.caMapiConfig();
-	var sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
-	var hostname = sysinfo.ca_hostname;
-	var amqp, mapi;
+	var mapi;
 
+	cfg_start = new Date().getTime();
+	cfg_sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
 	cfg_log = new mod_log.caLog({ out: process.stdout });
+	cfg_broker = mod_ca.caBroker();
+	cfg_mapi = mod_ca.caMapiConfig();
 
-	amqp = new mod_caamqp.caAmqp({
-	    broker: broker,
+	cfg_amqp = new mod_caamqp.caAmqp({
+	    broker: cfg_broker,
 	    exchange: mod_ca.ca_amqp_exchange,
 	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
 	    basename: mod_ca.ca_amqp_key_base_config,
-	    hostname: hostname,
+	    hostname: cfg_sysinfo.ca_hostname,
 	    bindings: [ mod_ca.ca_amqp_key_config, mod_ca.ca_amqp_key_all ]
 	});
-	amqp.on('amqp-error', mod_caamqp.caAmqpLogError(cfg_log));
-	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
+	cfg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError(cfg_log));
+	cfg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
 
 	cfg_cap = new mod_cap.capAmqpCap({
-	    amqp: amqp,
+	    amqp: cfg_amqp,
 	    log: cfg_log,
-	    sysinfo: sysinfo
+	    sysinfo: cfg_sysinfo
 	});
 	cfg_cap.on('msg-cmd-ping', cfgCmdPing);
 	cfg_cap.on('msg-cmd-status', cfgCmdStatus);
@@ -93,20 +98,20 @@ function main()
 
 	cfg_http = new mod_cahttp.caHttpServer({
 	    log: cfg_log,
-	    port: http_port,
+	    port: cfg_http_port,
 	    router: cfgHttpRouter
 	});
 
 	cfg_log.info('Config service starting up (%s/%s)', cfg_name, cfg_vers);
-	cfg_log.info('%-12s %s', 'Hostname:', hostname);
-	cfg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
-	cfg_log.info('%-12s %s', 'Routing key:', amqp.routekey());
-	cfg_log.info('%-12s Port %d', 'HTTP server:', http_port);
+	cfg_log.info('%-12s %s', 'Hostname:', cfg_sysinfo.ca_hostname);
+	cfg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(cfg_broker));
+	cfg_log.info('%-12s %s', 'Routing key:', cfg_amqp.routekey());
+	cfg_log.info('%-12s Port %d', 'HTTP server:', cfg_http_port);
 
-	if (mapicfg) {
-		cfg_log.info('%-12s %s:%s', 'MAPI host:', mapicfg.host,
-		    mapicfg.port);
-		mapi = new mod_mapi.caMapi(mapicfg);
+	if (cfg_mapi) {
+		cfg_log.info('%-12s %s:%s', 'MAPI host:', cfg_mapi.host,
+		    cfg_mapi.port);
+		mapi = new mod_mapi.caMapi(cfg_mapi);
 	} else {
 		cfg_log.warn('MAPI_HOST, MAPI_PORT, MAPI_USER, or ' +
 		    'MAPI_PASSWORD not set.  Per-customer use disabled.');
@@ -123,7 +128,7 @@ function main()
 	    mapi: mapi
 	});
 
-	amqp.start(function () {
+	cfg_amqp.start(function () {
 		cfg_log.info('AMQP broker connected.');
 
 		cfg_http.start(function () {
@@ -149,6 +154,8 @@ function cfgHttpRouter(server)
 	var instrumentations_id = instrumentations + '/:instid';
 	var infixes = [ '', '/customers/:custid' ];
 	var ii, base;
+
+	server.get(cfg_http_baseuri + '/admin/status', cfgHttpAdminStatus);
 
 	for (ii = 0; ii < infixes.length; ii++) {
 		base = cfg_http_baseuri + infixes[ii];
@@ -183,6 +190,175 @@ function cfgInstrumentations(custid)
 		cfg_customers[custid] = {};
 
 	return (cfg_customers[custid]);
+}
+
+/*
+ * Retrieves an object describing the current service state for debugging and
+ * monitoring.  Values include configuration constants (like remote service
+ * hostnames), tunables, internal state counters, etc.  The following arguments
+ * must be specified:
+ *
+ *	callback	Invoked upon completion with one argument representing
+ *			the current status.  The callback may be invoked
+ *			synchronously if "recurse" is false.
+ *
+ *	recurse		Send AMQP status messages to other components in the
+ *			system (instrumenters and aggregators) to retrieve their
+ *			status as well.  If any of these commands fail or
+ *			time out, the corresponding entries will contain an
+ *			'error' describing what happened.
+ *
+ *	timeout		When recurse is true, this number denotes the maximum
+ *			time to wait (in milliseconds) for any the status
+ *			requests to other components before timing out.
+ */
+function cfgAdminStatus(callback, recurse, timeout)
+{
+	var ret, key, obj;
+	var nrequests, checkdone, doamqp;
+	var start = new Date().getTime();
+
+	checkdone = function () {
+		ASSERT.ok(nrequests > 0);
+		if (--nrequests !== 0)
+			return;
+
+		ret['request_latency'] = new Date().getTime() - start;
+		callback(ret);
+	};
+
+	nrequests = 1;
+	ret = {};
+	ret['amqp_broker'] = cfg_broker;
+	ret['amqp_routekey'] = cfg_amqp.routekey();
+	ret['heap'] = process.memoryUsage();
+	ret['http'] = cfg_http.info();
+	ret['sysinfo'] = cfg_sysinfo;
+	ret['started'] = cfg_start;
+	ret['uptime'] = start - cfg_start;
+
+	ret['cfg_http_port'] = cfg_http_port;
+
+	ret['cfg_aggregators'] = {};
+	for (key in cfg_aggregators) {
+		obj = cfg_aggregators[key];
+		ret['cfg_aggregators'][key] = {
+		    hostname: obj.cag_hostname,
+		    routekey: obj.cag_routekey,
+		    http_port: obj.cag_http_port,
+		    transformations: obj.cag_transformations,
+		    ninsts: obj.cag_ninsts,
+		    insts: Object.keys(obj.cag_insts)
+		};
+	}
+
+	ret['cfg_instrumenters'] = {};
+	for (key in cfg_instrumenters) {
+		obj = cfg_instrumenters[key];
+
+		ret['cfg_instrumenters'][key] = {
+		    hostname: obj.ins_hostname,
+		    routekey: obj.ins_routekey,
+		    nmetrics_avail: obj.ins_nmetrics_avail,
+		    insts: Object.keys(obj.ins_insts)
+		};
+
+		ret['cfg_instrumenters'][key]['ninsts'] =
+		    ret['cfg_instrumenters'][key]['insts'].length;
+	}
+
+	ret['cfg_insts'] = {};
+	for (key in cfg_insts) {
+		obj = cfg_insts[key].inst;
+
+		ret['cfg_insts'][key] = caDeepCopy(obj.properties());
+		ret['cfg_insts'][key]['aggregator'] =
+		    obj.aggregator().cag_hostname;
+		ret['cfg_insts'][key]['custid'] = obj.custid();
+	}
+
+	ret['instn-scopes'] = {};
+	ret['instn-scopes']['global'] = Object.keys(cfgInstrumentations());
+	for (key in cfg_customers)
+		ret['instn-scopes']['cust:' + key] =
+		    Object.keys(cfgInstrumentations(key));
+
+	if (!recurse)
+		return (checkdone());
+
+	/*
+	 * The user wants information about each related service.  We make a
+	 * subrequest to each one and store the results in our return value.
+	 */
+	ASSERT.ok(timeout && typeof (timeout) == typeof (0));
+	doamqp = function (type, hostname) {
+		return (function (err, result) {
+			if (err)
+				ret[type][hostname] = { error: err };
+			else
+				ret[type][hostname] = result.s_status;
+
+			checkdone();
+		});
+	};
+
+	ret['aggregators'] = {};
+	for (key in cfg_aggregators) {
+		obj = cfg_aggregators[key];
+		ret['aggregators'][key] = { error: 'timed out' };
+		nrequests++;
+		cfg_cap.cmdStatus(obj.cag_routekey, timeout,
+		    doamqp('aggregators', key));
+	}
+
+	ret['instrumenters'] = {};
+	for (key in cfg_instrumenters) {
+		obj = cfg_instrumenters[key];
+		ret['instrumenters'][key] = { error: 'timed out' };
+		nrequests++;
+		cfg_cap.cmdStatus(obj.ins_routekey, timeout,
+		    doamqp('instrumenters', key));
+	}
+
+	return (checkdone());
+}
+
+var cfgHttpStatusParams = {
+	recurse: {
+		type: 'boolean',
+		default: false
+	},
+	timeout: {
+		type: 'number',
+		default: 5, /* sec */
+		min: 1,
+		max: 60
+	}
+};
+
+/*
+ * Handle GET /ca/admin/status
+ */
+function cfgHttpAdminStatus(request, response)
+{
+	var recurse, timeout;
+
+	try {
+		recurse = mod_ca.caHttpParam(cfgHttpStatusParams,
+		    request.ca_params, 'recurse');
+		timeout = mod_ca.caHttpParam(cfgHttpStatusParams,
+		    request.ca_params, 'timeout');
+	} catch (ex) {
+		if (!(ex instanceof caValidationError))
+			throw (ex);
+
+		response.send(HTTP.EBADREQUEST, ex);
+		return;
+	}
+
+	cfgAdminStatus(function (result) {
+		response.send(HTTP.OK, result);
+	}, recurse, timeout * 1000);
 }
 
 /*

@@ -2,6 +2,8 @@
  * cainstsvc: Cloud Analytics Instrumenter service
  */
 
+var ASSERT = require('assert').ok;
+
 var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
@@ -13,6 +15,7 @@ var ins_vers = '0.0';		/* component version */
 
 var ins_insts = {};		/* active instrumentations by id */
 var ins_modules = {};		/* registered stat modules */
+var ins_status_callbacks = {};	/* callbacks for getting status info */
 var ins_iid;			/* interval timer id */
 
 var ins_cap;			/* cap wrapper */
@@ -226,6 +229,16 @@ insBackendInterface.prototype.registerMetric = function (args)
 };
 
 /*
+ * Registers a new status reporter.  The "reporter" function is invoked to
+ * retrieve status information for debugging and monitoring.
+ */
+insBackendInterface.prototype.registerReporter = function (name, reporter)
+{
+	ASSERT(!(name in ins_status_callbacks));
+	ins_status_callbacks[name] = reporter;
+};
+
+/*
  * Search for installed Instrumenter backend plugins and load them.  We
  * currently hardcode this list, but ideally we'd find everything in some
  * particular directory.
@@ -385,6 +398,12 @@ function insCmdStatus(msg)
 	}
 
 	sendmsg.s_modules = insGetModules();
+	sendmsg.s_status = {
+		instrumentations: sendmsg.s_instrumentations
+	};
+
+	for (id in ins_status_callbacks)
+		sendmsg.s_status[id] = ins_status_callbacks[id]();
 
 	ins_cap.sendCmdAckStatus(msg.ca_source, msg.ca_id, sendmsg);
 }

@@ -10,6 +10,7 @@ var ASSERT = require('assert');
 
 var insd_log;
 var insd_dlibpath = [];		/* DTrace library Path (-L) */
+var insd_nenablings = 0;	/* number of active enablings */
 
 if (process.env['DTRACE_LIBPATH']) {
 	insd_dlibpath = process.env['DTRACE_LIBPATH'].split(':');
@@ -19,6 +20,9 @@ if (process.env['DTRACE_LIBPATH']) {
 exports.insinit = function (ins, log)
 {
 	insd_log = log;
+
+	ins.registerReporter('dtrace', insdStatus);
+
 	ins.registerModule({ name: 'syscall', label: 'System calls' });
 	ins.registerMetric({
 	    module: 'syscall',
@@ -119,6 +123,14 @@ exports.insinit = function (ins, log)
 	});
 
 };
+
+function insdStatus()
+{
+	var ret = {};
+	ret['dtrace_libpath'] = insd_dlibpath;
+	ret['nenablings'] = insd_nenablings;
+	return (ret);
+}
 
 var insdFields = {
 	hostname: '"' + mod_ca.caSysinfo().ca_hostname + '"',
@@ -762,6 +774,7 @@ insDTraceMetric.prototype.instrument = function (callback)
 	try {
 		this.cad_dtr.strcompile(this.cad_prog);
 		this.cad_dtr.go();
+		insd_nenablings++;
 
 		if (callback)
 			callback();
@@ -775,6 +788,7 @@ insDTraceMetric.prototype.instrument = function (callback)
 
 insDTraceMetric.prototype.deinstrument = function (callback)
 {
+	--insd_nenablings;
 	this.cad_dtr.stop();
 	this.cad_dtr = null;
 

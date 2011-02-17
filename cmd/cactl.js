@@ -9,6 +9,7 @@ var mod_log = require('../lib/ca/ca-log');
 var mod_sys = require('sys');
 
 var cc_timeout_msec = 3 * 1000;		/* timeout after 3s */
+var cc_verbose = false;
 var cc_cmdswitch = {};			/* dispatch cmds */
 var cc_amqp;				/* ca-amqp handle */
 var cc_cap;				/* cap wrapper */
@@ -23,7 +24,8 @@ var cc_help = [
     '    	hint: try "ca.config" for the config server',
     '    <command> is one of:',
     '        ping		check connectivity',
-    '        status		get detailed status info',
+    '        status [-v]	get detailed status info',
+    '                           with -v, print additional unstructured info',
     '        log <msg>		report log message'
 ].join('\n');
 
@@ -99,6 +101,9 @@ function ccRunCmd()
 	var msg;
 
 	cc_cmd = process.argv[3];
+
+	cc_verbose = process.argv.length > 4 &&
+	    process.argv[4] == '-v';
 
 	if (!(cc_cmd in cc_cmdswitch))
 		usage('unrecognized command: ' + cc_cmd);
@@ -267,6 +272,11 @@ function ccAckStatus(msg)
 	default:
 		printf('unknown component type\n');
 		break;
+	}
+
+	if (msg.s_status && cc_verbose) {
+		printf('additional unstructured status information:\n');
+		printf('%j\n', msg.s_status);
 	}
 
 	shutdown();

@@ -38,7 +38,9 @@ CC		 = gcc
 JSL_CONF_MAIN		 = $(TOOLSDIR)/jsl_support/jsl.conf
 JSL_CONF_WEB		 = $(TOOLSDIR)/jsl_support/jsl.web.conf
 DEMO_JSFILES		 = demo/basicvis/cademo.js
-DEMO_WEBJSFILES		 = demo/basicvis/caflot.js demo/basicvis/caadmin.js
+DEMO_WEBJSFILES		 = demo/basicvis/caflot.js	\
+	demo/basicvis/caadmin.js			\
+	demo/basicvis/camon.js
 JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
 JS_FILES		+= lib/ca/errno.js
 DEMO_FILES		:= $(shell find demo -type f)
@@ -92,7 +94,8 @@ PKGFILES_cabase = \
 	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
-	$(PKGROOT)/cabase/lib/ca
+	$(PKGROOT)/cabase/lib/ca			\
+	$(PKGROOT)/cabase/lib/node.d
 
 DEPS_cabase = \
 	amqp		\
@@ -300,6 +303,9 @@ $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)
 
 $(PKGROOT)/cabase/cmd/node: deps/node/node
+	cp $^ $@
+
+$(PKGROOT)/cabase/lib/node.d: deps/node-install/usr/lib/dtrace/node.d
 	cp $^ $@
 
 $(PKGROOT)/cabase/%: %

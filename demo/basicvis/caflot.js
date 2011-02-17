@@ -892,7 +892,8 @@ gGraph.prototype.serverCreate = function (callback)
 				 * In Firefox, accessing this field can generate
 				 * an exception.
 				 */
-				errmsg = request.statusText;
+				errmsg = request.statusText + ': ' +
+				    request.responseText;
 			} catch (ex) {
 				errmsg = '<unknown error: ' +
 				    request.status + '>';
@@ -930,7 +931,7 @@ gGraph.prototype.serverDelete = function (callback)
 
 		if (request.status != 200)
 			callback('failed to delete stat: ' +
-			    request.statusText);
+			    request.statusText + ': ' + request.responseText);
 		else
 			callback();
 	};
@@ -1591,7 +1592,8 @@ gGraph.prototype.heatmapClicked = function (event)
 			return;
 
 		if (request.status != 200) {
-			alert('failed to load details');
+			alert('failed to load details: ' +
+			    request.responseText);
 			return;
 		}
 

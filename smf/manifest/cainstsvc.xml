@@ -23,7 +23,7 @@
 <exec_method type="method" name="start" exec="@@CABASE_DIR@@/smf/method/canodesvc" timeout_seconds="10" />
 <exec_method type="method" name="stop" exec=":kill" timeout_seconds="10" />
 
-<instance name="default" enabled="true">
+<instance name="@@INSTANCE_NAME@@" enabled="true">
 	<property_group name="com.joyent.ca,caconfig" type="application">
 		<propval name="path-logs" type="astring" value="@@BASE_DIR@@/log/ca" />
 		<propval name="path-node" type="astring" value="@@CABASE_DIR@@/cmd/node" />

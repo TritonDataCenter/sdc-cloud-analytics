@@ -110,7 +110,8 @@ case $SMF_FMRI in
 	*caconfigsvc*)	ns_name=caconfigsvc
 			load_mapi
 			;;
-	*caaggsvc*)	ns_name=caaggsvc
+	*caaggsvc*)	export HOST=$(uname -n)-${SMF_FMRI/*:}
+			ns_name=caaggsvc
 			load_geoip
 			;;
 	*cainstsvc*)	ns_name=cainstsvc

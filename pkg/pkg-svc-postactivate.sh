@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -o xtrace
+
 function fatal
 {
 	echo "${npm_package_name} postactivate: fatal error: $*"
@@ -36,9 +38,24 @@ sed -e "s#@@CABASE_DIR@@#$CABASE_DIR#g" \
     -e "s#@@BASE_DIR@@#$BASE_DIR#g" \
     $src > $dest || fatal "could not process $src to $dest"
 
-fmri=`svccfg inventory ${dest} | grep ':default'`
+fmri=$(svccfg inventory $dest | grep ':@@INSTANCE_NAME@@' | sed -e s'#:@.*##')
 
-svccfg import ${dest} || fatal "could not import ${dest}"
-svcadm enable -s $fmri || fatal "could not enable $fmri"
+instances=
+if [[ $svc = "caaggsvc" ]]; then
+	ncpus=$(psrinfo | wc -l)
+	for (( ii = 0; ii < ncpus; ii++ )) {
+		instances="$instances auto$ii"
+	}
+else
+	instances="default"
+fi
+
+for instance in $instances; do
+	instfile=$dest.$instance
+	sed -e "s#@@INSTANCE_NAME@@#$instance#g" $dest > $instfile
+	svccfg import $instfile || fatal "could not import $instfile"
+	rm -f $instfile
+	svcadm enable -s $fmri:$instance || fatal "could not enable $fmri:$instance"
+done
 
 exit 0

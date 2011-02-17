@@ -3,6 +3,11 @@
 #
 
 #
+# Constants
+#
+CA_VERSION	:= $(shell git describe)
+
+#
 # Directories
 #
 BUILD		 = build
@@ -321,7 +326,7 @@ $(PKGROOT)/cainstsvc/%: %
 	cp $^ $@
 
 $(PKGROOT)/%/package.json: pkg/%-package.json
-	cp $^ $@
+	sed -e 's#@@CA_VERSION@@#$(CA_VERSION)#g' $^ > $@
 
 $(PKGROOT)/%/.npmignore: pkg/npm-ignore
 	grep -v ^# $^ > $@

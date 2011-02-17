@@ -1,7 +1,7 @@
 {
 	"name":		"caconfigsvc",
 	"description":	"Joyent Cloud Analytics Configuration Service",
-	"version":	"0.0.1-1",
+	"version":	"0.0.1v@@CA_VERSION@@",
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",
 	"scripts": {

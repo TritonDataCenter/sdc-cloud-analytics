@@ -112,8 +112,8 @@ exports.insinit = function (ins, log)
 	    label: 'socket operations',
 	    fields: {
 		type: { label: 'type', type: mod_ca.ca_type_string },
-		addr: { label: 'remote host', type: mod_ca.ca_type_string },
-		port: { label: 'remote port', type: mod_ca.ca_type_string },
+		raddr: { label: 'remote host', type: mod_ca.ca_type_string },
+		rport: { label: 'remote port', type: mod_ca.ca_type_string },
 		size: { label: 'size', type: mod_ca.ca_type_number },
 		buffered: {
 		    label: 'buffered data',
@@ -765,8 +765,8 @@ function insdNodeSocketImpl(metric)
 	    'node_dtrace_connection_t', 0, 'bufferSize');
 	var transforms = {
 	    type: '(probename == "net-socket-read" ? "read" : "write")',
-	    addr: arg0addr,
-	    port: 'lltostr( ' + arg0port + ')',
+	    raddr: arg0addr,
+	    rport: 'lltostr( ' + arg0port + ')',
 	    size: 'arg1',
 	    buffered: arg0buffer
 	};

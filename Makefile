@@ -382,7 +382,7 @@ $(ROOT_CA)/deps/node/node: deps/node-install/bin/node
 #
 # Subsequent head-node builds will then pick up the new release.
 #
-release: pkg $(DIST) $(DIST)/ca-pkg.tar.bz2
+release: pkg $(DIST) $(DIST)/ca-pkg-$(CA_VERSION).tar.bz2
 
 $(DIST):
 	mkdir -p $@
@@ -390,9 +390,9 @@ $(DIST):
 $(ROOT)/pkg:
 	cd $(ROOT) && ln -s ../pkg .
 
-$(DIST)/ca-pkg.tar.bz2: install $(ROOT)/pkg
+$(DIST)/ca-pkg-$(CA_VERSION).tar.bz2: install $(ROOT)/pkg
 	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz) | \
-	    bzip2 > $(DIST)/ca-pkg.tar.bz2
+	    bzip2 > $(DIST)/ca-pkg-$(CA_VERSION).tar.bz2
 
 #
 # "clean" target removes created files -- we currently have none

@@ -1,7 +1,7 @@
 {
 	"name":		"cabase",
 	"description":	"Joyent Cloud Analytics Common Libraries",
-	"version":	"1.0.1v@@CA_VERSION@@",
+	"version":	"1.0.2v@@CA_VERSION@@",
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",
 	"bin":		{

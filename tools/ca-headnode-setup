@@ -91,7 +91,7 @@ function sh_provision
 	local out turi
 
         out=$($sh_curlcmd -s -i -X POST -d template=$tpluri \
-	    --url "$sh_urlbase$custuri/zones" 2>&1)
+	    --url "$sh_urlbase$custuri/containers" 2>&1)
 
         [[ $? -eq 0 ]] || fail "failed to create zone: $out"
 	turi=$(echo "$out" | sh_extract_header X-Joyent-Transition-URI)

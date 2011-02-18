@@ -32,13 +32,7 @@ if [[ -z $npm_config_agent_root ]]; then
 fi
 
 src=${cabase}/smf/manifest/${manifest}
-dest=${npm_config_smfdir}/${manifest}
-
-sed -e "s#@@CABASE_DIR@@#$CABASE_DIR#g" \
-    -e "s#@@BASE_DIR@@#$BASE_DIR#g" \
-    $src > $dest || fatal "could not process $src to $dest"
-
-fmri=$(svccfg inventory $dest | grep ':@@INSTANCE_NAME@@' | sed -e s'#:@.*##')
+fmri=$(svccfg inventory $src | grep ':@@INSTANCE_NAME@@' | sed -e s'#:@.*##')
 
 instances=
 if [[ $svc = "caaggsvc" ]]; then
@@ -51,10 +45,14 @@ else
 fi
 
 for instance in $instances; do
-	instfile=$dest.$instance
-	sed -e "s#@@INSTANCE_NAME@@#$instance#g" $dest > $instfile
-	svccfg import $instfile || fatal "could not import $instfile"
-	rm -f $instfile
+	dest=${npm_config_smfdir}/${svc}-$instance.xml
+
+	sed -e "s#@@CABASE_DIR@@#$CABASE_DIR#g" \
+	    -e "s#@@BASE_DIR@@#$BASE_DIR#g" \
+	    -e "s#@@INSTANCE_NAME@@#$instance#g" \
+	    $src > $dest || fatal "could not process $src to $dest"
+
+	svccfg import $dest || fatal "could not import $dest"
 	svcadm enable -s $fmri:$instance || fatal "could not enable $fmri:$instance"
 done
 

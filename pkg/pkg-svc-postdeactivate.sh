@@ -10,11 +10,9 @@ function fatal
 
 svc=${npm_package_name}
 manifest=${npm_config_smfdir}/${svc}.xml
-basefmri=$(svccfg inventory ${manifest} | grep ':@@INSTANCE_NAME' | \
-    sed -e 's#:@.*##')
-[[ -n $basefmri ]] || fatal "no basefmri found"
+[[ -n $svc ]] || fatal "no svc found"
 
-for fmri in $(svcs -H -ofmri $basefmri); do
+for fmri in $(svcs -H -ofmri $svc); do
 	echo "found service $fmri"
 	svcadm disable -s $fmri || fatal "could not disable $fmri"
 	svccfg delete $fmri || fatal "could not delete $fmri"

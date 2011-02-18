@@ -1,0 +1,173 @@
+#!/bin/bash
+
+#
+# upgrades the "ca" zone CA bits on an SDC headnode
+#
+
+shopt -s xpg_echo
+set -o pipefail
+
+function fail
+{
+	echo "$*" >&2
+	exit 1
+}
+
+function usage
+{
+	echo "usage: $cus_arg0 [-fk] ca-pkg.tar.gz" >&2
+	echo "    Upgrades current CA headnode bits for the "ca" zone with " >&2
+	echo "    those in the specified upgrade image." >&2
+	echo >&2
+	echo "    Options" >&2
+	echo "        -f    skip sanity checks (be careful)" >&2
+	echo "        -k    keep temporary directory around (for debugging)" >&2
+	fail
+}
+
+function forcefail
+{
+	if [[ $opt_f = true ]]; then
+		echo "warning: $* (forcing anyway)"
+		return;
+	fi
+
+	echo "error: $* (use -f to force)" >&2
+	cus_forceerrors=true
+}
+
+#
+# Process arguments.  See usage message above for details.
+#
+cus_pkgs="cabase caaggsvc caconfigsvc"
+cus_arg0=$(basename $0)
+opt_f=false
+opt_k=false
+
+while getopts ":fk" c; do
+	case "$c" in
+	f|k)	eval opt_$c=true				;;
+	*)	usage "illegal option -- $OPTARG"		;;
+	esac
+done
+
+shift $((OPTIND - 1))
+cus_forcerrors=false
+cus_image=$1
+
+#
+# Run sanity checks.  The user can override these with "-f".
+#
+[[ -n $cus_image ]] || usage
+[[ -f $cus_image ]] || fail "no such file: $cus_image"
+
+[[ $(zonename) = "ca" ]] || forcefail "not in \"ca\" zone"
+[[ $# -eq 1 ]] || forcefail "expected one package"
+[[ $(basename $cus_image .tar.bz2) = $(basename $cus_image) ]] && \
+    forcefail "expected tar.bz2 package"
+
+[[ $cus_forceerrors = true ]] && fail "bailing out because of errors"
+
+#
+# Unpack the update image
+#
+cus_tmpdir=/var/tmp/$cus_arg0.$$
+echo "Unpacking update image to $cus_tmpdir ... \c"
+mkdir $cus_tmpdir || fail "failed to create tmpdir"
+bzcat $cus_image | (cd $cus_tmpdir && tar xf -) || fail "failed to unpack"
+echo "done."
+
+#
+# Verify the update image.  Check that the expected files are there.
+#
+cd $cus_tmpdir || fail
+echo "Verifying update image ... \c"
+[[ -d root/pkg ]] || fail "invalid image (expected 'root/pkg' directory)"
+cd root/pkg
+for pkg in cabase caaggsvc caconfigsvc; do
+	[[ -f $pkg.tar.gz ]] || fail "invalid image (missing $pkg.tar.gz)"
+done
+echo "done."
+
+#
+# Save the current runtime configuration.  This information is stored in the
+# SMF service but that gets removed when we uninstall the package so we need to
+# save it here and then reapply it when the new services are installed.
+#
+echo "Saving CA MAPI configuration ... \c"
+cus_mapi_host=$(svcprop -p com.joyent.ca,caconfig/mapi-host caconfigsvc) || \
+    fail "failed to retrieve mapi configuration"
+cus_mapi_port=$(svcprop -p com.joyent.ca,caconfig/mapi-port caconfigsvc) || \
+    fail "failed to retrieve mapi configuration"
+cus_mapi_user=$(svcprop -p com.joyent.ca,caconfig/mapi-user caconfigsvc) || \
+    fail "failed to retrieve mapi configuration"
+cus_mapi_pass=$(svcprop -p com.joyent.ca,caconfig/mapi-password \
+    caconfigsvc) || fail "failed to retrieve mapi configuration"
+echo "done."
+
+#
+# Remove the old services in reverse-dependency order to guarantee that npm
+# won't activate any of the new packages with older dependencies or vice versa.
+#
+for pkg in $(echo $cus_pkgs | tac -s' '); do
+	echo "Uninstalling old $pkg ... \c"
+	npm uninstall $pkg > $cus_tmpdir/npm_uninstall_$pkg.out 2>&1 || \
+	    fail "FAILED; see $cus_tmpdir/npm_uninstall_$pkg.out"
+	echo "done."
+done
+
+#
+# Install the new packages.
+#
+for pkg in $cus_pkgs; do
+	echo "Installing new $pkg ... \c"
+	npm install ./$pkg.tar.gz > $cus_tmpdir/npm_install_$pkg.out 2>&1 || \
+	    fail "FAILED; see $cus_tmpdir/npm_install_$pkg.out"
+	echo "done."
+
+	#
+	# Disable the configuration service now because we haven't restored the
+	# MAPI configuration yet.  Yes, there's a race here, and we're not
+	# proud.  But the client will have to deal with the potential error
+	# case here anyway.
+	#
+	[[ $pkg = "caconfigsvc" ]] || continue
+	echo "Disabling caconfigsvc ... \c"
+	svcadm disable -s caconfigsvc || fail "FAILED"
+	echo "done."
+done
+
+#
+# Restore the caconfigsvc runtime configuration.
+#
+echo "Restoring CA MAPI configuration ... \c"
+svccfg << EOF
+select caconfigsvc:default
+setprop com.joyent.ca,caconfig/mapi-host = astring: $cus_mapi_host
+setprop com.joyent.ca,caconfig/mapi-user = astring: $cus_mapi_user
+setprop com.joyent.ca,caconfig/mapi-password = astring: $cus_mapi_pass
+setprop com.joyent.ca,caconfig/mapi-port = astring: $cus_mapi_port
+refresh
+EOF
+echo "done."
+
+#
+# Re-enable the configuration service.
+#
+echo "Enabling caconfigsvc ... \c"
+svcadm enable -s caconfigsvc || fail "failed"
+echo "done."
+
+#
+# Remove our temporary directory.
+#
+if [[ $opt_k = false ]]; then
+	echo "Done.  Removing $cus_tmpdir ... \c"
+	cd /var/tmp || fail "failed to cd"
+	rm -rf $cus_tmpdir || fail "failed"
+	echo "done."
+else
+	echo "Done.  Kept temporary directory in $cus_tmpdir."
+fi
+
+exit 0

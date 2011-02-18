@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#
+# cadepsvcs: deploys headnode services to the specified system
+#
+shopt -s xpg_echo
+
+function fail
+{
+	echo "$*" >&2
+	exit 1
+}
+
+function usage
+{
+	echo "$d_arg0: $*" >&2
+	cat <<-USAGE >&2
+Usage: $d_arg0 hostname package.tar.bz2
+
+Deploy an updated aggregator and configsvc (from the specified package.tar.bz2
+file) to the specified host.
+USAGE
+	exit 2
+}
+
+d_arg0=$(basename $0)
+[[ $# -eq 2 ]] || usage "not enough arguments"
+
+d_host=$1
+d_file=$2
+d_tmpbase=/var/tmp/$d_arg0.$$
+
+[[ -f $d_file ]] || fail "not a file: $d_file"
+
+echo "Making remote temporary directory (may prompt for root password)"
+ssh root@$d_host mkdir $d_tmpbase || fail "failed"
+echo "done."
+
+echo "Copying files to root@$d_host via scp (may need root password)"
+scp $(dirname $0)/caupsvcs $d_file root@$d_host:$d_tmpbase || fail "failed"
+
+echo "Invoking remote script (may prompt again)"
+ssh root@$d_host bash $d_tmpbase/caupsvcs $d_tmpbase/$(basename $d_file) || \
+    fail "failed"

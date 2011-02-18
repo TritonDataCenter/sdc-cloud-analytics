@@ -5,6 +5,7 @@
  * analytics service, including instrumenters and aggregators.
  */
 
+var mod_fs = require('fs');
 var mod_http = require('http');
 var mod_sys = require('sys');
 var ASSERT = require('assert');
@@ -63,13 +64,33 @@ var cfg_global_insts = {};	/* global (non-customer) insts */
 
 function main()
 {
-	var mapi;
+	var mapi, lfile, request_log, opened;
 
 	cfg_start = new Date().getTime();
 	cfg_sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
 	cfg_log = new mod_log.caLog({ out: process.stdout });
 	cfg_broker = mod_ca.caBroker();
 	cfg_mapi = mod_ca.caMapiConfig();
+
+	if (process.argv.length > 2) {
+		opened = false;
+		cfg_log.info('Logging requests to %s', process.argv[2]);
+
+		lfile = mod_fs.createWriteStream(
+		    process.argv[2], { flags: 'a' });
+		lfile.on('open', function () { opened = true; });
+		lfile.on('error', function (err) {
+			if (!opened) {
+				cfg_log.error(
+				    'failed to open request log: %r', err);
+				process.exit(1);
+			}
+
+			cfg_log.error('failed write to request log: %r', err);
+		});
+
+		request_log = new mod_log.caLog({ out: lfile, candrop: true });
+	}
 
 	cfg_amqp = new mod_caamqp.caAmqp({
 	    broker: cfg_broker,
@@ -99,7 +120,8 @@ function main()
 	cfg_http = new mod_cahttp.caHttpServer({
 	    log: cfg_log,
 	    port: cfg_http_port,
-	    router: cfgHttpRouter
+	    router: cfgHttpRouter,
+	    log_requests: request_log
 	});
 
 	cfg_log.info('Config service starting up (%s/%s)', cfg_name, cfg_vers);

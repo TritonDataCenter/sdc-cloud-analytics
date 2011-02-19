@@ -123,6 +123,90 @@ exports.insinit = function (ins, log)
 	    metric: insdNodeSocket
 	});
 
+	ins.registerMetric({
+	    module: 'cpu',
+	    stat: 'thread_executions',
+	    type: 'ops',
+	    label: 'thread executions',
+	    fields: {
+		runtime: { label: 'runtime', type: mod_ca.ca_type_latency },
+		pid: {
+		    label: 'process identifier',
+		    type: mod_ca.ca_type_string
+		},
+		execname: {
+		    label: 'application name',
+		    type: mod_ca.ca_type_string
+		},
+		zonename: {
+		    label: 'zone name',
+		    type: mod_ca.ca_type_string
+		},
+		leavereason: {
+		    label: 'reason leaving cpu',
+		    type: mod_ca.ca_type_string
+		}
+/*
+ * We aren't using these for now until we better understand them.
+ *
+ *		leavepid: {
+ *		    label: 'process identifier taking over cpu',
+ *		    type: mod_ca.ca_type_string
+ *		},
+ *		leaveexec: {
+ *		    label: 'application name taking over cpu',
+ *		    type: mod_ca.ca_type_string
+ *		},
+ *		leavezone: {
+ *		    label: 'zone name taking over cpu',
+ *		    type: mod_ca.ca_type_string
+ *		}
+ */
+	    },
+	    metric: insdCpuThrExec
+	});
+
+	ins.registerModule({ name: 'fs', label: 'Filesystem' });
+	ins.registerMetric({
+	    module: 'fs',
+	    stat: 'logical_ops',
+	    type: 'ops',
+	    label: 'logical filesystem operations',
+	    fields: {
+		pid: {
+		    label: 'process identifier',
+		    type: mod_ca.ca_type_string
+		},
+		execname: {
+		    label: 'application name',
+		    type: mod_ca.ca_type_string
+		},
+		zonename: {
+		    label: 'zone name',
+		    type: mod_ca.ca_type_string
+		},
+/*
+ * We are not currently enabling filenames because our table gets rather large
+ * very quickly ~1000+ elements. Once that happens, jquery gets into bad shape
+ * and the browsers start getting upset.
+ *
+ *		filename: {
+ *		    label: 'file name',
+ *		    type: mod_ca.ca_type_string
+ *		},
+ */
+		operation: {
+		    label: 'operation type',
+		    type: mod_ca.ca_type_string
+		},
+		fstype: {
+		    label: 'filesystem type',
+		    type: mod_ca.ca_type_string
+		},
+		latency: { label: 'latency', type: mod_ca.ca_type_latency }
+	    },
+	    metric: insdLogFSIO
+	});
 };
 
 function insdStatus()
@@ -448,12 +532,6 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 	var arg0url = insdXlate('node_http_request_t',
 	    'node_dtrace_http_request_t', 0, 'url');
 
-	/*
-	 * We divide latency by the same amount that we do during the quantize,
-	 * so that that the values input by the user will be in the same unit as
-	 * when visualized. Hopefully this will not be needed once we have some
-	 * kind of equantize.
-	 */
 	var transforms = {
 	    latency: '((timestamp - latencys[' + arg0fd + ']))',
 	    method: '(methods['+ arg0fd + '])',
@@ -851,6 +929,403 @@ function insdNodeSocket(metric)
 	} else {
 		return (insdNodeSocketImpl(metric));
 	}
+}
+
+/*
+ * Customers want to know why they're leaving CPU and who is taking over from
+ * them. They should be able to know another customer is taking over, but not
+ * who they are or what they are running, just that this is the mythical "other
+ * customer". However, if the zone belongs to them, they should be able to see
+ * it just fine.
+ *
+ * This function creates a D expression that checks whether or not the zone that
+ * we are in is in the list of zones. If it is, we return the actual data that
+ * we want, if we aren't, we return an expression that says something is
+ * invalid. If the list of zones is null, then we are operating as someone who
+ * has full root on the Global Zone and should be able to always see this
+ * information.
+ *
+ *	zinfo		A D expression that tells us what zone we are in
+ *
+ *	arg		A D expression that tells us what value should be
+ *			returned if the zone matches
+ *
+ *	zones		A list of zone names that can see the data, or null if
+ *			it should always be accessible
+ *
+ *	inval		The D expression to return when the user cannot see the
+ *			data, this must be the same D type as "arg".
+ *
+ */
+function insdCpuThrSeeField(zinfo, arg, zones, inval)
+{
+	var ii;
+	var ret = '';
+
+	if (!zones)
+		return (arg);
+
+	for (ii = 0; ii < zones.length; ii++)
+		ret += caSprintf('%s == "%s" ? %s : ', zinfo, zones[ii], arg);
+
+	ret += '"' + inval + '"';
+
+	return (ret);
+}
+
+function insdCpuThrExec(metric)
+{
+	var script = '';
+	var decomps = metric.is_decomposition;
+	var pred = metric.is_predicate;
+	var aggRuntime = false;
+	var traceRuntime = false;
+	var onlySrun = false;
+	var predicates, hasPred, ii, indexes, zero, action, index;
+	var nextzone = 'stringof(((proc_t *)(args[1]->pr_addr))' +
+	     '->p_zone->zone_name)';
+	var zones = metric.is_zones === undefined ? null : metric.is_zones;
+	var transforms = {
+		runtime: '(timestamp - self->ts)',
+		pid: 'lltostr(curpsinfo->pr_pid)',
+		execname: 'curpsinfo->pr_fname',
+		leavereason: '(curlwpsinfo->pr_state == SRUN ? "runnable" : ' +
+		    'curlwpsinfo->pr_state == SZOMB ? "exited" : ' +
+		    'curlwpsinfo->pr_state == SSTOP ? "stopped" : ' +
+		    'curlwpsinfo->pr_state == SIDL ? "in proc creation" : ' +
+		    'curlwpsinfo->pr_state == SONPROC ? "on-cpu" : ' +
+		    'curlwpsinfo->pr_state == SWAIT ? "waiting to be ' +
+		    'runnable" :' +
+		    'curlwpsinfo->pr_stype == SOBJ_NONE ? "sleeping" : ' +
+		    'curlwpsinfo->pr_stype == SOBJ_MUTEX ? "kernel mutex" : ' +
+		    'curlwpsinfo->pr_stype == SOBJ_RWLOCK ? "kernel ' +
+		    'read/write lock" : ' +
+		    'curlwpsinfo->pr_stype == SOBJ_CV ? "kernel condition ' +
+		    'variable" : ' +
+		    'curlwpsinfo->pr_stype == SOBJ_SEMA ? "kernel ' +
+		    'semaphore" : ' +
+		    'curlwpsinfo->pr_stype == SOBJ_USER ? "user synch ' +
+		    'object" : ' +
+		    'curlwpsinfo->pr_stype == SOBJ_USER_PI ? ' +
+		    '"user sync object with priority inheritence" : ' +
+		    '"shuttle synchronization object")',
+		leavepid: insdCpuThrSeeField(nextzone,
+		    'lltostr(args[1]->pr_pid)', zones,
+		    'other customer pid'),
+		leaveexec: insdCpuThrSeeField(nextzone,
+		    'args[1]->pr_fname', zones,
+		    'other customer application'),
+		zonename: 'zonename',
+		leavezone: insdCpuThrSeeField(nextzone,
+		    nextzone, zones, 'other customer zone')
+	};
+
+	predicates = [];
+
+	hasPred = mod_capred.caPredNonTrivial(pred);
+	if (hasPred && mod_capred.caPredContainsField('runtime', pred))
+		traceRuntime = true;
+
+	if (zones) {
+		zones = metric.is_zones.map(function (elt) {
+			return ('zonename == "' + elt + '"');
+		});
+
+		predicates.push(zones.join(' ||\n'));
+	}
+
+	indexes = [];
+	for (ii = 0; ii < decomps.length; ii++) {
+		switch (decomps[ii]) {
+		case 'runtime':
+			traceRuntime = true;
+			aggRuntime = true;
+			break;
+		case 'leavepid':
+		case 'leaveexec':
+		case 'leavezone':
+			onlySrun = true;
+			/*jsl:fallthru*/
+		default:
+			indexes.push(transforms[decomps[ii]]);
+			break;
+		}
+	}
+
+	ASSERT.ok(indexes.length < 2);
+
+	if (indexes.length > 0) {
+		index = '[' + indexes.join(',') + ']';
+		zero = {};
+	} else {
+		index = '';
+		zero = aggRuntime ? [] : 0;
+	}
+
+	if (traceRuntime) {
+		script += 'sched:::on-cpu\n';
+		script += '{\n';
+		script += '\tself->ts = timestamp;\n';
+		script += '}\n\n';
+
+		predicates.push('self->ts != NULL');
+	}
+
+	if (aggRuntime)
+		action = insdLlquantize(transforms['runtime']) + ';';
+	else
+		action = 'count();';
+
+	if (hasPred) {
+		pred = mod_ca.caDeepCopy(metric.is_predicate);
+		mod_capred.caPredReplaceFields(transforms, pred);
+		predicates.push(mod_capred.caPredPrint(pred));
+	}
+
+	/*
+	 * XXX We don't want to include that we're giving up the CPU to say
+	 * cloud analytics. To keep those zones straight and separated from
+	 * customer zones, we're going to add a predicate that as general as we
+	 * can, but still encodes implementation details. This is ugly, but
+	 * there isn't really a better way currently.
+	 */
+	if (onlySrun) {
+		predicates.push('curlwpsinfo->pr_state == SRUN');
+		predicates.push(caSprintf('strlen(%s) == 36', nextzone));
+	}
+
+	predicates.push('(curlwpsinfo->pr_flag & PR_IDLE) == 0');
+
+	script += 'sched:::off-cpu\n';
+	script += insdMakePredicate(predicates);
+	script += '{\n';
+	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
+	script += '}\n\n';
+
+	/* Always clear ts */
+	script += 'sched:::off-cpu\n';
+	script += '{\n';
+	script += '\tself->ts = 0;\n';
+	script += '}\n\n';
+
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,
+	    action != 'count();'));
+}
+
+/*
+ * Generally all of the fop_* calls that we are interested in have the same
+ * interface for fbt:::entry where the first argument is a vnode_t *. However,
+ * fop_open is unique in that it takes a vnode_t **.
+ */
+function insdLogFSIO(metric)
+{
+	var script = '';
+	var pred = metric.is_predicate;
+	var decomps = metric.is_decomposition;
+	var before, ii, zones, predicates, indexes, index, zero, action;
+	var hasPred, fields, key;
+	var aggLatency = false;
+	var setFilename = '(((vnode_t *)arg0)->v_path == NULL ? "<unknown>" ' +
+	    ': cleanpath(((vnode_t *)arg0)->v_path))';
+	var setFstype = 'stringof(((vnode_t *)arg0)->v_op->vnop_name)';
+	var setOpenFilename = '(*((vnode_t**)arg0))->v_path == NULL ? ' +
+	    '"<unknown>" : cleanpath((*((vnode_t**)arg0))->v_path)';
+	var setOpenFstype = 'stringof((*((vnode_t**)arg0))->v_op->vnop_name)';
+	/* All probes sans fop_open */
+	var probelist = [ 'fop_read', 'fop_write', 'fop_ioctl', 'fop_access',
+	    'fop_getattr', 'fop_setattr', 'fop_lookup', 'fop_create',
+	    'fop_remove', 'fop_link', 'fop_rename', 'fop_mkdir', 'fop_rmdir',
+	    'fop_readdir', 'fop_symlink', 'fop_readlink', 'fop_fsync',
+	    'fop_getpage', 'fop_putpage', 'fop_map' ];
+	var transforms = {
+		execname: 'stringof(curpsinfo->pr_fname)',
+		pid: 'lltostr(curpsinfo->pr_pid)',
+		zonename: 'zonename',
+		filename: 'self->filename',
+		operation: 'probefunc == "fop_read" ? "read" : ' +
+		    'probefunc == "fop_write" ? "write" : ' +
+		    'probefunc == "fop_open" ? "open" : ' +
+		    'probefunc == "fop_close" ? "close" : ' +
+		    'probefunc == "fop_ioctl" ? "ioctl" : ' +
+		    'probefunc == "fop_getattr" ? "getattr" : ' +
+		    'probefunc == "fop_setattr" ? "setattr" : ' +
+		    'probefunc == "fop_access" ? "access" : ' +
+		    'probefunc == "fop_lookup" ? "lookup" : ' +
+		    'probefunc == "fop_create" ? "create" : ' +
+		    'probefunc == "fop_remove" ? "remove" : ' +
+		    'probefunc == "fop_link" ? "link" : ' +
+		    'probefunc == "fop_rename" ? "rename" : ' +
+		    'probefunc == "fop_mkdir" ? "mkdir" : ' +
+		    'probefunc == "fop_rmdir" ? "rmdir" : ' +
+		    'probefunc == "fop_readdir" ? "readdir" : ' +
+		    'probefunc == "fop_symlink" ? "symlink" : ' +
+		    'probefunc == "fop_readlink" ? "readlink" : ' +
+		    'probefunc == "fop_fsync" ? "fsync" : ' +
+		    'probefunc == "fop_getpage" ? "getpage" : ' +
+		    'probefunc == "fop_putpage" ? "putpage" : ' +
+		    'probefunc == "fop_map" ? "mmap" : ' +
+		    '"<unknown>"',
+		fstype: 'self->fstype',
+		latency: '(timestamp - self->ts)'
+	};
+
+	var fsign = [ 'sockfs', 'doorfs', 'sharefs sharetab file', 'mntfs',
+	    'fifofs', 'swapfs', 'specfs' ];
+
+	predicates = [];
+	before = {};
+	/* We must always get the fstype to ensure we don't catch sockfs */
+	before['fstype'] = true;
+	hasPred = mod_capred.caPredNonTrivial(pred);
+
+	if (zones) {
+		zones = metric.is_zones.map(function (elt) {
+			return ('zonename == "' + elt + '"');
+		});
+
+		predicates.push(zones.join(' ||\n'));
+	}
+
+	indexes = [];
+	for (ii = 0; ii < decomps.length; ii++) {
+		switch (decomps[ii]) {
+		case 'latency':
+			aggLatency = true;
+			before['latency'] = true;
+			break;
+		case 'filename':
+			before['filename'] = true;
+			indexes.push(transforms[decomps[ii]]);
+			break;
+		case 'fstype':
+			before['fstype'] = true;
+			indexes.push(transforms[decomps[ii]]);
+			break;
+		default:
+			indexes.push(transforms[decomps[ii]]);
+			break;
+		}
+	}
+
+	fields = mod_capred.caPredFields(pred);
+	for (ii = 0; ii < fields.length; ii++) {
+		switch (fields[ii]) {
+		case 'latency':
+			before['latency'] = true;
+			break;
+		case 'filename':
+			before['filename'] = true;
+			break;
+		case 'fstype':
+			before['fstype'] = true;
+			break;
+		default:
+			break;
+		}
+	}
+
+	ASSERT.ok(indexes.length < 2);
+
+	if (indexes.length > 0) {
+		index = '[' + indexes.join(',') + ']';
+		zero = {};
+	} else {
+		index = '';
+		zero = aggLatency ? [] : 0;
+	}
+
+	if (!caIsEmpty(before)) {
+		script += probelist.map(function (x) {
+			return (caSprintf('fbt::%s:entry', x));
+		}).join(',\n') + '\n';
+		script += caSprintf('/%s != "sockfs"/\n', transforms['fstype']);
+		script += '{\n';
+		for (key in before) {
+			switch (key) {
+			case 'latency':
+				script += '\tself->ts = timestamp;\n';
+				break;
+			case 'filename':
+				script += caSprintf('\tself->filename = %s;\n',
+				    setFilename);
+				break;
+			case 'fstype':
+				script += caSprintf('\tself->fstype = %s;\n',
+				    setFstype);
+				break;
+			default:
+				ASSERT.ok(false, 'programmer error');
+				break;
+			}
+		}
+		script += '}\n\n';
+		script += 'fbt::fop_open:entry\n';
+		script += caSprintf('/%s != "sockfs"/\n', transforms['fstype']);
+		script += '{\n';
+		for (key in before) {
+			switch (key) {
+			case 'latency':
+				script += '\tself->ts = timestamp;\n';
+				break;
+			case 'filename':
+				script += caSprintf('\tself->filename = %s;\n',
+				    setOpenFilename);
+				break;
+			case 'fstype':
+				script += caSprintf('\tself->fstype = %s;\n',
+				    setOpenFstype);
+				break;
+			default:
+				ASSERT.ok(false, 'programmer error');
+				break;
+			}
+		}
+		script += '}\n\n';
+	}
+
+	if (aggLatency) {
+		action = insdLlquantize(transforms['latency']) + ';';
+		predicates.push('self->ts');
+	} else {
+		action = 'count();';
+	}
+
+	if (hasPred) {
+		pred = mod_ca.caDeepCopy(metric.is_predicate);
+		mod_capred.caPredReplaceFields(transforms, pred);
+		predicates.push(mod_capred.caPredPrint(pred));
+	}
+
+	for (ii = 0; ii < fsign.length; ii++)
+		predicates.push(caSprintf('%s != "%s"\n', transforms['fstype'],
+		    fsign[ii]));
+
+	/*
+	 * The interface for the fop_open return probe is the same as the
+	 * others, so we can push it on now along with the others
+	 */
+	probelist.push('fop_open');
+
+	script += probelist.map(function (x) {
+			return (caSprintf('fbt::%s:return', x));
+		}).join(',\n') + '\n';
+	script += insdMakePredicate(predicates);
+	script += '{\n';
+	script += mod_ca.caSprintf('\t@%s = %s\n', index, action);
+	script += '}\n\n';
+
+	script += probelist.map(function (x) {
+			return (caSprintf('fbt::%s:return', x));
+		}).join(',\n') + '\n';
+	script += '{\n';
+	script += '\tself->ts = 0;\n';
+	script += '\tself->filename = 0;\n';
+	script += '\tself->fstype = 0;\n';
+	script += '}\n\n';
+
+	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,
+	    action != 'count();'));
+
 }
 
 function insDTraceMetric(prog)

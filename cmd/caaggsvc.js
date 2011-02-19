@@ -784,7 +784,7 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 {
 	var inst, conf, detconf, duration, xx, yy;
-	var dataset, range, present, ii, ret, bb;
+	var dataset, range, present, ii, ret, value;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
 	};
@@ -836,24 +836,53 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 		nsamples: 1
 	};
 
-	ret.total = Math.round(mod_heatmap.bucketize(
-	    dataset.total(), detconf)[0][0]);
+	/*
+	 * Our goal is to return the sum of values at a particular point as well
+	 * as the actual decomposition of values.  Recall that these values can
+	 * be fractional in cases where the underlying data included intervals
+	 * larger than the bucket size because in those cases we assign the
+	 * values proportionally to the buckets in the interval.  We'd rather
+	 * avoid presenting this detail to the user, since it doesn't generally
+	 * matter and can be rather confusing, so we always want to present
+	 * integer values for both the total and decompositions.  We could
+	 * simply round both the total and component values, but then we could
+	 * run into paradoxical situations in which the user sees non-zero data
+	 * in the heatmap but the total and components all round to zero so the
+	 * decomposition contains no data.  You could also wind up in situations
+	 * where the total didn't match the sum of the components because of
+	 * rounding errors.  To keep our lives simple, we say that the value for
+	 * each non-zero component is the maximum of 1 and the rounded value
+	 * from the underlying data, and the total is defined as the sum of the
+	 * components.  This works reasonably for cases where we have a
+	 * decomposition; in those where we don't, we apply the same rounded-
+	 * but-at-least-one rule to derive the total directly from the data.
+	 */
+	present = dataset.keysForTime(range[0], 1);
 	ret.present = {};
 
-	if (ret.total !== 0) {
-		present = dataset.keysForTime(range[0], 1);
+	if (present.length === 0) {
+		/*
+		 * Maybe there's no data here, or maybe there's just no
+		 * decomposition.  Either way, calculate the total separately.
+		 */
+		value = mod_heatmap.bucketize(dataset.total(), detconf)[0][0];
+		if (value === 0)
+			ret.total = 0;
+		else
+			ret.total = Math.max(1, Math.round(value));
+	} else {
+		ret.total = 0;
 
 		for (ii = 0; ii < present.length; ii++) {
-			bb = mod_heatmap.bucketize(
-			    dataset.dataForKey(present[ii]), detconf);
+			value = mod_heatmap.bucketize(
+			    dataset.dataForKey(present[ii]), detconf)[0][0];
 
-			if (bb.length === 0)
+			if (!value)
 				continue;
 
-			bb = Math.round(bb[0][0]);
-
-			if (bb > 0)
-				ret.present[present[ii]] = bb;
+			value = Math.max(1, Math.round(value));
+			ret.present[present[ii]] = value;
+			ret.total += value;
 		}
 	}
 

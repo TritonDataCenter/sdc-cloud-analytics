@@ -40,6 +40,8 @@ var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
 
+var cfg_instn_max_peruser = 10;		/* maximum allowed instns per user */
+
 /*
  * The following constants and data structures manage active instrumentations.
  * Each instrumentation is either global or associated with a particular
@@ -260,6 +262,7 @@ function cfgAdminStatus(callback, recurse, timeout)
 	ret['uptime'] = start - cfg_start;
 
 	ret['cfg_http_port'] = cfg_http_port;
+	ret['cfg_instn_max_peruser'] = cfg_instn_max_peruser;
 
 	ret['cfg_aggregators'] = {};
 	for (key in cfg_aggregators) {
@@ -431,11 +434,32 @@ function cfgInstrumentationsListCustomer(rv, insts)
  */
 function cfgHttpInstCreate(request, response)
 {
-	var custid, props;
+	var custid, props, ninstns;
 
 	custid = request.params['custid'];
 	props = cfgHttpInstReadProps(request);
 	cfg_log.info('request to instrument:\n%j', props);
+
+	/*
+	 * For customer requests, we impose a limit on the number of active
+	 * instrumentations at any given time to prevent individual customers
+	 * from over-taxing our infrastructure.  Global instrumentations (which
+	 * can only be created by administrators) have no such limits.
+	 */
+	if (custid !== undefined) {
+		ninstns = Object.keys(cfgInstrumentations(custid)).length;
+		ASSERT.ok(ninstns <= cfg_instn_max_peruser);
+		if (ninstns == cfg_instn_max_peruser) {
+			cfg_log.warn('user %s attempted to exceed max # of ' +
+			    'instrumentations allowed', custid);
+			response.send(HTTP.EBADREQUEST, {
+			    error: caSprintf('only %d instrumentations allowed',
+			    cfg_instn_max_peruser)
+			});
+			return;
+		}
+	}
+
 	cfg_factory.create(custid, props, function (err, inst) {
 		var headers, code;
 

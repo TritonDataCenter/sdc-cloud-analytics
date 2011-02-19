@@ -539,13 +539,13 @@ var aggValueHeatmapParams = {
 	},
 	ymin: {
 	    type: 'number',
-	    default: 1000,		/* 1us */
+	    default: 0,
 	    min: 0,
 	    max: 1000000000000		/* 1000s */
 	},
 	ymax: {
 	    type: 'number',
-	    default: 10000000000,	/* 10s */
+	    default: undefined,		/* auto-scale */
 	    min: 0,
 	    max: 1000000000000		/* 1000s */
 	},
@@ -614,7 +614,7 @@ function aggHttpHeatmapHues(nselected, isolate)
 
 function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 {
-	var conf, formals, actuals, nhues, hue, hues;
+	var conf, formals, actuals, max, nhues, hue, hues;
 	var ii;
 
 	formals = aggValueHeatmapParams;
@@ -627,7 +627,9 @@ function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 	conf.width = mod_ca.caHttpParam(formals, actuals, 'width');
 	conf.nbuckets = mod_ca.caHttpParam(formals, actuals, 'nbuckets');
 	conf.min = mod_ca.caHttpParam(formals, actuals, 'ymin');
-	conf.max = mod_ca.caHttpParam(formals, actuals, 'ymax');
+	max = mod_ca.caHttpParam(formals, actuals, 'ymax');
+	if (max !== undefined)
+		conf.max = max;
 	conf.weighbyrange = mod_ca.caHttpParam(formals, actuals,
 	    'weights') == 'weight';
 	conf.linear = mod_ca.caHttpParam(formals, actuals,
@@ -795,6 +797,10 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 		conf = aggHttpHeatmapConf(request, start, duration, false, 0);
 		xx = param(aggValueHeatmapParams, 'x');
 		yy = param(aggValueHeatmapParams, 'y');
+
+		if (!conf.max)
+			throw (new caValidationError(
+			    '"ymax" must be specified'));
 
 		if (xx >= conf.width)
 			throw (new caValidationError(

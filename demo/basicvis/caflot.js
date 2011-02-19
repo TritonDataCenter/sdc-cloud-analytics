@@ -13,7 +13,7 @@ var gMetrics = [];		/* all available metrics */
 var gGraphs = {};		/* currently active graphs */
 var gZoomOptions = [ 10, 30, 60, 300, 600, 3600 ];	/* seconds */
 var gZoomDefault = 1;		/* default is 30 seconds */
-var gyMin = 1000;		/* global/default ymin for heatmaps 1us */
+var gyMin = 0;			/* global/default ymin for heatmaps */
 var gyMax = 10000000000;	/* global/default ymax for heatmaps 10s */
 
 /*
@@ -400,6 +400,8 @@ function gGraph(conf)
 	this.g_paused = false;
 	this.g_ymin = gyMin;
 	this.g_ymax = gyMax;
+	this.g_scalemin = this.g_ymin;
+	this.g_scalemax = this.g_ymax;
 	this.g_secondsback = 0;
 	this.g_legend_mode = 'summary';
 
@@ -573,22 +575,11 @@ gGraph.prototype.initDom = function ()
 
 		slider = td.appendChild(document.createElement('div'));
 		slider.className = 'gRange';
+		this.g_slider = slider;
+
 		text = slider.appendChild(document.createElement('div'));
 		text.className = 'gRangeText';
-		$(text).text(graph.g_ymin + ' - ' + graph.g_ymax);
-		$(slider).slider({
-			orientation: 'vertical',
-			range: true,
-			min: graph.g_ymin,
-			max: graph.g_ymax,
-			values: [ gyMin, gyMax ],
-			stop: function (event, ui) {
-				graph.g_ymin = ui.values[0];
-				graph.g_ymax = ui.values[1];
-				$(text).text(graph.g_ymin + ' - ' +
-				    graph.g_ymax);
-			}
-		});
+		this.g_slider_text = text;
 	}
 
 	$(tbody).click(function (event) {
@@ -954,7 +945,8 @@ gGraph.prototype.uriParams = function (duration, start)
 	url += 'width=' + gPlotWidth + '&';
 	url += 'height=' + gPlotHeight + '&';
 	url += 'ymin=' + this.g_ymin + '&';
-	url += 'ymax=' + this.g_ymax + '&';
+	if (this.g_ymax !== undefined && this.g_ymax !== this.g_scalemax)
+		url += 'ymax=' + this.g_ymax + '&';
 	url += 'duration=' + duration + '&';
 	url += 'nbuckets=' + gnBuckets + '&';
 	url += 'coloring=' + this.g_coloring + '&';
@@ -1015,6 +1007,19 @@ gGraph.prototype.retrieveDatum = function (duration, start_time)
 			graph.updateHeatmap(value);
 		else
 			graph.updateRaw(value);
+
+		/*
+		 * This is a bit of a hack, but other callers (e.g.,
+		 * heatmapClicked) use g_uri_params to get the parameters used
+		 * to build the current heatmap image.  However, while we may
+		 * not have explicitly specified a value for "max" (allowing the
+		 * server to pick it), these other callers will need to have
+		 * "max" specified for retrieving the related URIs.  So we tack
+		 * the server's value on here, but only if it wasn't already in
+		 * the parameters.
+		 */
+		if (params.indexOf('&ymax=') == -1)
+			params += '&ymax=' + value.ymax;
 
 		graph.g_uri_params = params;
 	};
@@ -1117,6 +1122,26 @@ gGraph.prototype.updateHeatmap = function (value)
 
 	if (this.g_legend_mode == 'summary')
 		this.updateTable(this.g_legend_summary);
+
+	if (this.g_ymax == this.g_scalemax && value.ymax !== this.g_ymax) {
+		this.g_scalemax = this.g_ymax = value.ymax;
+
+		$(this.g_slider).slider({
+			orientation: 'vertical',
+			range: true,
+			min: this.g_scalemin,
+			max: this.g_scalemax,
+			values: [ this.g_ymin, this.g_ymax ],
+			stop: function (event, ui) {
+				graph.g_ymin = ui.values[0];
+				graph.g_ymax = ui.values[1];
+				$(graph.g_slider_text).text(
+				    graph.g_ymin + ' - ' + graph.g_ymax);
+			}
+		});
+
+		$(this.g_slider_text).text(this.g_ymin + '-' + this.g_ymax);
+	}
 };
 
 /*

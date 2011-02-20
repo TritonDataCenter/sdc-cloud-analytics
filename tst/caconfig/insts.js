@@ -145,6 +145,7 @@ var listInsts = function (id, inputExp)
 	    'value-arity': 'scalar',
 	    enabled: true,
 	    'retention-time': 600,
+	    'idle-max': 3600,
 	    uri: '/ca/instrumentations/1',
 	    uris: [ {
 		name: 'value_raw',

@@ -41,6 +41,8 @@ var cfg_statmods = {};		/* describes available metrics and which */
 				/* instrumenters provide them. */
 
 var cfg_instn_max_peruser = 10;		/* maximum allowed instns per user */
+var cfg_reaper_interval = 60 * 1000;	/* time between reaps (ms) */
+var cfg_reaper_last;			/* last time reaper ran */
 
 /*
  * The following constants and data structures manage active instrumentations.
@@ -165,6 +167,55 @@ function main()
 function cfgStarted()
 {
 	cfg_cap.sendNotifyCfgOnline(mod_ca.ca_amqp_key_all);
+	setTimeout(cfgReaper, cfg_reaper_interval);
+}
+
+/*
+ * Scans through all instrumentations and destroys those which were last touched
+ * more than their max-allowed-idle-time allows.
+ */
+function cfgReaper()
+{
+	var now, fqid, instn, idlemax;
+
+	now = new Date().getTime();
+
+	for (fqid in cfg_insts) {
+		instn = cfg_insts[fqid];
+		idlemax = instn.inst.properties()['idle-max'];
+		if (idlemax === 0 ||
+		    (now - instn.last.getTime()) <= idlemax * 1000)
+			continue;
+
+		cfg_log.warn('expiring idle instrumentation "%s" (last: %s)',
+		    fqid, instn.last);
+		cfgInstDelete(instn.inst);
+	}
+
+	cfg_reaper_last = now;
+	setTimeout(cfgReaper, cfg_reaper_interval);
+}
+
+/*
+ * Deletes the given instrumentation.  This operation is actually asynchronous
+ * but callers currently do not care when it actually completes.
+ */
+function cfgInstDelete(instn)
+{
+	var fqid, custid;
+
+	fqid = instn.fqid();
+	custid = instn.custid();
+	delete (cfgInstrumentations(custid)[fqid]);
+	delete (cfg_insts[fqid]);
+
+	cfg_factory.destroy(instn, function (err) {
+		if (!err)
+			return;
+
+		cfg_log.error('failure deleting instrumentation "%s": %r',
+		    fqid, err);
+	});
 }
 
 /*
@@ -263,6 +314,9 @@ function cfgAdminStatus(callback, recurse, timeout)
 
 	ret['cfg_http_port'] = cfg_http_port;
 	ret['cfg_instn_max_peruser'] = cfg_instn_max_peruser;
+	ret['cfg_reaper_interval'] = cfg_reaper_interval;
+	ret['cfg_reaper_last'] = cfg_reaper_last;
+	ret['cfg_factory'] = cfg_factory.info();
 
 	ret['cfg_aggregators'] = {};
 	for (key in cfg_aggregators) {
@@ -294,12 +348,13 @@ function cfgAdminStatus(callback, recurse, timeout)
 
 	ret['cfg_insts'] = {};
 	for (key in cfg_insts) {
-		obj = cfg_insts[key].inst;
+		obj = cfg_insts[key];
 
-		ret['cfg_insts'][key] = caDeepCopy(obj.properties());
+		ret['cfg_insts'][key] = caDeepCopy(obj.inst.properties());
 		ret['cfg_insts'][key]['aggregator'] =
-		    obj.aggregator().cag_hostname;
-		ret['cfg_insts'][key]['custid'] = obj.custid();
+		    obj.inst.aggregator().cag_hostname;
+		ret['cfg_insts'][key]['custid'] = obj.inst.custid();
+		ret['cfg_insts'][key]['last'] = obj.last;
 	}
 
 	ret['instn-scopes'] = {};
@@ -473,7 +528,7 @@ function cfgHttpInstCreate(request, response)
 
 		props = inst.properties();
 		headers = { 'Location': props['uri'] };
-		cfg_insts[inst.fqid()] = { inst: inst };
+		cfg_insts[inst.fqid()] = { inst: inst, last: new Date() };
 		cfgInstrumentations(inst.custid())[inst.fqid()] = true;
 		response.send(HTTP.CREATED, props, headers);
 	});
@@ -497,7 +552,7 @@ function cfgHttpInstReadProps(request)
 
 	props = {};
 	fields = [ 'module', 'stat', 'predicate', 'decomposition', 'enabled',
-	    'retention-time' ];
+	    'retention-time', 'idle-max' ];
 
 	for (ii = 0; ii < fields.length; ii++) {
 		if (fields[ii] in actuals)
@@ -515,7 +570,6 @@ function cfgHttpInstDelete(request, response)
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND);
@@ -524,21 +578,12 @@ function cfgHttpInstDelete(request, response)
 
 	/*
 	 * We always complete this request immediately and successfully since we
-	 * can always pretend we don't have this thing any more even if we
-	 * failed to disable some instrumenters.  We don't even need to wait for
-	 * the commands to complete.
+	 * can always pretend we don't have this thing any more even if we fail
+	 * to disable some instrumenters.  We don't even need to wait for the
+	 * commands to complete.
 	 */
-	inst = cfg_insts[fqid];
-	delete (cfgInstrumentations(custid)[fqid]);
-	delete (cfg_insts[fqid]);
+	cfgInstDelete(cfg_insts[fqid].inst);
 	response.send(HTTP.OK);
-
-	cfg_factory.destroy(inst.inst, function (err) {
-		if (!err)
-			return;
-
-		cfg_log.error('failure during instrumentation delete: %r', err);
-	});
 }
 
 /*
@@ -558,6 +603,7 @@ function cfgHttpInstSetProperties(request, response)
 
 	inst = cfg_insts[fqid];
 	props = cfgHttpInstReadProps(request);
+	inst.last = new Date();
 	cfg_factory.setProperties(inst.inst, props, function (err) {
 		if (err)
 			return (response.send(
@@ -574,13 +620,16 @@ function cfgHttpInstGetProperties(request, response)
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
+	var inst;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND);
 		return;
 	}
 
-	response.send(HTTP.OK, cfg_insts[fqid].inst.properties());
+	inst = cfg_insts[fqid];
+	inst.last = new Date();
+	response.send(HTTP.OK, inst.inst.properties());
 }
 
 /*
@@ -599,6 +648,7 @@ function cfgHttpInstValue(request, response)
 	}
 
 	inst = cfg_insts[fqid];
+	inst.last = new Date();
 	port = inst.inst.aggregator().cag_http_port;
 	ASSERT.ok(port);
 	mod_cahttp.caHttpForward(request, response, '127.0.0.1', port, cfg_log);

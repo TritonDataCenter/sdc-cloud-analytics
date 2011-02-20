@@ -10,13 +10,14 @@ var mod_sys = require('sys');
 var ASSERT = require('assert');
 
 var insd_log;
-var insd_dlibpath = [];		/* DTrace library Path (-L) */
-var insd_nenablings = 0;	/* number of active enablings */
+var insd_dt_bufsize = '16k';		/* principal buffer size */
+var insd_dt_strsize = '128';		/* string size */
+var insd_dt_libpath = [];		/* DTrace library Path (-L) */
+var insd_nenablings = 0;		/* number of active enablings */
 
 if (process.env['DTRACE_LIBPATH']) {
-	insd_dlibpath = process.env['DTRACE_LIBPATH'].split(':');
+	insd_dt_libpath = process.env['DTRACE_LIBPATH'].split(':');
 }
-
 
 exports.insinit = function (ins, log)
 {
@@ -212,7 +213,9 @@ exports.insinit = function (ins, log)
 function insdStatus()
 {
 	var ret = {};
-	ret['dtrace_libpath'] = insd_dlibpath;
+	ret['dtrace_libpath'] = insd_dt_libpath;
+	ret['dtrace_bufsize'] = insd_dt_bufsize;
+	ret['dtrace_strsize'] = insd_dt_strsize;
 	ret['nenablings'] = insd_nenablings;
 	return (ret);
 }
@@ -1346,9 +1349,11 @@ insDTraceMetric.prototype.instrument = function (callback)
 		insd_log.dbg('\n%s\n%s%s', sep, this.cad_prog, sep);
 
 	this.cad_dtr = new mod_dtrace.Consumer();
+	this.cad_dtr.setopt('bufsize', insd_dt_bufsize);
+	this.cad_dtr.setopt('strsize', insd_dt_strsize);
 	this.cad_dtr.setopt('zdefs');
-	for (ii = 0; ii < insd_dlibpath.length; ii++)
-		this.cad_dtr.setopt('libdir', insd_dlibpath[ii]);
+	for (ii = 0; ii < insd_dt_libpath.length; ii++)
+		this.cad_dtr.setopt('libdir', insd_dt_libpath[ii]);
 
 	try {
 		this.cad_dtr.strcompile(this.cad_prog);

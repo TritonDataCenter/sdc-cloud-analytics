@@ -33,6 +33,8 @@ var agg_broker;			/* AMQP broker config */
 
 var agg_transforms = {};	/* available transformations by name */
 
+var agg_recent_interval = 2 * agg_http_req_timeout;	/* see aggExpected() */
+
 function main()
 {
 	agg_start = new Date().getTime();
@@ -177,7 +179,7 @@ function aggCmdStatus(msg)
  */
 function aggData(msg)
 {
-	var id, time, hostname, value;
+	var id, time, hostname, value, now;
 	var inst, dataset, rq, ii;
 
 	id = msg.d_inst_id;
@@ -220,15 +222,17 @@ function aggData(msg)
 	 */
 	dataset = inst.agi_dataset;
 	ASSERT.ok(dataset.nreporting(time) <= dataset.nsources());
-	if (dataset.nreporting(time) != dataset.nsources())
+	if (dataset.nreporting(time) < aggExpected(dataset, time))
 		return;
 
+	now = new Date().getTime();
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
 		rq = inst.agi_requests[ii];
 
 		if (rq.datatime + rq.duration <= time) {
 			inst.agi_requests.splice(ii--, 1);
-			rq.callback(id, rq.datatime, rq.request, rq.response);
+			rq.callback(id, rq.datatime, rq.request, rq.response,
+			    now - rq.rqtime);
 		}
 	}
 }
@@ -279,6 +283,7 @@ function aggAdminStatus()
 	ret['uptime'] = start - agg_start;
 
 	ret['agg_http_req_timeout'] = agg_http_req_timeout;
+	ret['agg_recent_interval'] = agg_recent_interval;
 	ret['agg_http_port'] = agg_http_port;
 	ret['agg_profile'] = agg_profile;
 	ret['agg_transforms'] = {};
@@ -383,7 +388,8 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 
 	dataset = inst.agi_dataset;
 	if ((start + duration) * 1000 < since ||
-	    dataset.nreporting(start + duration - 1) == dataset.nsources()) {
+	    dataset.nreporting(start + duration - 1) >=
+	    aggExpected(dataset, start + duration - 1)) {
 		callback(fqid, start, request, response, 0);
 		return;
 	}
@@ -887,6 +893,23 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 	}
 
 	response.send(HTTP.OK, ret);
+}
+
+/*
+ * We define the number of sources we expect to be reporting data at a given
+ * time as the number of sources that reported data "recently".  For simplicity,
+ * we define "recent" as "within the interval of length 2*'timeout' ending
+ * 'timeout' seconds ago.  That is, if we typically wait 5 up to seconds for an
+ * instrumenter to report data, then the number of sources we expect to report
+ * data now is the number of different sources that reported data between 5 and
+ * 15 seconds ago.  Essentially, an instrumenter has to disappear for at least
+ * 15 seconds before we stop holding client data requests for that
+ * instrumenter's data.
+ */
+function aggExpected(dataset, time)
+{
+	return (dataset.maxreporting(time - agg_http_req_timeout / 1000 -
+	    agg_recent_interval / 1000, agg_recent_interval / 1000));
 }
 
 /*

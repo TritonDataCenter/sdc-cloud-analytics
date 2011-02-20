@@ -973,7 +973,7 @@ gGraph.prototype.uriParams = function (duration, start)
 
 	if (this.g_show != 'rainbow') {
 		for (value in this.g_selected) {
-			url += '&selected=' + value;
+			url += '&selected=' + encodeURIComponent(value);
 			url += '&hues=' + this.g_selected[value];
 		}
 	}

@@ -307,7 +307,7 @@ function aggAdminStatus()
 		    type: obj.agi_dataset.constructor.name,
 		    nsources: obj.agi_dataset.nsources(),
 		    last: obj.agi_last,
-		    pending_requests: obj.agi_requests,
+		    pending_requests: obj.agi_requests.length,
 		    inst: obj.agi_instrumentation
 		};
 

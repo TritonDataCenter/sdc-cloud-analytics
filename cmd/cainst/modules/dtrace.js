@@ -11,6 +11,8 @@ var ASSERT = require('assert');
 
 var insd_log;
 var insd_dt_bufsize = '16k';		/* principal buffer size */
+var insd_dt_cleanrate = '101hz';	/* cleaning rate */
+var insd_dt_dynvarsize = '32M';		/* dynamic variable space */
 var insd_dt_strsize = '128';		/* string size */
 var insd_dt_libpath = [];		/* DTrace library Path (-L) */
 var insd_nenablings = 0;		/* number of active enablings */
@@ -215,6 +217,8 @@ function insdStatus()
 	var ret = {};
 	ret['dtrace_libpath'] = insd_dt_libpath;
 	ret['dtrace_bufsize'] = insd_dt_bufsize;
+	ret['dtrace_cleanrate'] = insd_dt_cleanrate;
+	ret['dtrace_dynvarsize'] = insd_dt_dynvarsize;
 	ret['dtrace_strsize'] = insd_dt_strsize;
 	ret['nenablings'] = insd_nenablings;
 	return (ret);
@@ -1350,6 +1354,8 @@ insDTraceMetric.prototype.instrument = function (callback)
 
 	this.cad_dtr = new mod_dtrace.Consumer();
 	this.cad_dtr.setopt('bufsize', insd_dt_bufsize);
+	this.cad_dtr.setopt('cleanrate', insd_dt_cleanrate);
+	this.cad_dtr.setopt('dynvarsize', insd_dt_dynvarsize);
 	this.cad_dtr.setopt('strsize', insd_dt_strsize);
 	this.cad_dtr.setopt('zdefs');
 	for (ii = 0; ii < insd_dt_libpath.length; ii++)

@@ -65,6 +65,7 @@ SH_SCRIPTS = \
 	smf/method/canodesvc		\
 	tools/cadeploy			\
 	tools/cadepsvcs			\
+	tools/caupagent			\
 	tools/caupsvcs			\
 	tools/ca-headnode-setup
 

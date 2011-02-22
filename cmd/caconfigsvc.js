@@ -108,6 +108,7 @@ function main()
 	cfg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
 
 	cfg_cap = new mod_cap.capAmqpCap({
+	    debug: true,
 	    amqp: cfg_amqp,
 	    log: cfg_log,
 	    sysinfo: cfg_sysinfo
@@ -519,6 +520,7 @@ function cfgHttpInstCreate(request, response)
 		var headers, code;
 
 		if (err) {
+			cfg_log.error('failed to create instn: %r', err);
 			code = err instanceof caError &&
 			    err.code() == ECA_INVAL ? HTTP.EBADREQUEST :
 			    HTTP.ESERVER;

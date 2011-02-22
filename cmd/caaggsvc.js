@@ -55,6 +55,7 @@ function main()
 	agg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
 
 	agg_cap = new mod_cap.capAmqpCap({
+	    debug: true,
 	    amqp: agg_amqp,
 	    log: agg_log,
 	    sysinfo: agg_sysinfo

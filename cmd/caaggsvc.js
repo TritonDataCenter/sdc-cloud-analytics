@@ -672,7 +672,7 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 {
 	var conf, duration, selected, isolate, exclude, rainbow;
 	var inst, dataset, datasets, count;
-	var ii, ret, range, transforms, buffer, png;
+	var ii, ret, transforms, buffer, png;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
 	};
@@ -773,10 +773,8 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	if (transforms != null)
 		ret.transformations = transforms;
 
-	conf.nbuckets = 1;
-	range = mod_heatmap.samplerange(0, 0, conf)[1];
-	ret.ymin = range[0];
-	ret.ymax = range[1];
+	ret.ymin = conf.min;
+	ret.ymax = conf.max;
 	tk.step('transform + samplerange');
 	buffer = png.encodeSync();
 	tk.step('png encoding');

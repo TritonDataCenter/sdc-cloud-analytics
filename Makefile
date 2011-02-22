@@ -64,6 +64,8 @@ SH_SCRIPTS = \
 	pkg/pkg-postdeactivate.sh	\
 	smf/method/canodesvc		\
 	tools/cadeploy			\
+	tools/cadepsvcs			\
+	tools/caupsvcs			\
 	tools/ca-headnode-setup
 
 SVC_SCRIPTS = \

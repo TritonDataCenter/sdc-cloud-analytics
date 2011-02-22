@@ -35,7 +35,7 @@ function sh_curl
 
 function sh_extract
 {
-	nicerest | grep \"$1\" | cut -d\" -f4
+	json | grep \"$1\" | cut -d\" -f4
 }
 
 function sh_extract_header
@@ -58,7 +58,7 @@ function sh_install_agents
 
 function sh_loadcust
 {
-	sh_custuri=/customers/$(sh_curl $sh_capi/customers | sh_extract uuid)
+	sh_custuri=/customers/$(sh_curl $sh_capi/customers | json 0.uuid)
 }
 
 function sh_loadtpl
@@ -74,7 +74,7 @@ function sh_loadtpl
 
 	echo "Retrieving URI for template $sh_zonetpl ... \c"
         for uri in $uris; do
-                name=$(sh_curl $sh_urlbase$uri | sh_extract name)
+                name=$(sh_curl $sh_urlbase$uri | json name)
                 if [[ $name = $sh_zonetpl ]]; then
                         sh_zonetpluri=$uri
 			echo $uri
@@ -95,7 +95,7 @@ function sh_provision
 
         [[ $? -eq 0 ]] || fail "failed to create zone: $out"
 	turi=$(echo "$out" | sh_extract_header X-Joyent-Transition-URI)
-	[[ -n $turi ]] || fail "no transition URI"
+	[[ -n $turi ]] || fail "no transition URI: $out"
 
 	while [[ -z $sh_conturi ]]; do
 		sleep 1
@@ -106,8 +106,10 @@ function sh_provision
 	done
 
 	out=$(sh_curl $sh_urlbase$sh_conturi)
-	sh_zonename=$(echo "$out" | sh_extract name | grep -v joyent.us | head -1)
-	sh_zoneip=$(echo "$out" | sh_extract address)
+	sh_zonename=$(echo "$out" | json name)
+	[[ -n $sh_zonename ]] || fail "no zone name: $out"
+	sh_zoneip=$(echo "$out" | json ips.0.address)
+	[[ -n $sh_zoneip ]] || fail "no zone ip: $out"
 }
 
 [[ -n $sh_user ]] || fail "usage: $sh_arg0 <username>"
@@ -125,8 +127,6 @@ sh_loadtpl || fail "failed"
 
 echo "Provisioning $sh_zonetpl zone ... \c"
 sh_provision $sh_custuri $sh_zonetpluri || fail "failed"
-[[ -n $sh_zonename ]] || fail "no zone name found"
-[[ -n $sh_zoneip ]] || fail "no zone IP found"
 echo "$sh_zonename ($sh_zoneip)"
 
 cat > /zones/ca/root/root/setup_zone.sh <<EOF

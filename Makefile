@@ -325,8 +325,12 @@ $(PKGROOT)/caaggsvc/%: %
 $(PKGROOT)/cainstsvc/%: %
 	cp $^ $@
 
-$(PKGROOT)/%/package.json: pkg/%-package.json
-	sed -e 's#@@CA_VERSION@@#$(CA_VERSION)#g' $^ > $@
+$(PKGROOT)/%/package.json: pkg/%-package.json FORCE
+	sed -e 's#@@CA_VERSION@@#$(CA_VERSION)#g' $< > $@
+
+FORCE:
+
+.PHONY: FORCE
 
 $(PKGROOT)/%/.npmignore: pkg/npm-ignore
 	grep -v ^# $^ > $@

@@ -1,0 +1,130 @@
+#!/bin/bash
+
+#
+# Upgrades the global zone CA bits on an SDC node (both headnode and compute)
+#
+
+shopt -s xpg_echo
+set -o pipefail
+
+function fail
+{
+	echo "$*" >&2
+	exit 1
+}
+
+function usage
+{
+	echo "usage: $cus_arg0 [-fk] ca-pkg.tar.gz" >&2
+	echo "    Upgrades current CA global zone bits with those in the " >&2
+	echo "    specified upgrade image." >&2
+	echo >&2
+	echo "    Options" >&2
+	echo "        -f    skip sanity checks (be careful)" >&2
+	echo "        -k    keep temporary directory around (for debugging)" >&2
+	fail
+}
+
+function forcefail
+{
+	if [[ $opt_f = true ]]; then
+		echo "warning: $* (forcing anyway)"
+		return;
+	fi
+
+	echo "error: $* (use -f to force)" >&2
+	cus_forceerrors=true
+}
+
+#
+# Process arguments.  See usage message above for details.
+#
+cus_pkgs="cabase cainstsvc"
+cus_arg0=$(basename $0)
+opt_f=false
+opt_k=false
+
+while getopts ":fk" c; do
+	case "$c" in
+	f|k)	eval opt_$c=true				;;
+	*)	usage "illegal option -- $OPTARG"		;;
+	esac
+done
+
+shift $((OPTIND - 1))
+cus_forcerrors=false
+cus_image=$1
+
+#
+# Run sanity checks.  The user can override these with "-f".
+#
+[[ -n $cus_image ]] || usage
+[[ -f $cus_image ]] || fail "no such file: $cus_image"
+
+npm=$(which npm) || npm=/opt/smartdc/agents/bin/agents-npm
+[[ -n $npm && -x $npm ]] || \
+    fail "can't find executable npm in PATH or /opt/smartdc/agents/bin"
+echo "using npm = $npm"
+
+[[ $(zonename) = "global" ]] || forcefail "not in \"global\" zone"
+[[ $# -eq 1 ]] || forcefail "expected one package"
+[[ $(basename $cus_image .tar.bz2) = $(basename $cus_image) ]] && \
+    forcefail "expected tar.bz2 package"
+
+[[ $cus_forceerrors = true ]] && fail "bailing out because of errors"
+
+#
+# Unpack the update image
+#
+cus_tmpdir=/var/tmp/$cus_arg0.$$
+echo "Unpacking update image to $cus_tmpdir ... \c"
+mkdir $cus_tmpdir || fail "failed to create tmpdir"
+bzcat $cus_image | (cd $cus_tmpdir && tar xf -) || fail "failed to unpack"
+echo "done."
+
+#
+# Verify the update image.  Check that the expected files are there.
+#
+cd $cus_tmpdir || fail
+echo "Verifying update image ... \c"
+[[ -d root/pkg ]] || fail "invalid image (expected 'root/pkg' directory)"
+cd root/pkg
+for pkg in $cus_pkgs; do
+	[[ -f $pkg.tar.gz ]] || fail "invalid image (missing $pkg.tar.gz)"
+done
+echo "done."
+
+#
+# Remove the old services in reverse-dependency order to guarantee that npm
+# won't activate any of the new packages with older dependencies or vice versa.
+#
+for pkg in $(echo $cus_pkgs | nawk '{ for (i = NF; i > 0; --i) print $i }'); do
+	echo "Uninstalling old $pkg ... \c"
+	$npm uninstall $pkg > $cus_tmpdir/npm_uninstall_$pkg.out 2>&1 || \
+	    fail "FAILED; see $cus_tmpdir/npm_uninstall_$pkg.out"
+	echo "done."
+done
+
+#
+# Install the new packages.
+#
+for pkg in $cus_pkgs; do
+	echo "Installing new $pkg ... \c"
+	$npm install ./$pkg.tar.gz > $cus_tmpdir/npm_install_$pkg.out 2>&1 || \
+	    fail "FAILED; see $cus_tmpdir/npm_install_$pkg.out"
+	echo "done."
+done
+
+#
+# Remove our temporary directory.
+#
+if [[ $opt_k = false ]]; then
+	echo "Done.  Removing $cus_tmpdir ... \c"
+	cd /var/tmp || fail "failed to cd"
+	rm -rf $cus_tmpdir || fail "failed"
+	echo "done."
+else
+	echo "Done.  Kept temporary directory in $cus_tmpdir."
+fi
+
+exit 0

@@ -5,7 +5,7 @@
 #
 # Constants
 #
-CA_VERSION	:= $(shell git describe)
+CA_VERSION	:= $(shell git symbolic-ref HEAD | nawk -F / '{print $$3}')-$(shell git describe)
 
 #
 # Directories

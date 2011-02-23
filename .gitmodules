@@ -1,6 +1,6 @@
 [submodule "deps/node-amqp"]
 	path = deps/node-amqp
-	url = git://github.com/ry/node-amqp.git
+	url = git@git.joyent.com:node-amqp-joyent.git
 [submodule "deps/node-libdtrace"]
 	path = deps/node-libdtrace
 	url = git://github.com/bcantrill/node-libdtrace.git

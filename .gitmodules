@@ -12,7 +12,7 @@
 	url = git://github.com/ry/node.git
 [submodule "deps/node-png"]
 	path = deps/node-png
-	url = git://github.com/pkrumins/node-png.git
+	url = git@git.joyent.com:node-png-joyent.git
 [submodule "deps/node-heatmap"]
 	path = deps/node-heatmap
 	url = git@git.joyent.com:node-heatmap.git

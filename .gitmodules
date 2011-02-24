@@ -9,7 +9,7 @@
 	url = git://github.com/bcantrill/node-kstat.git
 [submodule "deps/node"]
 	path = deps/node
-	url = git://github.com/ry/node.git
+	url = git://github.com/joyent/node.git
 [submodule "deps/node-png"]
 	path = deps/node-png
 	url = git@git.joyent.com:node-png-joyent.git

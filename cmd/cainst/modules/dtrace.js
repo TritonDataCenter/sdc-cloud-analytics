@@ -1439,7 +1439,9 @@ function insDTraceVectorMetric(prog, hasdecomps, zero, hasdists)
 	else if (!hasdecomps)
 		this.cadv_adder = mod_caagg.caAddDistributions;
 	else if (!hasdists)
-		this.cadv_adder = mod_caagg.caAddDecompositions;
+		this.cadv_adder = function (lhs, rhs) {
+			return (mod_caagg.caAddDecompositions(lhs, rhs));
+		};
 	else
 		this.cadv_adder = function (lhs, rhs) {
 			return (mod_caagg.caAddDecompositions(lhs, rhs,
@@ -1528,9 +1530,16 @@ insDTraceMetricArray.prototype.deinstrument = function (callback)
 	});
 };
 
+/*
+ * It is rather important that we make a copy of zero here. When we use
+ * caAddDecompositions as our adder it modifies the left hand side of our value.
+ * If we don't copy zero, the initial value will end up getting modified. This
+ * can lead to an ever-increasing value.
+ */
 insDTraceMetricArray.prototype.value = function ()
 {
 	var adder = this.cad_progs[0].cadv_adder;
+	var zero = caDeepCopy(this.cad_progs[0].cadv_zero);
 	var data = this.cad_progs.map(function (x) {
 		var val = x.value();
 		if (val === undefined)
@@ -1538,5 +1547,6 @@ insDTraceMetricArray.prototype.value = function ()
 		else
 			return (val);
 	});
-	return (data.reduce(adder));
+
+	return (data.reduce(adder, zero));
 };

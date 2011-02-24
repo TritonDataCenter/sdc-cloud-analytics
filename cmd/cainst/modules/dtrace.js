@@ -61,7 +61,7 @@ exports.insinit = function (ins, log)
 	    metric: insdIops
 	});
 
-	ins.registerModule({ name: 'node', label: 'Node.js' });
+	ins.registerModule({ name: 'node', label: 'Node.js 0.4.x' });
 	ins.registerMetric({
 	    module: 'node',
 	    stat: 'httpd_ops',

@@ -36,6 +36,11 @@ function forcefail
 	cus_forceerrors=true
 }
 
+function svc_iter_instances
+{
+	svcs -H -ofmri $1
+}
+
 #
 # Process arguments.  See usage message above for details.
 #
@@ -94,7 +99,7 @@ echo "done."
 # SMF service but that gets removed when we uninstall the package so we need to
 # save it here and then reapply it when the new services are installed.
 #
-echo "Saving CA MAPI configuration ... \c"
+echo "Saving CA MAPI/AMQP configuration ... \c"
 cus_mapi_host=$(svcprop -p com.joyent.ca,caconfig/mapi-host caconfigsvc) || \
     fail "failed to retrieve mapi configuration"
 cus_mapi_port=$(svcprop -p com.joyent.ca,caconfig/mapi-port caconfigsvc) || \
@@ -103,6 +108,8 @@ cus_mapi_user=$(svcprop -p com.joyent.ca,caconfig/mapi-user caconfigsvc) || \
     fail "failed to retrieve mapi configuration"
 cus_mapi_pass=$(svcprop -p com.joyent.ca,caconfig/mapi-password \
     caconfigsvc) || fail "failed to retrieve mapi configuration"
+cus_amqp_host=$(svcprop -p com.joyent.ca,caconfig/amqp-host caconfigsvc) || \
+    fail "failed to retrieve AMQP host"
 echo "done."
 
 #
@@ -126,15 +133,18 @@ for pkg in $cus_pkgs; do
 	echo "done."
 
 	#
-	# Disable the configuration service now because we haven't restored the
-	# MAPI configuration yet.  Yes, there's a race here, and we're not
-	# proud.  But the client will have to deal with the potential error
-	# case here anyway.
+	# Disable the aggregator and configuration services because we haven't
+	# restored their configurations yet.  Yes, there's a race here, and
+	# we're not proud.  But the client will have to deal with the potential
+	# error case here anyway.
 	#
-	[[ $pkg = "caconfigsvc" ]] || continue
-	echo "Disabling caconfigsvc ... \c"
-	svcadm disable -s caconfigsvc || fail "FAILED"
-	echo "done."
+	[[ $pkg = "cabase" ]] && continue
+
+	for fmri in $(svc_iter_instances $pkg); do
+		echo "Disabling $fmri ... \c"
+		svcadm disable -s $fmri || fail "FAILED"
+		echo "done."
+	done
 done
 
 #
@@ -152,11 +162,30 @@ EOF
 echo "done."
 
 #
-# Re-enable the configuration service.
+# Restore the AMQP configuration.
 #
-echo "Enabling caconfigsvc ... \c"
-svcadm enable -s caconfigsvc || fail "failed"
-echo "done."
+for pkg in $cus_pkgs; do
+	[[ $pkg = "cabase" ]] && continue
+	for fmri in $(svc_iter_instances $pkg); do
+		echo "Restoring AMQP config to $fmri ... \c"
+		svccfg <<-EOF || fail "FAILED"
+		select $fmri
+		setprop com.joyent.ca,caconfig/amqp-host = \
+		    astring: $cus_amqp_host
+		refresh
+		EOF
+		echo "done."
+	done
+done
+
+for pkg in $cus_pkgs; do
+	[[ $pkg = "cabase" ]] && continue
+	for fmri in $(svc_iter_instances $pkg); do
+		echo "Enabling $fmri ... \c"
+		svcadm enable -s $fmri || fail "failed"
+		echo "done."
+	done
+done
 
 #
 # Remove our temporary directory.

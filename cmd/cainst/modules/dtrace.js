@@ -888,7 +888,7 @@ function insdNodeSocketImpl(metric)
 		zero = {};
 	} else {
 		index = '';
-		zero = 0;
+		zero = (aggSize || aggBuff) ? [] : 0;
 	}
 
 	if (aggBuff) {

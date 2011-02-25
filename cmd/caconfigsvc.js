@@ -102,7 +102,8 @@ function main()
 	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
 	    basename: mod_ca.ca_amqp_key_base_config,
 	    hostname: cfg_sysinfo.ca_hostname,
-	    bindings: [ mod_ca.ca_amqp_key_config, mod_ca.ca_amqp_key_all ]
+	    bindings: [ mod_ca.ca_amqp_key_config, mod_ca.ca_amqp_key_all ],
+	    log: cfg_log
 	});
 	cfg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError(cfg_log));
 	cfg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
@@ -309,6 +310,7 @@ function cfgAdminStatus(callback, recurse, timeout)
 	ret['amqp_routekey'] = cfg_amqp.routekey();
 	ret['heap'] = process.memoryUsage();
 	ret['http'] = cfg_http.info();
+	ret['amqp'] = cfg_amqp.info();
 	ret['sysinfo'] = cfg_sysinfo;
 	ret['started'] = cfg_start;
 	ret['uptime'] = start - cfg_start;

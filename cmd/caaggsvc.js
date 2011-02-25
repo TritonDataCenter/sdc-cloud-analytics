@@ -49,7 +49,8 @@ function main()
 	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
 	    basename: mod_ca.ca_amqp_key_base_aggregator,
 	    hostname: agg_sysinfo.ca_hostname,
-	    bindings: [ mod_ca.ca_amqp_key_all ]
+	    bindings: [ mod_ca.ca_amqp_key_all ],
+	    log: agg_log
 	});
 	agg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
 	agg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
@@ -279,6 +280,7 @@ function aggAdminStatus()
 	ret['amqp_routekey'] = agg_amqp.routekey();
 	ret['heap'] = process.memoryUsage();
 	ret['http'] = agg_http.info();
+	ret['amqp'] = agg_amqp.info();
 	ret['sysinfo'] = agg_sysinfo;
 	ret['started'] = agg_start;
 	ret['uptime'] = start - agg_start;

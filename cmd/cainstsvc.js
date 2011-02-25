@@ -20,6 +20,7 @@ var ins_iid;			/* interval timer id */
 
 var ins_cap;			/* cap wrapper */
 var ins_log;			/* log handle */
+var ins_amqp;
 
 var stdout = process.stdout;
 
@@ -28,23 +29,23 @@ function main()
 	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(ins_name, ins_vers);
 	var hostname = sysinfo.ca_hostname;
-	var amqp;
 
 	ins_log = new mod_log.caLog({ out: process.stdout });
 
-	amqp = new mod_caamqp.caAmqp({
+	ins_amqp = new mod_caamqp.caAmqp({
 	    broker: broker,
 	    exchange: mod_ca.ca_amqp_exchange,
 	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
 	    basename: mod_ca.ca_amqp_key_base_instrumenter,
 	    hostname: hostname,
-	    bindings: [ mod_ca.ca_amqp_key_all ]
+	    bindings: [ mod_ca.ca_amqp_key_all ],
+	    log: ins_log
 	});
-	amqp.on('amqp-error', mod_caamqp.caAmqpLogError(ins_log));
-	amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(ins_log));
+	ins_amqp.on('amqp-error', mod_caamqp.caAmqpLogError(ins_log));
+	ins_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(ins_log));
 
 	ins_cap = new mod_cap.capAmqpCap({
-	    amqp: amqp,
+	    amqp: ins_amqp,
 	    log: ins_log,
 	    sysinfo: sysinfo
 	});
@@ -57,11 +58,11 @@ function main()
 	ins_log.info('Instrumenter starting up (%s/%s)', ins_name, ins_vers);
 	ins_log.info('%-12s %s', 'Hostname:', hostname);
 	ins_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
-	ins_log.info('%-12s %s', 'Routing key:', amqp.routekey());
+	ins_log.info('%-12s %s', 'Routing key:', ins_amqp.routekey());
 
 	insInitBackends();
 
-	amqp.start(insStarted);
+	ins_amqp.start(insStarted);
 }
 
 /*
@@ -399,7 +400,8 @@ function insCmdStatus(msg)
 
 	sendmsg.s_modules = insGetModules();
 	sendmsg.s_status = {
-		instrumentations: sendmsg.s_instrumentations
+		instrumentations: sendmsg.s_instrumentations,
+		amqp: ins_amqp.info()
 	};
 
 	for (id in ins_status_callbacks)

@@ -892,9 +892,11 @@ function insdNodeSocketImpl(metric)
 	}
 
 	if (aggBuff) {
-		action = insdLlquantize(transforms['buffered']) + ';';
+		action = mod_ca.caSprintf('llquantize((%s), 10, 0, 11, 100);',
+		    transforms['buffered']);
 	} else if (aggSize) {
-		action = insdLlquantize(transforms['size']) + ';';
+		action = mod_ca.caSprintf('llquantize((%s), 10, 0, 11, 100);',
+		    transforms['size']);
 	} else {
 		action = 'count();';
 	}

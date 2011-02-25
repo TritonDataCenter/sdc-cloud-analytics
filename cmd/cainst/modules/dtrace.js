@@ -1185,7 +1185,7 @@ function insdLogFSIO(metric)
 	before['fstype'] = true;
 	hasPred = mod_capred.caPredNonTrivial(pred);
 
-	if (zones) {
+	if (metric.is_zones) {
 		zones = metric.is_zones.map(function (elt) {
 			return ('zonename == "' + elt + '"');
 		});

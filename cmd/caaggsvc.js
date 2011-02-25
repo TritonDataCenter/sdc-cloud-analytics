@@ -37,11 +37,20 @@ var agg_recent_interval = 2 * agg_http_req_timeout;	/* see aggExpected() */
 
 function main()
 {
+	var dbg_log;
+
 	agg_start = new Date().getTime();
 	agg_sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
 	agg_broker = mod_ca.caBroker();
 
 	agg_log = new mod_log.caLog({ out: process.stdout });
+
+	if (process.argv.length > 2) {
+		dbg_log = mod_log.caLogFromFile(process.argv[2],
+		    { candrop: true }, mod_log.caLogError(agg_log));
+		agg_log.info('Logging AMQP debug messages to "%s"',
+		    process.argv[2]);
+	}
 
 	agg_amqp = new mod_caamqp.caAmqp({
 	    broker: agg_broker,
@@ -56,7 +65,7 @@ function main()
 	agg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
 
 	agg_cap = new mod_cap.capAmqpCap({
-	    debug: true,
+	    dbglog: dbg_log,
 	    amqp: agg_amqp,
 	    log: agg_log,
 	    sysinfo: agg_sysinfo

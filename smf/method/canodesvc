@@ -101,7 +101,6 @@ ns_node="$(getprop caconfig/path-node)"
 ns_logbase="$(getprop caconfig/path-logs)"
 ns_rt=$(getprop caconfig/run-rt)
 ns_name=
-ns_args=
 
 #
 # Figure out which service to start.
@@ -134,9 +133,10 @@ env | sort | egrep '^(AMQP_|MAPI_|NODE_PATH)' | grep -v PASSWORD
 # Launch the daemon.
 #
 mkdir -p "$ns_logbase/$ns_name" || fail "failed to create log directory"
-ns_logfile="$ns_logbase/$ns_name/$(date +%F.%T)"
+ns_dbglogfile="$ns_logbase/$ns_name/amqp-$(date +%F.%T).$$"
+ns_rqlogfile="$ns_logbase/$ns_name/requests-$(date +%F.%T).$$"
 smf_clear_env
-$ns_node $ns_exec $ns_logfile $ns_args &
+$ns_node $ns_exec $ns_dbglogfile $ns_rqlogfile &
 ns_pid=$!
 [[ $ns_rt == "true" ]] && run_realtime $ns_pid
 exit $SMF_EXIT_OK

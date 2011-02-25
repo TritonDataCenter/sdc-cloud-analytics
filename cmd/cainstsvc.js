@@ -29,8 +29,16 @@ function main()
 	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(ins_name, ins_vers);
 	var hostname = sysinfo.ca_hostname;
+	var dbg_log;
 
 	ins_log = new mod_log.caLog({ out: process.stdout });
+
+	if (process.argv.length > 2) {
+		dbg_log = mod_log.caLogFromFile(process.argv[2],
+		    { candrop: true }, mod_log.caLogError(ins_log));
+		ins_log.info('Logging AMQP debug messages to "%s"',
+		    process.argv[2]);
+	}
 
 	ins_amqp = new mod_caamqp.caAmqp({
 	    broker: broker,
@@ -46,6 +54,7 @@ function main()
 
 	ins_cap = new mod_cap.capAmqpCap({
 	    amqp: ins_amqp,
+	    dbglog: dbg_log,
 	    log: ins_log,
 	    sysinfo: sysinfo
 	});

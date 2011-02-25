@@ -5,7 +5,6 @@
  * analytics service, including instrumenters and aggregators.
  */
 
-var mod_fs = require('fs');
 var mod_http = require('http');
 var mod_sys = require('sys');
 var ASSERT = require('assert');
@@ -68,7 +67,7 @@ var cfg_global_insts = {};	/* global (non-customer) insts */
 
 function main()
 {
-	var mapi, lfile, request_log, opened;
+	var mapi, request_log, dbg_log;
 
 	cfg_start = new Date().getTime();
 	cfg_sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
@@ -77,23 +76,16 @@ function main()
 	cfg_mapi = mod_ca.caMapiConfig();
 
 	if (process.argv.length > 2) {
-		opened = false;
-		cfg_log.info('Logging requests to %s', process.argv[2]);
+		dbg_log = mod_log.caLogFromFile(process.argv[2],
+		    { candrop: true }, mod_log.caLogError(cfg_log));
+		cfg_log.info('Logging AMQP debug messages to "%s"',
+		    process.argv[2]);
+	}
 
-		lfile = mod_fs.createWriteStream(
-		    process.argv[2], { flags: 'a' });
-		lfile.on('open', function () { opened = true; });
-		lfile.on('error', function (err) {
-			if (!opened) {
-				cfg_log.error(
-				    'failed to open request log: %r', err);
-				process.exit(1);
-			}
-
-			cfg_log.error('failed write to request log: %r', err);
-		});
-
-		request_log = new mod_log.caLog({ out: lfile, candrop: true });
+	if (process.argv.length > 3) {
+		request_log = mod_log.caLogFromFile(process.argv[3],
+		    { candrop: true }, mod_log.caLogError(cfg_log));
+		cfg_log.info('Logging HTTP requests to "%s"', process.argv[3]);
 	}
 
 	cfg_amqp = new mod_caamqp.caAmqp({
@@ -109,7 +101,7 @@ function main()
 	cfg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
 
 	cfg_cap = new mod_cap.capAmqpCap({
-	    debug: true,
+	    dbglog: dbg_log,
 	    amqp: cfg_amqp,
 	    log: cfg_log,
 	    sysinfo: cfg_sysinfo

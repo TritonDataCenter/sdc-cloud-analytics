@@ -145,7 +145,6 @@ function gInitMetricsFini(metrics)
 		elt = document.getElementById('gStatAddButton');
 		elt.disabled = false;
 	}
-
 	gInitInstrumentations();
 }
 
@@ -598,8 +597,22 @@ gGraph.prototype.initDom = function ()
 		this.g_slider_text = text;
 	}
 
-	$(tbody).click(function (event) {
-	    graph.heatmapRowClicked(event); });
+	/*
+	 * We use the mousedown event as opposed to the click because most
+	 * browsers do not send a click event for the right mouse button. It's
+	 * as though Steve Job's one button mouse has taken over the Browser
+	 * world.
+	 */
+	$(tbody).mousedown(function (event) {
+		switch (event.which) {
+		case 1:
+			graph.heatmapRowClicked(event);
+			break;
+		default:
+			graph.legendRowRightClicked(event);
+			break;
+		}
+	});
 };
 
 /*
@@ -2125,3 +2138,182 @@ gGraph.prototype.predName = function (pred)
 
 	return (ret);
 };
+
+/*
+ * Given a metric it returns an object with keys as types and values as the
+ * keys of the field.
+ *
+ * XXX This information shouldn't really be hardcoded here, but rather should
+ * use the missing /types API endpoint
+ */
+function gatherMetricFieldsByType(metric)
+{
+	var key;
+	var fields = metric.fields;
+	var ret = {};
+
+	for (key in fields) {
+		switch (fields[key]['type']) {
+		case 'string':
+		case 'ip_address':
+			ret[key] = {
+			    type: 'discrete',
+			    label: fields[key]['label']
+			};
+			break;
+		default:
+			ret[key] = {
+			    type: 'numeric',
+			    label: fields[key]['label']
+			};
+			break;
+		}
+	}
+
+	return (ret);
+}
+
+function gatherMetricCombos(fields)
+{
+	var ii, jj, key;
+	var discrete = [];
+	var numeric = [];
+	var ret = [];
+
+	for (key in fields) {
+		if (fields[key]['type'] == 'numeric')
+			numeric.push(key);
+		else
+			discrete.push(key);
+	}
+
+	ret.push({ label: 'raw statistic', value: '' });
+	for (ii = 0; ii < discrete.length; ii++)
+		ret.push({
+		    label: fields[discrete[ii]]['label'],
+		    value: discrete[ii]
+		});
+
+	for (ii = 0; ii < numeric.length; ii++)
+		ret.push({
+		    label: fields[numeric[ii]]['label'],
+		    value: numeric[ii]
+		});
+
+	for (ii = 0; ii < discrete.length; ii++) {
+		for (jj = 0; jj < numeric.length; jj++)
+			ret.push({
+			    label: fields[numeric[jj]]['label'] + ' and ' +
+				fields[discrete[ii]]['label'],
+			    value: numeric[jj] + '&' + discrete[ii]
+			});
+	}
+
+	return (ret);
+}
+
+/*
+ * Produce a dialogue box that describes the right clicking of a legend row and
+ * allows for investingating further.
+ */
+gGraph.prototype.legendRowRightClicked = function (event)
+{
+	var dialog, form, par, cur, sel, ii, disc;
+	var graph = this;
+	var rent = graph.g_table.fnGetData(event.target.parentNode)[0];
+	var fields = gatherMetricFieldsByType(graph.g_metric);
+	var combos = gatherMetricCombos(fields);
+
+	for (ii = 0; ii < graph.g_decomps.length; ii++) {
+		if (fields[graph.g_decomps[ii]]['type'] == 'discrete') {
+			disc = fields[graph.g_decomps[ii]]['label'];
+			break;
+		}
+	}
+
+	form = document.createElement('form');
+	form.id = 'gInvestigate' + graph.g_id;
+	/* Create discrete question */
+	par = form.appendChild(document.createElement('p'));
+	par.appendChild(document.createTextNode('Predicating that \'' +
+	    disc + '\' equals \'' +  rent + '\':'));
+	par = form.appendChild(document.createElement('p'));
+	par.appendChild(document.createTextNode('\tChange decomposition to:'));
+	sel = par.appendChild(document.createElement('select'));
+	sel.id = 'gInvestigateSel' + graph.g_id;
+	for (ii = 0; ii < combos.length; ii++) {
+		cur = sel.appendChild(document.createElement('option'));
+		cur.value = combos[ii]['value'];
+		cur.appendChild(document.createTextNode(combos[ii]['label']));
+	}
+	/* Go ahead and create an input */
+	cur = form.appendChild(document.createElement('input'));
+	cur.type = 'button';
+	cur.id = 'gInvestigateSumbit' + graph.g_id;
+	cur.value = 'Investigate!';
+	cur.onclick = function () {
+	    var gid = graph.g_id;
+	    var dia = dialog;
+	    gInvestigateSubmit(gid, dia, rent);
+	};
+
+	/* Put it all together */
+	dialog = document.createElement('div');
+	dialog.appendChild(form);
+	$(dialog).dialog({
+		autoOpen: true,
+		title: graph.g_metric.modlabel + ' : ' +
+		    graph.g_metric.statlabel
+	});
+};
+
+function gInvestigateSubmit(graphId, dialog, rent)
+{
+	var elt, ii, decomp, curDiscrete;
+	var predicate = {};
+	var decomps = [];
+	var graph = gGraphs[graphId];
+	var fields = gatherMetricFieldsByType(graph.g_metric);
+
+	for (ii = 0; ii < graph.g_decomps.length; ii++) {
+		if (fields[graph.g_decomps[ii]]['type'] == 'discrete') {
+			curDiscrete = graph.g_decomps[ii];
+			break;
+		}
+	}
+
+	predicate['eq'] = [ curDiscrete, rent ];
+
+	elt = document.getElementById('gInvestigateSel' + graph.g_id);
+	decomp = elt.options[elt.selectedIndex].value;
+
+	if (decomp != '') {
+		ii = decomp.indexOf('&');
+		if (ii != -1) {
+			decomps.push(decomp.substring(0, ii));
+			decomps.push(decomp.substring(ii + 1, decomp.length));
+		} else {
+			decomps.push(decomp);
+		}
+	}
+
+	/* Preserve existing predicates */
+	if (!isEmpty(graph.g_predicate))
+		predicate =  { and: [ predicate, graph.g_predicate ] };
+
+	graph = new gGraph({
+		metric: graph.g_metric,
+		decomps: decomps,
+		predicate: predicate,
+		customer_id: gCustId() || undefined
+	});
+
+	gAppendGraph(graph);
+
+	/*
+	 * We have to remember to destroy the underlying elements otherwise
+	 * we're not going to properly reset our state.
+	 */
+	$(dialog).dialog('destroy');
+	dialog.removeChild(document.getElementById('gInvestigate' + graphId));
+}

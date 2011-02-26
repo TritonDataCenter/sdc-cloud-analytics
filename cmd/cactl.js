@@ -51,7 +51,8 @@ function main()
 		exchange_opts: mod_ca.ca_amqp_exchange_opts,
 		basename: mod_ca.ca_amqp_key_base_tool,
 		hostname: hostname,
-		bindings: []
+		bindings: [],
+		log: log
 	});
 	cc_amqp.on('amqp-error', function (err) {
 		die('amqp: %s', err.message);

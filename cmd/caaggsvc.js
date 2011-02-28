@@ -836,6 +836,9 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 	range = mod_heatmap.samplerange(xx, yy, conf);
 
 	ret = {};
+	ret.bucket_time = range[0];
+	ret.bucket_ymin = range[1][0];
+	ret.bucket_ymax = range[1][1];
 	ret.start_time = start;
 	ret.duration = duration;
 	ret.nsources = dataset.nsources();

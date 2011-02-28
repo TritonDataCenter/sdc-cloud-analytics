@@ -540,9 +540,9 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 	    'node_dtrace_http_request_t', 0, 'url');
 
 	var transforms = {
-	    latency: '((timestamp - latencys[' + arg0fd + ']))',
-	    method: '(methods['+ arg0fd + '])',
-	    url: '(urls['+ arg0fd + '])',
+	    latency: '((timestamp - latencys[pid,' + arg0fd + ']))',
+	    method: '(methods[pid,'+ arg0fd + '])',
+	    url: '(urls[pid,'+ arg0fd + '])',
 	    raddr: '(' + arg0raddr + ')',
 	    rport: 'lltostr(' + arg0port + ')'
 	};
@@ -601,15 +601,15 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 		for (ii = 0; ii < before.length; ii++) {
 			switch (before[ii]) {
 			case 'latency':
-				script += '\tlatencys[' + arg1fd + '] = ' +
+				script += '\tlatencys[pid,' + arg1fd + '] = ' +
 				    'timestamp;\n';
 				break;
 			case 'method':
-				script += '\tmethods[' + arg1fd + '] = ' +
+				script += '\tmethods[pid,' + arg1fd + '] = ' +
 				    arg0method + ';\n';
 				break;
 			case 'url':
-				script += '\turls[' + arg1fd + '] = ' +
+				script += '\turls[pid,' + arg1fd + '] = ' +
 				    arg0url + ';\n';
 				break;
 			default:
@@ -628,7 +628,7 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 	}
 
 	if (before.length > 0) {
-		predicates.push(mod_ca.caSprintf('%ss[%s] != NULL',
+		predicates.push(mod_ca.caSprintf('%ss[pid,%s] != NULL',
 		    before[0], arg0fd));
 	}
 
@@ -649,7 +649,7 @@ function insdNodeHttpCreate(metric, entryp, returnp)
 		script += '{\n';
 
 		for (ii = 0; ii < before.length; ii++)
-			script += mod_ca.caSprintf('\t%ss[%s] = 0;\n',
+			script += mod_ca.caSprintf('\t%ss[pid,%s] = 0;\n',
 			    before[ii], arg0fd);
 
 		script += '}\n';

@@ -1201,14 +1201,18 @@ function insdLogFSIO(metric)
 		case 'latency':
 			aggLatency = true;
 			before['latency'] = true;
+			predicates.push('self->ts != NULL');
 			break;
 		case 'filename':
 			before['filename'] = true;
 			indexes.push(transforms[decomps[ii]]);
+			predicates.push('self->filename != NULL');
 			break;
 		case 'fstype':
 			before['fstype'] = true;
 			indexes.push(transforms[decomps[ii]]);
+			predicates.push('self->fstype != NULL');
+			predicates.push('self->depth == stackdepth');
 			break;
 		default:
 			indexes.push(transforms[decomps[ii]]);
@@ -1247,7 +1251,7 @@ function insdLogFSIO(metric)
 		script += probelist.map(function (x) {
 			return (caSprintf('fbt::%s:entry', x));
 		}).join(',\n') + '\n';
-		script += caSprintf('/%s != "sockfs"/\n', transforms['fstype']);
+		script += '/self->fstype == NULL/\n';
 		script += '{\n';
 		for (key in before) {
 			switch (key) {
@@ -1261,6 +1265,7 @@ function insdLogFSIO(metric)
 			case 'fstype':
 				script += caSprintf('\tself->fstype = %s;\n',
 				    setFstype);
+				script += '\tself->depth = stackdepth;\n';
 				break;
 			default:
 				ASSERT.ok(false, 'programmer error');
@@ -1269,7 +1274,7 @@ function insdLogFSIO(metric)
 		}
 		script += '}\n\n';
 		script += 'fbt::fop_open:entry\n';
-		script += caSprintf('/%s != "sockfs"/\n', transforms['fstype']);
+		script += '/self->fstype == NULL/\n';
 		script += '{\n';
 		for (key in before) {
 			switch (key) {
@@ -1283,6 +1288,7 @@ function insdLogFSIO(metric)
 			case 'fstype':
 				script += caSprintf('\tself->fstype = %s;\n',
 				    setOpenFstype);
+				script += '\tself->depth = stackdepth;\n';
 				break;
 			default:
 				ASSERT.ok(false, 'programmer error');
@@ -1326,10 +1332,12 @@ function insdLogFSIO(metric)
 	script += probelist.map(function (x) {
 			return (caSprintf('fbt::%s:return', x));
 		}).join(',\n') + '\n';
+	script += '/self->depth == stackdepth/\n';
 	script += '{\n';
 	script += '\tself->ts = 0;\n';
 	script += '\tself->filename = 0;\n';
 	script += '\tself->fstype = 0;\n';
+	script += '\tself->depth = 0;\n';
 	script += '}\n\n';
 
 	return (new insDTraceVectorMetric(script, indexes.length > 0, zero,

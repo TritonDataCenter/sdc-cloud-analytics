@@ -1,0 +1,74 @@
+#!/bin/bash
+
+#
+# camonsvcs: monitors CA services with AMQP ping messages
+#
+
+function fail
+{
+	echo "$cm_arg0: $*" >&2
+	exit 1
+}
+
+cm_confighost=$1
+cm_configport=23181
+cm_timeout=0
+
+cm_url="--url http://$cm_confighost:$cm_configport/ca/admin/status"
+cm_curl="curl -is -X GET $cm_url"
+cm_tmpfile=/var/tmp/$cm_arg0.$$
+cm_verbose=true
+cm_arg0=$(basename $0)
+
+[[ -n $cm_confighost ]] || fail "config host not specified"
+[[ -x $(which cactl) ]] || fail "cactl not found in PATH"
+[[ -n $AMQP_HOST ]] || fail "AMQP_HOST not set in environment"
+
+function update_config
+{
+	$cm_curl | json > $cm_tmpfile
+}
+
+#
+# list_hosts <type>: lists hosts of a given type (aggregator or instrumenter)
+#
+function list_hosts
+{
+	json $1 < $cm_tmpfile | grep "hostname" | sed -e 's#.*"\(.*\)",#\1#'
+}
+
+function list_instrumenters
+{
+	list_hosts cfg_instrumenters
+}
+
+function list_aggregators
+{
+	list_hosts cfg_aggregators
+}
+
+function ping_host
+{
+	[[ $cm_verbose = true ]] && echo "checking $1 $2"
+	cactl ca.$1.$2 ping > /dev/null
+}
+
+while :; do
+	[[ $cm_verbose = true ]] && echo "beginning check at $(date)"
+	update_config || fail "failed to update configuration"
+
+	for inst in $(list_instrumenters); do
+		ping_host instrumenter $inst || \
+		    fail "failed to ping instrumenter $inst"
+	done
+
+	for agg in $(list_aggregators); do
+		ping_host aggregator $agg ||
+		    fail "failed to ping aggregator $agg"
+	done
+
+	rm -f $cm_tmpfile
+	echo "completed check at $(date)" $'\r'
+	[[ $cm_timeout = 0 ]] && exit
+	sleep $cm_timeout
+done

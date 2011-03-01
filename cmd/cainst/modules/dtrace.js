@@ -1211,14 +1211,16 @@ function insdLogFSIO(metric)
 		case 'fstype':
 			before['fstype'] = true;
 			indexes.push(transforms[decomps[ii]]);
-			predicates.push('self->fstype != NULL');
-			predicates.push('self->depth == stackdepth');
 			break;
 		default:
 			indexes.push(transforms[decomps[ii]]);
 			break;
 		}
 	}
+
+	/* We should always be checking the fstype and stackdepth predicates */
+	predicates.push('self->fstype != NULL');
+	predicates.push('self->depth == stackdepth');
 
 	fields = mod_capred.caPredFields(pred);
 	for (ii = 0; ii < fields.length; ii++) {

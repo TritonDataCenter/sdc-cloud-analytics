@@ -17,6 +17,22 @@ var gyMin = 0;			/* global/default ymin for heatmaps */
 var gyMax = 10000000000;	/* global/default ymax for heatmaps 10s */
 
 /*
+ *  Fix that Firefox < 4 doesn't have Object.keys(); -- Code from
+ *  developer.mozilla.org
+ */
+if (!Object.keys)
+	Object.keys = function (o) {
+		var ret = [], p;
+
+		for (p in o) {
+			if (Object.prototype.hasOwnProperty.call(o, p))
+				ret.push(p);
+		}
+
+		return (ret);
+	};
+
+/*
  * Color management
  */
 var gBaseColors = [ '#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed' ];

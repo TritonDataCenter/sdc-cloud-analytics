@@ -11,7 +11,6 @@ sh_arg0=$(basename $0)
 sh_tmpbase=/var/tmp/$sh_arg0.$$
 sh_urlbase="http://10.99.99.8:8080"
 sh_capi="http://10.99.99.11:8080"
-sh_zonetpl="bare_256"
 sh_user="$1"
 sh_curlcmd="curl -u admin:tot@ls3crit"
 
@@ -43,55 +42,28 @@ function sh_extract_header
 	egrep "^$1: " | sed -e "s#$1: ##" | tr -d '\r\n'
 }
 
-function sh_install_agents
-{
-        if svcs smartdc/agent/provisioner > /dev/null 2>&1; then
-                echo "skipped (already done)"
-                return 0
-        fi
-
-        bash /usbkey/ur-scripts/agents-*.sh > $sh_tmpbase.agents.out 2>&1 || \
-            fail "failed to install agents; see $sh_tmpbase.agents.out"
-        rm -f $sh_tmpbase.agents.out
-        echo "done."
-}
-
 function sh_loadcust
 {
 	sh_custuri=/customers/$(sh_curl $sh_capi/customers | json 0.uuid)
 }
 
-function sh_loadtpl
+function sh_load_dataset
 {
-        local uris name
-
-	echo "Listing templates ... \c"
-        uris=$(sh_curl $sh_urlbase/templates | sh_extract uri)
-	for uri in $uris; do
-		echo "$uri \c"
-	done
-	echo
-
-	echo "Retrieving URI for template $sh_zonetpl ... \c"
-        for uri in $uris; do
-                name=$(sh_curl $sh_urlbase$uri | json name)
-                if [[ $name = $sh_zonetpl ]]; then
-                        sh_zonetpluri=$uri
-			echo $uri
-                        return;
-                fi
-        done
-
-        fail "not found"
+	echo "Finding bare dataset ... \c"
+	sh_dataset=$($sh_curlcmd -s $sh_urlbase/datasets | json | \
+	    grep '"basename": "bare-' | \
+	    sed -e 's#.*"bare-\(.*\)".*#bare-\1#' | head -1) || fail "failed"
+	echo "done."
 }
 
 function sh_provision
 {
-        local custuri=$1 tpluri=$2
+        local custuri=$1 dataset=$2
 	local out turi
 
-        out=$($sh_curlcmd -s -i -X POST -d template=$tpluri \
-	    --url "$sh_urlbase$custuri/containers" 2>&1)
+        out=$($sh_curlcmd -s -i -X POST -d dataset=$dataset \
+	    -d package="Regular 256" \
+	    --url "$sh_urlbase$custuri/zones" 2>&1)
 
         [[ $? -eq 0 ]] || fail "failed to create zone: $out"
 	turi=$(echo "$out" | sh_extract_header X-Joyent-Transition-URI)
@@ -114,19 +86,16 @@ function sh_provision
 
 [[ -n $sh_user ]] || fail "usage: $sh_arg0 <username>"
 
-echo "Installing agents (including provisioner) ... \c"
-sh_install_agents || fail
-
 echo "Retrieving customer uri ... \c"
 sh_loadcust || fail "failed"
 [[ -n $sh_custuri ]] || fail "no customer uri found"
 echo "$sh_custuri"
 
-sh_loadtpl || fail "failed"
-[[ -n $sh_zonetpluri ]] || fail "failed to get template URI"
+sh_load_dataset || fail "failed"
+[[ -n $sh_dataset ]] || fail "failed to get template URI"
 
-echo "Provisioning $sh_zonetpl zone ... \c"
-sh_provision $sh_custuri $sh_zonetpluri || fail "failed"
+echo "Provisioning $sh_dataset zone ... \c"
+sh_provision $sh_custuri $sh_dataset || fail "failed"
 echo "$sh_zonename ($sh_zoneip)"
 
 cat > /zones/ca/root/root/setup_zone.sh <<EOF
@@ -211,9 +180,8 @@ fi
 export PATH=/opt/local/bin:$PATH
 
 echo "Setting up pkgsrc and packages ... \c"
-echo "http://pkgsrc.joyent.com/2010Q3/All" > /opt/local/etc/pkgin/repositories.conf
-pkgin update > /dev/null
-pkgin -y in binutils gcc34 cscope pkg-config gmake scmgit python24 python26 png npm GeoIP GeoLiteCity ghostscript > /dev/null
+pkgin update > /var/tmp/pkgin_update.out
+pkgin -y in gcc34 gcc-tools cscope pkg-config gmake scmgit python24 python26 png npm GeoIP GeoLiteCity ghostscript > /var/tmp/pkgin_install.out || fail "failed"
 echo "done."
 EOF
 

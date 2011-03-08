@@ -13,6 +13,7 @@ sh_urlbase="http://10.99.99.8:8080"
 sh_capi="http://10.99.99.11:8080"
 sh_user="$1"
 sh_curlcmd="curl -u admin:tot@ls3crit"
+sh_skip_setup=false
 
 sh_custuri=
 sh_conturi=
@@ -98,6 +99,28 @@ echo "Provisioning $sh_dataset zone ... \c"
 sh_provision $sh_custuri $sh_dataset || fail "failed"
 echo "$sh_zonename ($sh_zoneip)"
 
+#
+# Work around PROV-487.  The zone may be booted, but it might be running zoneinit,
+# after which it will reboot.  We need to wait for this second boot before
+# trying to log in.  We separately wait for the reboot to complete and then for
+# logins to work again.  We check for network connectivity to make sure that
+# when we run our real setup script later it can assume a working network
+# environment.
+#
+echo "Waiting for zone $sh_zonename to reboot ... \c"
+while zlogin $sh_zonename pgrep -x reboot > /dev/null 2>&1; do
+	echo ".\c"
+	sleep 1
+done
+echo " done."
+
+echo "Waiting for zone $sh_zonename to boot (+ net) ... \c"
+while ! zlogin $sh_zonename ping 8.8.8.8 > /dev/null 2>&1; do
+	echo ".\c"
+	sleep 1
+done
+echo " done."
+
 cat > /zones/ca/root/root/setup_zone.sh <<EOF
 #!/bin/bash
 shopt -s xpg_echo
@@ -126,7 +149,7 @@ shopt -s xpg_echo
 
 function fail
 {
-	echo "$*"
+	echo "\$*"
 	exit 1
 }
 
@@ -186,8 +209,7 @@ echo "done."
 EOF
 
 chmod +x /zones/$sh_zonename/root/root/setup_zone.sh
-zlogin $sh_zonename /root/setup_zone.sh || fail
+[[ $sh_skip_setup = true ]] || zlogin $sh_zonename /root/setup_zone.sh || fail
 
 echo "Setup complete for zone $sh_zonename at $sh_zoneip."
 echo "Remember to set the passwords for root and $sh_user manually before using ssh."
-

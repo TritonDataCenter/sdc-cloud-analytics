@@ -338,12 +338,6 @@ if [ $# -eq 0 -a $OPT_RUN_ALL -eq 0 ]; then
 	usage "must specify tests to run or -a"
 fi
 
-#
-# We need to sanity check and make sure that the user has defined AMQP_HOST. If
-# not, we should gracefully tell them to fix it.
-#
-[[ -z $AMQP_HOST ]] && fail "error: AMQP_HOST not set"
-
 setup $base
 get-output-base $OPT_OUTPUT_DIR
 

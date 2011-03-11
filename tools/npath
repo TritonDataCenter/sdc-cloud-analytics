@@ -28,3 +28,7 @@ export NODE_PATH="$NODE_PATH:$ws_root/deps/connect/lib"
 export NODE_PATH="$NODE_PATH:$ws_root/deps/node-heatmap/lib"
 
 echo "NODE_PATH=$NODE_PATH"
+
+[[ -z $AMQP_HOST ]] && echo AMQP_HOST=10.99.99.5
+[[ -z $GEOIP_DATABASE ]] && \
+    echo GEOIP_DATABASE=/opt/local/share/GeoIP/GeoLiteCity.dat

@@ -754,7 +754,10 @@ function cfgCmdStatus(msg)
 		});
 	}
 
-	cfg_cap.sendCmdAckStatus(msg.ca_source, msg.ca_id, sendmsg);
+	cfgAdminStatus(function (status) {
+		sendmsg.s_status = status;
+		cfg_cap.sendCmdAckStatus(msg.ca_source, msg.ca_id, sendmsg);
+	}, false, 0);
 }
 
 /*

@@ -35,6 +35,15 @@ var agg_transforms = {};	/* available transformations by name */
 
 var agg_recent_interval = 2 * agg_http_req_timeout;	/* see aggExpected() */
 
+/*
+ * When we receive data messages from too far in the future, we log a warning
+ * and drop the message.  We only want to log the warning if we haven't logged
+ * this warning recently.
+ */
+var agg_future_interval = 10;			/* max seconds in the future */
+var agg_future_warns = {};			/* last warning by hostname */
+var agg_future_warn_interval = 60 * 60 * 1000;	/* warning frequency (1/hour) */
+
 function main()
 {
 	var dbg_log;
@@ -211,11 +220,15 @@ function aggData(msg)
 	inst = agg_insts[id];
 	value = msg.d_value;
 	hostname = msg.ca_hostname;
+	now = new Date().getTime();
 
 	if (inst === undefined) {
 		agg_log.warn('dropped data message for unknown id: %s', id);
 		return;
 	}
+
+	if (!aggDataFutureCheck(hostname, time, now))
+		return;
 
 	if (inst.agi_last < time)
 		inst.agi_last = time;
@@ -236,7 +249,6 @@ function aggData(msg)
 	if (dataset.nreporting(time) < aggExpected(dataset, time))
 		return;
 
-	now = new Date().getTime();
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
 		rq = inst.agi_requests[ii];
 
@@ -246,6 +258,21 @@ function aggData(msg)
 			    now - rq.rqtime);
 		}
 	}
+}
+
+function aggDataFutureCheck(hostname, datatime, now)
+{
+	if ((datatime - agg_future_interval) * 1000 <= now)
+		return (true);
+
+	if ((hostname in agg_future_warns) &&
+	    now - agg_future_warns[hostname] < agg_future_warn_interval)
+		return (false);
+
+	agg_future_warns[hostname] = now;
+	agg_log.warn('dropped data from "%s" from %dms in the future (%s)',
+	    hostname, datatime * 1000 - now, 'check system clocks?');
+	return (false);
 }
 
 /*

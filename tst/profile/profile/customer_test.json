@@ -1,0 +1,17 @@
+{
+	"name": "customer_test",
+	"label": "Customer_test",
+	"metrics": [ {
+		"module": "cpu",
+		"stat": "thread_executions",
+		"fields": [
+		    "zonename", "execname", "pid", "leavereason", "runtime"
+		]
+	}, {
+		"module": "syscall",
+		"stat": "ops",
+		"fields": [
+		    "zonename", "execname", "latency", "syscall"
+		]
+	} ]
+}

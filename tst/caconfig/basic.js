@@ -12,7 +12,7 @@ var HTTP = require('../../lib/ca/http-constants');
 
 var log = mod_tl.ctStdout;
 var http_port = mod_ca.ca_http_port_config;
-var url_create = '/ca/instrumentations';
+var url_create = '/ca/instrumentations?profile=none';
 var instrumenter, aggregator, http;
 
 mod_tl.ctSetTimeout(10 * 1000);
@@ -237,7 +237,7 @@ function check_global_uris()
 	});
 
 	/* /ca/metrics should exist with the correct metrics. */
-	http.sendEmpty('GET', '/ca/metrics', true,
+	http.sendEmpty('GET', '/ca/metrics?profile=none', true,
 	    function (err, response, rv) {
 		var mod = rv['test_module'], stat = mod['stats']['ops1'];
 		var fields = stat['fields'];
@@ -316,6 +316,7 @@ function walk_create(test, callback)
 
 	rawpredicate = test.input.predicate;
 	test.input.predicate = JSON.stringify(test.input.predicate);
+	test.input.profile = 'none';
 	http.sendAsForm('POST', url_create, test.input, true, handler);
 	test.input.predicate = rawpredicate;
 }

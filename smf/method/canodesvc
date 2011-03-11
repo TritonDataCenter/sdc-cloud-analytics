@@ -29,7 +29,7 @@ function load_amqp
         		*)              echo "ignoring amqp-config key $key" >&2
         		esac
 		done) > $ns_tmpfile || return 1
-		. $ns_tmpfile && rm -f $tmpfile || return 1
+		. $ns_tmpfile && rm -f $ns_tmpfile || return 1
 		return 0
 	fi
 

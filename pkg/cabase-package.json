@@ -6,6 +6,7 @@
 	"author":	"Joyent (joyent.com)",
 	"bin":		{
 		"cactl":	"cmd/cactl.js",
+		"caprof":	"tools/caprof.js",
 	},
 	"scripts": {
 		"postactivate":		"pkg/pkg-postactivate.sh",

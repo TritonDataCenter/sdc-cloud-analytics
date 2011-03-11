@@ -37,7 +37,9 @@ function tl_launchsvc
 
 	[[ -n $NODE_EXEC ]] || tl_fail "launchsvc: NODE_EXEC not set"
 	echo "launchsvc: launching $NODE_EXEC $path"
+	cd $SRC
 	$NODE_EXEC $path &
+	cd - > /dev/null
 	tl_launchpid=$!
 }
 

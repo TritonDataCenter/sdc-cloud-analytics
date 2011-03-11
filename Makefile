@@ -16,7 +16,7 @@ PKGROOT		 = $(BUILD)/pkg
 ROOT		 = $(BUILD)/root
 ROOT_CA		 = $(ROOT)/opt/smartdc/ca
 TOOLSDIR	 = tools
-JS_SUBDIRS	 = cmd lib
+JS_SUBDIRS	 = cmd lib tools
 TST_SUBDIRS	 = tst
 SRC		:= $(shell pwd)
 NODEDIR		:= $(SRC)/deps/node-install/bin
@@ -29,6 +29,7 @@ BASH		 = bash
 CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
+CAPROF		 = node $(TOOLSDIR)/caprof.js
 XMLLINT		 = xmllint --noout
 TAR		 = tar
 RMTREE		 = rm -rf
@@ -52,6 +53,7 @@ DEMO_FILES		:= $(shell find demo -type f)
 DEMO_DIRS		:= $(shell find demo -type d)
 WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
 TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
+METADATA_FILES		:= $(shell find metadata -name '*.json')
 SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 
 SMF_MANIFESTS = \
@@ -87,6 +89,8 @@ PKGDIRS_cabase := \
 	$(PKGROOT)/cabase/lib			\
 	$(PKGROOT)/cabase/lib/ca		\
 	$(PKGROOT)/cabase/lib/tst		\
+	$(PKGROOT)/cabase/metadata		\
+	$(PKGROOT)/cabase/metadata/profile	\
 	$(PKGROOT)/cabase/pkg			\
 	$(PKGROOT)/cabase/smf			\
 	$(PKGROOT)/cabase/smf/manifest		\
@@ -102,6 +106,7 @@ PKGFILES_cabase = \
 	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
+	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(PKGROOT)/cabase/lib/ca			\
 	$(PKGROOT)/cabase/lib/node.d
 
@@ -222,6 +227,11 @@ lib/ca/errno.js: /usr/include/sys/errno.h
 #
 # "check" targets check syntax for files
 #
+check-metadata: $(METADATA_FILES:%=%.check)
+
+metadata/%.json.check: metadata/%.json
+	$(CAPROF) $^
+
 check-manifests: $(SMF_MANIFESTS)
 	$(XMLLINT) --dtdvalid $(SMF_DTD) $(SMF_MANIFESTS)
 
@@ -239,7 +249,7 @@ check-jsl-web: $(WEBJS_FILES)
 check-jsstyle: $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 
-check: check-shell check-manifests check-jsstyle check-jsl
+check: check-metadata check-shell check-manifests check-jsstyle check-jsl
 	@echo check okay
 
 #

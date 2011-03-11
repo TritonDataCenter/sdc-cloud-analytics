@@ -16,6 +16,8 @@ var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
 var mod_log = require('../lib/ca/ca-log');
 var mod_mapi = require('../lib/ca/ca-mapi');
+var mod_md = require('../lib/ca/ca-metadata');
+var mod_profile = require('../lib/ca/ca-profile');
 var HTTP = require('../lib/ca/http-constants');
 
 var cfg_http;			/* http server */
@@ -26,6 +28,11 @@ var cfg_factory;		/* instrumentation factory */
 var cfg_mapi;			/* mapi config */
 var cfg_broker;			/* AMQP broker config */
 var cfg_sysinfo;		/* system config */
+var cfg_metadata;		/* metadata manager */
+var cfg_profiles;		/* profile manager */
+var cfg_profile_all;		/* "all" profile */
+var cfg_profile_customer;	/* customer profile */
+var cfg_profile_operator;	/* operator profile */
 
 var cfg_name = 'configsvc';			/* component name */
 var cfg_vers = '0.0';				/* component version */
@@ -148,14 +155,69 @@ function main()
 	    mapi: mapi
 	});
 
-	cfg_amqp.start(function () {
-		cfg_log.info('AMQP broker connected.');
+	cfgProfileInit(function () {
+		cfg_amqp.start(function () {
+			cfg_log.info('AMQP broker connected.');
 
-		cfg_http.start(function () {
-			cfg_log.info('HTTP server started.');
-			cfgStarted();
+			cfg_http.start(function () {
+				cfg_log.info('HTTP server started.');
+				cfgStarted();
+			});
 		});
 	});
+}
+
+/*
+ * Loads profiles.  We first load metadata, then load profiles from that.
+ */
+function cfgProfileInit()
+{
+	cfg_metadata = new mod_md.caMetadataManager(cfg_log, './metadata');
+	cfg_metadata.load(function (err) {
+		if (err) {
+			cfg_log.error('fatal: failed to load metadata: %r',
+			    err);
+			throw (err);
+		}
+
+		cfg_profiles = new mod_profile.caProfileManager();
+		cfg_profiles.load(cfg_metadata);
+
+		cfg_profile_customer = cfg_profiles.get('customer');
+		if (!cfg_profile_customer) {
+			cfg_log.error('fatal: customer profile not found');
+			throw (new Error('customer profile not found'));
+		}
+
+		cfg_profile_operator = cfg_profiles.get('operator');
+		if (!cfg_profile_operator) {
+			cfg_log.error('fatal: operator profile not found');
+			throw (new Error('operator profile not found'));
+		}
+
+		cfg_profile_all = cfg_profiles.forMetrics(cfg_statmods);
+		ASSERT.ok(cfg_profile_all);
+
+		cfg_amqp.start(function () {
+			cfg_log.info('AMQP broker connected.');
+
+			cfg_http.start(function () {
+				cfg_log.info('HTTP server started.');
+				cfgStarted();
+			});
+		});
+	});
+}
+
+function cfgRequestProfile(request)
+{
+	if (request.params['custid'] !== undefined)
+		return (cfg_profile_customer);
+
+	if (request.ca_params['profile'] == 'none')
+		return (cfg_profile_all);
+
+	return (cfg_profile_operator);
 }
 
 function cfgStarted()
@@ -437,11 +499,15 @@ function cfgHttpAdminStatus(request, response)
 }
 
 /*
- * Handle GET /ca/metrics
+ * Handle GET /ca/[customers/:custid]/metrics
  */
 function cfgHttpMetricsList(request, response)
 {
-	response.send(HTTP.OK, cfg_statmods);
+	var profile, metrics;
+
+	profile = cfgRequestProfile(request);
+	metrics = profile.project(cfg_statmods);
+	response.send(HTTP.OK, metrics);
 }
 
 /*
@@ -484,7 +550,7 @@ function cfgInstrumentationsListCustomer(rv, insts)
  */
 function cfgHttpInstCreate(request, response)
 {
-	var custid, props, ninstns;
+	var custid, props, ninstns, profile;
 
 	custid = request.params['custid'];
 	props = cfgHttpInstReadProps(request);
@@ -510,7 +576,8 @@ function cfgHttpInstCreate(request, response)
 		}
 	}
 
-	cfg_factory.create(custid, props, function (err, inst) {
+	profile = cfgRequestProfile(request);
+	cfg_factory.create(custid, props, profile, function (err, inst) {
 		var headers, code;
 
 		if (err) {

@@ -1,0 +1,40 @@
+{
+	"name": "operator",
+	"label": "Operator",
+	"metrics": [ {
+		"module": "cpu",
+		"stat": "thread_executions",
+		"fields": [
+		    "zonename", "execname", "pid", "leavereason", "runtime"
+		]
+	}, {
+		"module": "fs",
+		"stat": "logical_ops",
+		"fields": [
+		    "zonename", "execname", "pid", "operation", "fstype",
+		    "latency"
+		]
+	}, {
+		"module": "node",
+		"stat": "gc_ops",
+		"fields": [ "type", "latency" ]
+	}, {
+		"module": "node",
+		"stat": "httpc_ops",
+		"fields": [ "raddr", "rport", "method", "url", "latency" ]
+	}, {
+		"module": "node",
+		"stat": "httpd_ops",
+		"fields": [ "raddr", "rport", "method", "url", "latency" ]
+	}, {
+		"module": "node",
+		"stat": "socket_ops",
+		"fields": [ "raddr", "rport", "size", "type", "buffered" ]
+	}, {
+		"module": "syscall",
+		"stat": "ops",
+		"fields": [
+		    "hostname", "zonename", "execname", "latency", "syscall"
+		]
+	} ]
+}

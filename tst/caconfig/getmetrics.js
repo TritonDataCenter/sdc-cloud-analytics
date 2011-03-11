@@ -108,7 +108,7 @@ var startInstB = function ()
 var checkMetrics = function ()
 {
 	var func = function (resFunc) {
-	    var url = '/ca/metrics';
+	    var url = '/ca/metrics?profile=none';
 	    mod_tl.ctHttpRequest({
 		method: 'GET',
 		path: url,

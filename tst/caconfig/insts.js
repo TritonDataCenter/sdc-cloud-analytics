@@ -111,7 +111,7 @@ var startWorld = function ()
 
 var createInsts = function ()
 {
-	var postdata = 'module=cpu&stat=utilization';
+	var postdata = 'module=cpu&stat=utilization&profile=none';
 	var headers = {};
 	headers['content-length'] = postdata.length;
 	headers['content-type'] = 'application/x-www-form-urlencoded';

@@ -85,6 +85,7 @@ PKGDIRS_cabase := \
 	$(PKGROOT)/cabase/cmd/caagg/transforms	\
 	$(PKGROOT)/cabase/cmd/cainst		\
 	$(PKGROOT)/cabase/cmd/cainst/modules	\
+	$(PKGROOT)/cabase/cmd/cainst/modules/dtrace	\
 	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)	\
 	$(PKGROOT)/cabase/lib			\
 	$(PKGROOT)/cabase/lib/ca		\
@@ -157,6 +158,7 @@ ROOT_DIRS = \
 	$(ROOT_CA)/cmd/caagg/transforms				\
 	$(ROOT_CA)/cmd/cainst					\
 	$(ROOT_CA)/cmd/cainst/modules				\
+	$(ROOT_CA)/cmd/cainst/modules/dtrace			\
 	$(ROOT_CA)/deps						\
 	$(ROOT_CA)/deps/connect					\
 	$(ROOT_CA)/deps/connect/connect				\
@@ -323,7 +325,7 @@ $(PKG_DIRS):
 $(PKGROOT)/cabase/cmd/node: deps/node/node
 	cp $^ $@
 
-$(PKGROOT)/cabase/lib/node.d: deps/node-install/usr/lib/dtrace/node.d
+$(PKGROOT)/cabase/lib/node.d: deps/node-install/lib/dtrace/node.d
 	cp $^ $@
 
 $(PKGROOT)/cabase/%: %

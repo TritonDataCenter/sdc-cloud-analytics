@@ -50,10 +50,10 @@ function sh_loadcust
 
 function sh_load_dataset
 {
-	echo "Finding bare dataset ... \c"
+	echo "Finding smartos dataset ... \c"
 	sh_dataset=$($sh_curlcmd -s $sh_urlbase/datasets | json | \
-	    grep '"basename": "bare-' | \
-	    sed -e 's#.*"bare-\(.*\)".*#bare-\1#' | head -1) || fail "failed"
+	    grep '"basename": "smartos-' | \
+	    sed -e 's#.*"smartos-\(.*\)".*#smartos-\1#' | head -1) || fail "failed"
 	echo "done."
 }
 
@@ -63,7 +63,7 @@ function sh_provision
 	local out turi
 
         out=$($sh_curlcmd -s -i -X POST -d dataset=$dataset \
-	    -d package="Regular 256" \
+	    -d package="regular_256" \
 	    --url "$sh_urlbase$custuri/zones" 2>&1)
 
         [[ $? -eq 0 ]] || fail "failed to create zone: $out"

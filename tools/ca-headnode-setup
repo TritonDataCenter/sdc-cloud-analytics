@@ -63,7 +63,7 @@ function sh_provision
 	local out turi
 
         out=$($sh_curlcmd -s -i -X POST -d dataset=$dataset \
-	    -d package="regular_256" \
+	    -d package="regular_256" -d networks="admin" \
 	    --url "$sh_urlbase$custuri/zones" 2>&1)
 
         [[ $? -eq 0 ]] || fail "failed to create zone: $out"

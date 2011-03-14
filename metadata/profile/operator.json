@@ -5,36 +5,49 @@
 		"module": "cpu",
 		"stat": "thread_executions",
 		"fields": [
-		    "zonename", "execname", "pid", "leavereason", "runtime"
+		    "zonename", "execname", "pid", "leavereason", "runtime",
+		    "hostname"
 		]
 	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [
 		    "zonename", "execname", "pid", "operation", "fstype",
-		    "latency"
+		    "latency", "hostname"
 		]
 	}, {
 		"module": "node",
 		"stat": "gc_ops",
-		"fields": [ "type", "latency" ]
+		"fields": [
+		    "type", "latency", "zonename", "pid", "hostname"
+		]
 	}, {
 		"module": "node",
 		"stat": "httpc_ops",
-		"fields": [ "raddr", "rport", "method", "url", "latency" ]
+		"fields": [
+		    "raddr", "rport", "method", "url", "latency", "zonename",
+		    "pid", "hostname"
+		]
 	}, {
 		"module": "node",
 		"stat": "httpd_ops",
-		"fields": [ "raddr", "rport", "method", "url", "latency" ]
+		"fields": [
+		    "raddr", "rport", "method", "url", "latency", "zonename",
+		    "pid", "hostname"
+		]
 	}, {
 		"module": "node",
 		"stat": "socket_ops",
-		"fields": [ "raddr", "rport", "size", "type", "buffered" ]
+		"fields": [
+		    "raddr", "rport", "size", "type", "buffered", "zonename",
+		    "pid", "hostname"
+		]
 	}, {
 		"module": "syscall",
 		"stat": "ops",
 		"fields": [
-		    "hostname", "zonename", "execname", "latency", "syscall"
+		    "hostname", "zonename", "execname", "latency", "syscall",
+		    "pid"
 		]
 	} ]
 }

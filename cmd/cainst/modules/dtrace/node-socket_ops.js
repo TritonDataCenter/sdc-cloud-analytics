@@ -30,6 +30,7 @@ var desc = {
 		    buffered: 'llquantize($0, 10, 0, 11, 100)',
 		    default: 'count()',
 		    zonename: 'count()',
+		    hostname: 'count()',
 		    pid: 'count()'
 		},
 		transforms: {

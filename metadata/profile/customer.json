@@ -17,18 +17,29 @@
 	}, {
 		"module": "node",
 		"stat": "gc_ops",
-		"fields": [ "type", "latency" ]
+		"fields": [
+		    "type", "latency", "zonename", "pid"
+		]
 	}, {
 		"module": "node",
 		"stat": "httpc_ops",
-		"fields": [ "raddr", "rport", "method", "url", "latency" ]
+		"fields": [
+		    "raddr", "rport", "method", "url", "latency", "zonename",
+		    "pid"
+		]
 	}, {
 		"module": "node",
 		"stat": "httpd_ops",
-		"fields": [ "raddr", "rport", "method", "url", "latency" ]
+		"fields": [
+		    "raddr", "rport", "method", "url", "latency", "zonename",
+		    "pid"
+		]
 	}, {
 		"module": "node",
 		"stat": "socket_ops",
-		"fields": [ "raddr", "rport", "size", "type", "buffered" ]
+		"fields": [
+		    "raddr", "rport", "size", "type", "buffered", "zonename",
+		    "pid"
+		]
 	} ]
 }

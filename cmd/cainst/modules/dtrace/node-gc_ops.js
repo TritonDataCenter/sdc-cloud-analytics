@@ -13,7 +13,19 @@ var desc = {
 	latency: { label: 'latency', type: mod_ca.ca_type_latency },
 	zonename: { label: 'zone name', type: mod_ca.ca_type_string },
 	hostname: { label: 'hostname', type: mod_ca.ca_type_string },
-	pid: { label: 'process identifier', type: mod_ca.ca_type_string }
+	pid: { label: 'process identifier', type: mod_ca.ca_type_string },
+	ppid: {
+	    label: 'parent process identifier',
+	    type: mod_ca.ca_type_string
+	},
+	execname: {
+	    label: 'application name',
+	    type: mod_ca.ca_type_string
+	},
+	args: {
+	    label: 'process arguments',
+	    type: mod_ca.ca_type_string
+	}
     },
     metad: {
 	probedesc: [
@@ -34,6 +46,9 @@ var desc = {
 			default: 'count()',
 			hostname: 'count()',
 			zonename: 'count()',
+			ppid: 'count()',
+			execname: 'count()',
+			args: 'count()',
 			pid: 'count()'
 		},
 		transforms: {
@@ -44,7 +59,10 @@ var desc = {
 			    'sweep."))',
 			latency: 'timestamp - $0',
 			zonename: 'zonename',
-			pid: 'lltostr(pid)'
+			pid: 'lltostr(pid)',
+			ppid: 'lltostr(ppid)',
+			execname: 'execname',
+			args: 'curpsinfo->pr_psargs'
 		},
 		verify: {
 			latency: '$0'

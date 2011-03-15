@@ -18,7 +18,19 @@ var desc = {
 	    type: mod_ca.ca_type_string },
 	latency: { label: 'latency', type: mod_ca.ca_type_latency },
 	zonename: { label: 'zone name', type: mod_ca.ca_type_string },
-	pid: { label: 'process identifier', type: mod_ca.ca_type_string }
+	pid: { label: 'process identifier', type: mod_ca.ca_type_string },
+	ppid: {
+	    label: 'parent process identifier',
+	    type: mod_ca.ca_type_string
+	},
+	execname: {
+	    label: 'application name',
+	    type: mod_ca.ca_type_string
+	},
+	args: {
+	    label: 'process arguments',
+	    type: mod_ca.ca_type_string
+	}
     },
     metad: {
 	locals: [
@@ -63,6 +75,9 @@ var desc = {
 			hostname: 'count()',
 			default: 'count()',
 			zonename: 'count()',
+			ppid: 'count()',
+			execname: 'count()',
+			args: 'count()',
 			pid: 'count()'
 		},
 		transforms: {
@@ -77,7 +92,10 @@ var desc = {
 			zonename: 'zonename',
 			hostname:
 			    '"' + mod_ca.caSysinfo().ca_hostname + '"',
-			pid: 'lltostr(pid)'
+			pid: 'lltostr(pid)',
+			ppid: 'lltostr(ppid)',
+			execname: 'execname',
+			args: 'curpsinfo->pr_psargs'
 		},
 		verify: {
 			url: '$0[pid,((xlate <node_connection_t *>' +

@@ -33,6 +33,10 @@ var desc = {
 	    label: 'process identifier',
 	    type: mod_ca.ca_type_string
 	},
+	ppid: {
+	    label: 'parent process identifier',
+	    type: mod_ca.ca_type_string
+	},
 	hostname: { label: 'hostname', type: mod_ca.ca_type_string },
 	execname: {
 	    label: 'application name',
@@ -51,6 +55,10 @@ var desc = {
 	    type: mod_ca.ca_type_string
 	},
 	latency: { label: 'latency', type: mod_ca.ca_type_latency },
+	args: {
+	    label: 'process arguments',
+	    type: mod_ca.ca_type_string
+	},
 	vnode: {
 	    internal: true
 	},
@@ -85,12 +93,14 @@ var desc = {
 	    probes: [ 'fbt::fop_open:return' ],
 	    aggregate: {
 		pid: 'count()',
+		ppid: 'count()',
 		execname: 'count()',
 		zonename: 'count()',
 		operation: 'count()',
 		hostname: 'count()',
 		fstype: 'count()',
 		latency: 'llquantize($0, 10, 3, 11, 100)',
+		args: 'count()',
 		default: 'count()'
 	    },
 	    local: [
@@ -99,12 +109,14 @@ var desc = {
 	    ],
 	    transforms: {
 		pid: 'lltostr(pid)',
+		ppid: 'lltostr(ppid)',
 		hostname:
 		    '"' + mod_ca.caSysinfo().ca_hostname + '"',
 		execname: 'execname',
 		zonename: 'zonename',
 		operation: '(probefunc + 4)',
 		latency: 'timestamp - $0',
+		args: 'curpsinfo->pr_psargs',
 		fstype: 'stringof((*((vnode_t**)self->vnode0))->' +
 		'v_op->vnop_name)'
 	    },
@@ -121,11 +133,13 @@ var desc = {
 	    }),
 	    aggregate: {
 		pid: 'count()',
+		ppid: 'count()',
 		execname: 'count()',
 		zonename: 'count()',
 		operation: 'count()',
 		hostname: 'count()',
 		fstype: 'count()',
+		args: 'count()',
 		latency: 'llquantize($0, 10, 3, 11, 100)',
 		default: 'count()'
 	    },
@@ -138,12 +152,14 @@ var desc = {
 	    },
 	    transforms: {
 		pid: 'lltostr(pid)',
+		ppid: 'lltostr(ppid)',
 		hostname:
 		    '"' + mod_ca.caSysinfo().ca_hostname + '"',
 		execname: 'execname',
 		zonename: 'zonename',
 		operation: '(probefunc + 4)',
 		latency: 'timestamp - $0',
+		args: 'curpsinfo->pr_psargs',
 		fstype: 'stringof(((vnode_t*)self->vnode0)->' +
 		'v_op->vnop_name)'
 	    },

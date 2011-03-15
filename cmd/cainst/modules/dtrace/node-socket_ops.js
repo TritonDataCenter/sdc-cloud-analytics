@@ -16,7 +16,20 @@ var desc = {
 	    buffered: { label: 'buffered data', type: mod_ca.ca_type_number },
 	    zonename: { label: 'zone name', type: mod_ca.ca_type_string },
 	    hostname: { label: 'hostname', type: mod_ca.ca_type_string },
-	    pid: { label: 'process identifier', type: mod_ca.ca_type_string }
+	    pid: { label: 'process identifier', type: mod_ca.ca_type_string },
+	    ppid: {
+		label: 'parent process identifier',
+		type: mod_ca.ca_type_string
+	    },
+	    execname: {
+		label: 'application name',
+		type: mod_ca.ca_type_string
+	    },
+	    args: {
+		label: 'process arguments',
+		type: mod_ca.ca_type_string
+	    }
+
 	},
 	metad: {
 	    probedesc: [ {
@@ -31,6 +44,9 @@ var desc = {
 		    default: 'count()',
 		    zonename: 'count()',
 		    hostname: 'count()',
+		    ppid: 'count()',
+		    execname: 'count()',
+		    args: 'count()',
 		    pid: 'count()'
 		},
 		transforms: {
@@ -45,7 +61,10 @@ var desc = {
 		    buffered: '((xlate <node_connection_t *>' +
 			'((node_dtrace_connection_t *)arg0))->bufferSize)',
 		    zonename: 'zonename',
-		    pid: 'lltostr(pid)'
+		    pid: 'lltostr(pid)',
+		    ppid: 'lltostr(ppid)',
+		    execname: 'execname',
+		    args: 'curpsinfo->pr_psargs'
 		}
 	    } ],
 	    usepragmazone: true

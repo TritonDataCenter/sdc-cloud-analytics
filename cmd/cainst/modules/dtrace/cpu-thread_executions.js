@@ -15,6 +15,10 @@ var desc = {
 	    label: 'process identifier',
 	    type: mod_ca.ca_type_string
 	},
+	ppid: {
+	    label: 'parent process identifier',
+	    type: mod_ca.ca_type_string
+	},
 	execname: {
 	    label: 'application name',
 	    type: mod_ca.ca_type_string
@@ -25,6 +29,10 @@ var desc = {
 	},
 	leavereason: {
 	    label: 'reason leaving cpu',
+	    type: mod_ca.ca_type_string
+	},
+	args: {
+	    label: 'process arguments',
 	    type: mod_ca.ca_type_string
 	}
     },
@@ -52,6 +60,7 @@ var desc = {
 	    transforms: {
 		runtime: 'timestamp - $0',
 		pid: 'lltostr(pid)',
+		ppid: 'lltostr(ppid)',
 		execname: 'execname',
 		hostname:
 		    '"' + mod_ca.caSysinfo().ca_hostname + '"',
@@ -76,15 +85,18 @@ var desc = {
 		    'this->stype == SOBJ_USER_PI ? ' +
 		    '"user sync object with priority inheritence" : ' +
 		    'this->stype == SOBJ_SHUTTLE ? "shuttle synchronization ' +
-		    'object" : "unknown")'
+		    'object" : "unknown")',
+		args: 'curpsinfo->pr_psargs'
 	    },
 	    aggregate: {
 		runtime: 'llquantize($0, 10, 3, 11, 100)',
 		hostname: 'count()',
 		pid: 'count()',
+		ppid: 'count()',
 		execname: 'count()',
 		zonename: 'count()',
 		leavereason: 'count()',
+		args: 'count()',
 		default: 'count()'
 	    },
 	    verify: {

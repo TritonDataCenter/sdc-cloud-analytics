@@ -15,7 +15,16 @@ var desc = {
 	pid: { label: 'process identifier', type: mod_ca.ca_type_string },
 	execname: { label: 'application name',
 	    type: mod_ca.ca_type_string },
-	latency: { label: 'latency', type: mod_ca.ca_type_latency }
+	latency: { label: 'latency', type: mod_ca.ca_type_latency },
+	ppid: {
+	    label: 'parent process identifier',
+	    type: mod_ca.ca_type_string
+	},
+	args: {
+	    label: 'process arguments',
+	    type: mod_ca.ca_type_string
+	}
+
     },
     metad: {
 	probedesc: [
@@ -36,6 +45,8 @@ var desc = {
 			syscall: 'count()',
 			hostname: 'count()',
 			pid: 'count()',
+			ppid: 'count()',
+			args: 'count()',
 			execname: 'count()',
 			latency: 'llquantize($0, 10, 3, 11, 100)'
 		},
@@ -46,6 +57,8 @@ var desc = {
 			execname: 'execname',
 			syscall: 'probefunc',
 			pid: 'lltostr(pid)',
+			ppid: 'lltostr(pid)',
+			args: 'curpsinfo->pr_psargs',
 			latency: 'timestamp - $0'
 		},
 		verify: {

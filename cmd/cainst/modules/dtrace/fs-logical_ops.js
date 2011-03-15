@@ -59,6 +59,9 @@ var desc = {
 	}
     },
     metad: {
+	locals: [
+	    { fstype: 'string' }
+	],
 	probedesc: [ {
 	    probes: entryprobes,
 	    alwaysgather: {

@@ -29,6 +29,10 @@ var desc = {
 	}
     },
     metad: {
+	locals: [
+	    { state: 'int' },
+	    { stype: 'int' }
+	],
 	probedesc: [ {
 	    probes: [ 'sched:::on-cpu' ],
 	    gather: {
@@ -39,6 +43,12 @@ var desc = {
 	    }
 	}, {
 	    probes: [ 'sched:::off-cpu' ],
+	    local: [
+	        { state: 'curlwpsinfo->pr_state' },
+		{ stype: '(this->ops = curthread->t_sobj_ops) != NULL ? ' +
+		    'this->ops->sobj_type : 0' }
+
+	    ],
 	    transforms: {
 		runtime: 'timestamp - $0',
 		pid: 'lltostr(pid)',
@@ -46,26 +56,27 @@ var desc = {
 		hostname:
 		    '"' + mod_ca.caSysinfo().ca_hostname + '"',
 		zonename: 'zonename',
-		leavereason: '(curlwpsinfo->pr_state == SRUN ? "runnable" : ' +
-		    'curlwpsinfo->pr_state == SZOMB ? "exited" : ' +
-		    'curlwpsinfo->pr_state == SSTOP ? "stopped" : ' +
-		    'curlwpsinfo->pr_state == SIDL ? "in proc creation" : ' +
-		    'curlwpsinfo->pr_state == SONPROC ? "on-cpu" : ' +
-		    'curlwpsinfo->pr_state == SWAIT ? "waiting to be ' +
+		leavereason: '(this->state == SRUN ? "runnable" : ' +
+		    'this->state == SZOMB ? "exited" : ' +
+		    'this->state == SSTOP ? "stopped" : ' +
+		    'this->state == SIDL ? "in proc creation" : ' +
+		    'this->state == SONPROC ? "on-cpu" : ' +
+		    'this->state == SWAIT ? "waiting to be ' +
 		    'runnable" :' +
-		    'curlwpsinfo->pr_stype == SOBJ_NONE ? "sleeping" : ' +
-		    'curlwpsinfo->pr_stype == SOBJ_MUTEX ? "kernel mutex" : ' +
-		    'curlwpsinfo->pr_stype == SOBJ_RWLOCK ? "kernel ' +
+		    'this->stype == SOBJ_NONE ? "sleeping" : ' +
+		    'this->stype == SOBJ_MUTEX ? "kernel mutex" : ' +
+		    'this->stype == SOBJ_RWLOCK ? "kernel ' +
 		    'read/write lock" : ' +
-		    'curlwpsinfo->pr_stype == SOBJ_CV ? "kernel condition ' +
+		    'this->stype == SOBJ_CV ? "kernel condition ' +
 		    'variable" : ' +
-		    'curlwpsinfo->pr_stype == SOBJ_SEMA ? "kernel ' +
+		    'this->stype == SOBJ_SEMA ? "kernel ' +
 		    'semaphore" : ' +
-		    'curlwpsinfo->pr_stype == SOBJ_USER ? "user synch ' +
+		    'this->stype == SOBJ_USER ? "user synch ' +
 		    'object" : ' +
-		    'curlwpsinfo->pr_stype == SOBJ_USER_PI ? ' +
+		    'this->stype == SOBJ_USER_PI ? ' +
 		    '"user sync object with priority inheritence" : ' +
-		    '"shuttle synchronization object")'
+		    'this->stype == SOBJ_SHUTTLE ? "shuttle synchronization ' +
+		    'object" : "unknown")'
 	    },
 	    aggregate: {
 		runtime: 'llquantize($0, 10, 3, 11, 100)',

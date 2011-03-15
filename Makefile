@@ -21,6 +21,7 @@ TST_SUBDIRS	 = tst
 SRC		:= $(shell pwd)
 NODEDIR		:= $(SRC)/deps/node-install/bin
 WEBREV		 = $(TOOLSDIR)/webrev_support
+METAD_DIR	 = $(SRC)/cmd/cainst/modules/dtrace/
 
 #
 # Tools
@@ -30,6 +31,7 @@ CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
 CAPROF		 = node $(TOOLSDIR)/caprof.js
+CAMD		 = node $(TOOLSDIR)/camd.js
 XMLLINT		 = xmllint --noout
 TAR		 = tar
 RMTREE		 = rm -rf
@@ -54,6 +56,7 @@ DEMO_DIRS		:= $(shell find demo -type d)
 WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
 TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
 METADATA_FILES		:= $(shell find metadata -name '*.json')
+METAD_FILES		:= $(shell find $(METAD_DIR) -name '*.js')
 SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 
 SMF_MANIFESTS = \
@@ -69,6 +72,7 @@ SH_SCRIPTS = \
 	tools/cadepsvcs			\
 	tools/caupagent			\
 	tools/caupsvcs			\
+	tools/catest			\
 	tools/ca-headnode-setup
 
 SVC_SCRIPTS = \
@@ -231,6 +235,9 @@ lib/ca/errno.js: /usr/include/sys/errno.h
 #
 check-metadata: $(METADATA_FILES:%=%.check)
 
+check-metad:
+	$(CAMD) $(METAD_FILES)
+
 metadata/%.json.check: metadata/%.json
 	$(CAPROF) $^
 
@@ -251,7 +258,7 @@ check-jsl-web: $(WEBJS_FILES)
 check-jsstyle: $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 
-check: check-metadata check-shell check-manifests check-jsstyle check-jsl
+check: check-metadata check-metad check-shell check-manifests check-jsstyle check-jsl
 	@echo check okay
 
 #

@@ -21,6 +21,9 @@ var desc = {
 	pid: { label: 'process identifier', type: mod_ca.ca_type_string }
     },
     metad: {
+	locals: [
+	    { fd: 'int' }
+	],
 	probedesc: [
 	    {
 		probes: [ 'node*:::http-client-request' ],

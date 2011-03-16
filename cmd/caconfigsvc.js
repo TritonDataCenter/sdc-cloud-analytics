@@ -18,6 +18,7 @@ var mod_log = require('../lib/ca/ca-log');
 var mod_mapi = require('../lib/ca/ca-mapi');
 var mod_md = require('../lib/ca/ca-metadata');
 var mod_profile = require('../lib/ca/ca-profile');
+var mod_metric = require('../lib/ca/ca-metric');
 var HTTP = require('../lib/ca/http-constants');
 
 var cfg_http;			/* http server */
@@ -30,7 +31,6 @@ var cfg_broker;			/* AMQP broker config */
 var cfg_sysinfo;		/* system config */
 var cfg_metadata;		/* metadata manager */
 var cfg_profiles;		/* profile manager */
-var cfg_profile_all;		/* "all" profile */
 var cfg_profile_customer;	/* customer profile */
 var cfg_profile_operator;	/* operator profile */
 
@@ -43,8 +43,7 @@ var cfg_start;			/* start time */
 var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_transformations = {};	/* all transformations, by name */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
-var cfg_statmods = {};		/* describes available metrics and which */
-				/* instrumenters provide them. */
+var cfg_metrics;		/* all metrics */
 
 var cfg_instn_max_peruser = 10;		/* maximum allowed instns per user */
 var cfg_reaper_interval = 60 * 1000;	/* time between reaps (ms) */
@@ -81,6 +80,7 @@ function main()
 	cfg_log = new mod_log.caLog({ out: process.stdout });
 	cfg_broker = mod_ca.caBroker();
 	cfg_mapi = mod_ca.caMapiConfig();
+	cfg_metrics = new mod_metric.caMetricSet();
 
 	if (process.argv.length > 2) {
 		dbg_log = mod_log.caLogFromFile(process.argv[2],
@@ -147,7 +147,7 @@ function main()
 	cfg_factory = new mod_cainst.caInstrumentationFactory({
 	    cap: cfg_cap,
 	    log: cfg_log,
-	    modules: cfg_statmods,
+	    metrics: cfg_metrics,
 	    transformations: cfg_transformations,
 	    aggregators: cfg_aggregators,
 	    instrumenters: cfg_instrumenters,
@@ -195,9 +195,6 @@ function cfgProfileInit()
 			throw (new Error('operator profile not found'));
 		}
 
-		cfg_profile_all = cfg_profiles.forMetrics(cfg_statmods);
-		ASSERT.ok(cfg_profile_all);
-
 		cfg_amqp.start(function () {
 			cfg_log.info('AMQP broker connected.');
 
@@ -209,15 +206,15 @@ function cfgProfileInit()
 	});
 }
 
-function cfgRequestProfile(request)
+function cfgRequestProfileSet(request)
 {
 	if (request.params['custid'] !== undefined)
-		return (cfg_profile_customer);
+		return (cfg_profile_customer.metrics());
 
 	if (request.ca_params['profile'] == 'none')
-		return (cfg_profile_all);
+		return (cfg_metrics);
 
-	return (cfg_profile_operator);
+	return (cfg_profile_operator.metrics());
 }
 
 function cfgStarted()
@@ -395,7 +392,6 @@ function cfgAdminStatus(callback, recurse, timeout)
 		ret['cfg_instrumenters'][key] = {
 		    hostname: obj.ins_hostname,
 		    routekey: obj.ins_routekey,
-		    nmetrics_avail: obj.ins_nmetrics_avail,
 		    insts: Object.keys(obj.ins_insts)
 		};
 
@@ -503,11 +499,10 @@ function cfgHttpAdminStatus(request, response)
  */
 function cfgHttpMetricsList(request, response)
 {
-	var profile, metrics;
+	var pset;
 
-	profile = cfgRequestProfile(request);
-	metrics = profile.project(cfg_statmods);
-	response.send(HTTP.OK, metrics);
+	pset = cfgRequestProfileSet(request);
+	response.send(HTTP.OK, cfg_metrics.intersection(pset).toJson());
 }
 
 /*
@@ -550,7 +545,7 @@ function cfgInstrumentationsListCustomer(rv, insts)
  */
 function cfgHttpInstCreate(request, response)
 {
-	var custid, props, ninstns, profile;
+	var custid, props, ninstns, pset;
 
 	custid = request.params['custid'];
 	props = cfgHttpInstReadProps(request);
@@ -576,8 +571,8 @@ function cfgHttpInstCreate(request, response)
 		}
 	}
 
-	profile = cfgRequestProfile(request);
-	cfg_factory.create(custid, props, profile, function (err, inst) {
+	pset = cfgRequestProfileSet(request).intersection(cfg_metrics);
+	cfg_factory.create(custid, props, pset, function (err, inst) {
 		var headers, code;
 
 		if (err) {
@@ -740,7 +735,7 @@ function cfgCmdStatus(msg)
 		inst = cfg_instrumenters[key];
 		sendmsg.s_instrumenters.push({
 		    sii_hostname: inst.ins_hostname,
-		    sii_nmetrics_avail: inst.ins_nmetrics_avail,
+		    sii_nmetrics_avail: 'unknown',
 		    sii_ninsts: inst.ins_ninsts
 		});
 	}
@@ -816,9 +811,7 @@ function cfgNotifyAggregatorOnline(msg)
  */
 function cfgNotifyInstrumenterOnline(msg)
 {
-	var inst, action;
-	var mod, mstats, stat, mfields, field;
-	var mm, ss, ff, id;
+	var inst, action, id;
 
 	if (msg.ca_hostname in cfg_instrumenters) {
 		inst = cfg_instrumenters[msg.ca_hostname];
@@ -837,45 +830,8 @@ function cfgNotifyInstrumenterOnline(msg)
 	inst.ins_os_name = msg.ca_os_name;
 	inst.ins_os_release = msg.ca_os_release;
 	inst.ins_os_revision = msg.ca_os_revision;
-	inst.ins_nmetrics_avail = 0;
 
-	for (mm = 0; mm < msg.ca_modules.length; mm++) {
-		mod = msg.ca_modules[mm];
-
-		if (!(mod.cam_name in cfg_statmods)) {
-			cfg_statmods[mod.cam_name] = {
-				stats: {},
-				label: mod.cam_description
-			};
-		}
-
-		mstats = cfg_statmods[mod.cam_name]['stats'];
-		inst.ins_nmetrics_avail += mod.cam_stats.length;
-
-		for (ss = 0; ss < mod.cam_stats.length; ss++) {
-			stat = mod.cam_stats[ss];
-			if (!(stat.cas_name in mstats)) {
-				mstats[stat.cas_name] = {
-				    label: stat.cas_description,
-				    type: stat.cas_type,
-				    fields: {}
-				};
-			}
-
-			mfields = mstats[stat.cas_name]['fields'];
-
-			for (ff = 0; ff < stat.cas_fields.length; ff++) {
-				field = stat.cas_fields[ff];
-
-				if (!(field.caf_name in mfields)) {
-					mfields[field.caf_name] = {
-					    type: field.caf_type,
-					    label: field.caf_description
-					};
-				}
-			}
-		}
-	}
+	cfg_metrics.addFromHost(msg.ca_modules, msg.ca_hostname);
 
 	for (id in inst.ins_insts) {
 		cfg_factory.enableInstrumenter(cfg_insts[id].inst,

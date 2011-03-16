@@ -30,7 +30,7 @@ function setup()
 
 function check()
 {
-	var pp;
+	var pp, set, metric;
 
 	profmgr = new mod_profile.caProfileManager();
 	profmgr.load(mdmgr);
@@ -39,51 +39,24 @@ function check()
 	ASSERT(pp.name() == 'customer_test');
 	ASSERT(pp.label() == 'Customer_test');
 
-	ASSERT(!pp.validateMetric({
-		module: 'cpu',
-		stat: 'thread_executions',
-		fields: []
-	}));
-	ASSERT(!pp.validateMetric({
-		module: 'cpu',
-		stat: 'thread_executions',
-		fields: [ 'runtime' ]
-	}));
-	ASSERT(!pp.validateMetric({
-		module: 'cpu',
-		stat: 'thread_executions',
-		fields: [ 'runtime', 'pid' ]
-	}));
-	ASSERT(pp.validateMetric({
-		module: 'cpu',
-		stat: 'thread_executions',
-		fields: [ 'junk' ]
-	}));
-	ASSERT(pp.validateMetric({
-		module: 'cpu',
-		stat: 'thread_executions',
-		fields: [ 'runtime', 'pid', 'junk' ]
-	}));
-	ASSERT(pp.validateMetric({
-		module: 'junk',
-		stat: 'thread_executions',
-		fields: [ 'runtime', 'pid' ]
-	}));
-	ASSERT(pp.validateMetric({
-		module: 'cpu',
-		stat: 'dunk',
-		fields: [ 'runtime', 'pid' ]
-	}));
-	ASSERT(pp.validateMetric({
-		module: 'syscall',
-		stat: 'ops',
-		fields: [ 'runtime', 'pid' ]
-	}));
-	ASSERT(!pp.validateMetric({
-		module: 'syscall',
-		stat: 'ops',
-		fields: [ 'latency', 'execname' ]
-	}));
+	set = pp.metrics();
+	metric = set.baseMetric('cpu', 'thread_executions');
+	ASSERT(metric !== null);
+
+	ASSERT(set.supports(metric, []));
+	ASSERT(set.supports(metric, [ 'runtime' ]));
+	ASSERT(set.supports(metric, [ 'runtime', 'pid' ]));
+	ASSERT(!set.supports(metric, [ 'junk' ]));
+	ASSERT(!set.supports(metric, [ 'runtime', 'pid', 'junk' ]));
+
+	ASSERT(set.baseMetric('junk', 'thread_executions') === null);
+	ASSERT(set.baseMetric('cpu', 'dunk') === null);
+
+	metric = set.baseMetric('syscall', 'ops');
+	ASSERT(metric !== null);
+
+	ASSERT(!set.supports(metric, [ 'runtime', 'pid' ]));
+	ASSERT(set.supports(metric, [ 'latency', 'execname' ]));
 
 	ASSERT(profmgr.get('junk') === undefined);
 

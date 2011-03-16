@@ -1,5 +1,5 @@
 /*
- * tst.project.js: tests projecting a metric onto a profile
+ * tst.intersect.js: tests intersecting metric sets
  */
 
 var mod_assert = require('assert');
@@ -7,37 +7,28 @@ var ASSERT = mod_assert.ok;
 
 var mod_tl = require('../../lib/tst/ca-test');
 var mod_md = require('../../lib/ca/ca-metadata');
-var mod_profile = require('../../lib/ca/ca-profile');
+var mod_metric = require('../../lib/ca/ca-metric');
 
 mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
 
-function check()
+var xform = mod_metric.caMetricsExpand;
+
+/*
+ * Checks intersection of one set based on input we'd get from the profile
+ * consumer and input we'd get from instrumenters.
+ */
+function check_profile()
 {
-	var pp, ret;
+	var profset, instset, ret;
 
-	pp = new mod_profile.caProfile({
-		name: 'test',
-		label: 'test profile',
-		metrics: [ {
-			module: 'mod1',
-			stat: 'stat1',
-			fields: [ 'f1', 'f2', 'f3' ]
-		}, {
-			module: 'mod1',
-			stat: 'stat2',
-			fields: []
-		}, {
-			module: 'mod2',
-			stat: 'stat1',
-			fields: [ 'f21', 'f22' ]
-		}, {
-			module: 'mod3',
-			stat: 'stat9',
-			fields: [ 'f21', 'f22' ]
-		} ]
-	});
+	profset = new mod_metric.caMetricSet();
+	profset.addMetric('mod1', 'stat1', [ 'f1', 'f2', 'f3' ]);
+	profset.addMetric('mod1', 'stat2', []);
+	profset.addMetric('mod2', 'stat1', [ 'f21', 'f22' ]);
+	profset.addMetric('mod3', 'stat9', [ 'f21', 'f22' ]);
 
-	ret = pp.project({
+	instset = new mod_metric.caMetricSet();
+	instset.addFromHost(xform({
 		mod1: {
 			label: 'module 1',
 			stats: {
@@ -133,8 +124,18 @@ function check()
 				}
 			}
 		}
-	});
+	}), 'test_host');
 
+	ret = profset.intersection(instset).toJson();
+
+	/*
+	 * Check commutativity.
+	 */
+	mod_assert.deepEqual(ret, instset.intersection(profset).toJson());
+
+	/*
+	 * Check that the result is what we expect.
+	 */
 	mod_assert.deepEqual(ret, {
 		mod1: {
 			label: 'module 1',
@@ -184,6 +185,6 @@ function check()
 	mod_tl.advance();
 }
 
-mod_tl.ctPushFunc(check);
+mod_tl.ctPushFunc(check_profile);
 mod_tl.ctPushFunc(mod_tl.ctDoExitSuccess);
 mod_tl.advance();

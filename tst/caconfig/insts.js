@@ -11,7 +11,7 @@ var CFG_PORT = mod_ca.ca_http_port_config;
 var fakeInst, fakeAgg;
 
 /*
- * A wrapper that we use when we get a requet to enable instrumentation
+ * A wrapper that we use when we get a request to enable instrumentation
  */
 var enableInst = function (msg)
 {

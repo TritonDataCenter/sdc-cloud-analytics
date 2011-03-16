@@ -37,7 +37,7 @@ function compArrays(arr0, arr1)
 }
 
 /*
- * Test that we a non-object won't validate as a predicate
+ * Test that a non-object won't validate as a predicate
  */
 mod_assert.throws(function () { mod_capred.caPredValidate(null, 23); });
 mod_assert.throws(function () { mod_capred.caPredValidate(null, '23'); });

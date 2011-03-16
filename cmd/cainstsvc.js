@@ -188,7 +188,7 @@ insBackendInterface.prototype.registerModule = function (args)
  */
 insBackendInterface.prototype.registerMetric = function (args)
 {
-	var modname, statname, label, type, fields, metric, stat;
+	var modname, statname, label, type, fields, field, metric, stat;
 
 	modname = mod_ca.caFieldExists(args, 'module', '');
 	statname = mod_ca.caFieldExists(args, 'stat', '');
@@ -234,6 +234,10 @@ insBackendInterface.prototype.registerMetric = function (args)
 	 * to the config svc.
 	 */
 	stat['fields'] = mod_ca.caDeepCopy(fields);
+	stat['fieldtypes'] = {};
+
+	for (field in fields)
+		stat['fieldtypes'][field] = fields[field]['type'];
 
 	ins_modules[modname]['stats'][statname].push(stat);
 };
@@ -465,8 +469,8 @@ function insCmdEnable(msg)
 
 		if (!mod_ca.caIsEmpty(msg.is_predicate)) {
 			try {
-				mod_capred.caPredValidate(metrics[ii].fields,
-				    msg.is_predicate);
+				mod_capred.caPredValidate(
+				    metrics[ii].fieldtypes, msg.is_predicate);
 			} catch (ex) {
 				if (ex instanceof
 				    mod_capred.caPredValidationError)

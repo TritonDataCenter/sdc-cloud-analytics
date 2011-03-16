@@ -7,27 +7,13 @@
 
 source ../catestlib.sh
 
-GET_METRICS="getmetrics.js"
-INST_HTTP="insts.js"
-BASIC="basic.js"
+TESTS="getmetrics.js insts.js basic.js multi_insts.js"
 
-printf "Running test %s\n" $GET_METRICS
-tl_launchsvc config
-$NODE_EXEC $GET_METRICS
-RET=$?
-tl_killwait $tl_launchpid
-[[ $RET  == 0 ]] || tl_fail "Failed test $GET_METRICS with return code $RET"
-
-printf "Running test %s\n" $INST_HTTP
-tl_launchsvc config
-$NODE_EXEC $INST_HTTP
-RET=$?
-tl_killwait $tl_launchpid
-[[ $RET  == 0 ]] || tl_fail "Failed test $INST_HTTP with return code $RET"
-
-printf "Running test %s\n" $BASIC
-tl_launchsvc config
-$NODE_EXEC $BASIC
-RET=$?
-tl_killwait $tl_launchpid
-[[ $RET  == 0 ]] || tl_fail "Failed test $BASIC with return code $RET"
+for test in $TESTS; do
+	printf "Running test %s\n" $test
+	tl_launchsvc config
+	$NODE_EXEC $test
+	RET=$?
+	tl_killwait $tl_launchpid
+	[[ $RET == 0 ]] || tl_fail "failed test $test with return code $ret"
+done

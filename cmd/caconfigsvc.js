@@ -278,6 +278,7 @@ function cfgHttpRouter(server)
 {
 	var metrics = '/metrics';
 	var transforms = '/transformations';
+	var types = '/types';
 	var instrumentations = '/instrumentations';
 	var instrumentations_id = instrumentations + '/:instid';
 	var infixes = [ '', '/customers/:custid' ];
@@ -288,6 +289,7 @@ function cfgHttpRouter(server)
 	for (ii = 0; ii < infixes.length; ii++) {
 		base = cfg_http_baseuri + infixes[ii];
 		server.get(base + metrics, cfgHttpMetricsList);
+		server.get(base + types, cfgHttpTypesList);
 		server.get(base + transforms, cfgHttpTransformsList);
 		server.get(base + instrumentations,
 		    cfgHttpInstrumentationsList);
@@ -503,6 +505,25 @@ function cfgHttpMetricsList(request, response)
 
 	pset = cfgRequestProfileSet(request);
 	response.send(HTTP.OK, cfg_metrics.intersection(pset).toJson());
+}
+
+/*
+ * Handle GET /ca/[customers/:custid]/types
+ */
+function cfgHttpTypesList(request, response)
+{
+	var types, mset, ii, ret;
+
+	mset = cfg_metrics.intersection(cfgRequestProfileSet(request));
+	types = mset.types();
+	ret = {};
+
+	for (ii = 0; ii < types.length; ii++)
+		ret[types[ii]] = {
+		    arity: mod_ca.caTypeToArity(types[ii])
+		};
+
+	response.send(HTTP.OK, ret);
 }
 
 /*

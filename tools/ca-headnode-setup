@@ -14,7 +14,9 @@ sh_capi="http://10.99.99.11:8080"
 sh_user="$1"
 sh_curlcmd="curl -u admin:tot@ls3crit"
 sh_skip_setup=false
+sh_dataset_name=smartos
 
+sh_dataset_version=
 sh_custuri=
 sh_conturi=
 sh_zonename=
@@ -50,11 +52,9 @@ function sh_loadcust
 
 function sh_load_dataset
 {
-	echo "Finding smartos dataset ... \c"
-	sh_dataset=$($sh_curlcmd -s $sh_urlbase/datasets | json | \
-	    grep '"basename": "smartos-' | \
-	    sed -e 's#.*"smartos-\(.*\)".*#smartos-\1#' | head -1) || fail "failed"
-	echo "done."
+	sh_dataset_version=$($sh_curlcmd -s \
+	    --url $sh_urlbase/search/datasets?name=$sh_dataset_name | \
+	    json 0.version)
 }
 
 function sh_provision
@@ -92,11 +92,13 @@ sh_loadcust || fail "failed"
 [[ -n $sh_custuri ]] || fail "no customer uri found"
 echo "$sh_custuri"
 
+echo "Finding version of dataset "$sh_dataset_name" ... \c"
 sh_load_dataset || fail "failed"
-[[ -n $sh_dataset ]] || fail "failed to get template URI"
+[[ -n $sh_dataset_version ]] || fail "no version found"
+echo "$sh_dataset_version"
 
-echo "Provisioning $sh_dataset zone ... \c"
-sh_provision $sh_custuri $sh_dataset || fail "failed"
+echo "Provisioning $sh_dataset_name-$sh_dataset_version zone ... \c"
+sh_provision $sh_custuri "$sh_dataset_name-$sh_dataset_version" || fail "failed"
 echo "$sh_zonename ($sh_zoneip)"
 
 #

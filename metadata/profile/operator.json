@@ -50,5 +50,11 @@
 		    "hostname", "zonename", "execname", "latency", "syscall",
 		    "pid", "ppid", "args"
 		]
+	}, {
+		"module": "io",
+		"stat": "ops",
+		"fields": [
+		    "hostname", "optype", "latency", "size", "name", "offset"
+		]
 	} ]
 }

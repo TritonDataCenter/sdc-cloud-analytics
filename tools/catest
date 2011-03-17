@@ -287,9 +287,9 @@ function results
 {
 	printf "\n===================================================\n\n"
 	printf "Results:\n"
-	printf "\tTests passed:\t%d/%d\n" $CURRENT_PASSES $TESTS_RUN
-	printf "\tTests failed:\t%d/%d\n" $CURRENT_FAILURES $TESTS_RUN
-	printf "\tTests errored:\t%d/%d\n" $CURRENT_ERRORS $TESTS_RUN
+	printf "\tTests passed:\t%2d/%2d\n" $CURRENT_PASSES $TESTS_RUN
+	printf "\tTests failed:\t%2d/%2d\n" $CURRENT_FAILURES $TESTS_RUN
+	printf "\tTests errored:\t%2d/%2d\n" $CURRENT_ERRORS $TESTS_RUN
 	printf "\n===================================================\n"
 }
 

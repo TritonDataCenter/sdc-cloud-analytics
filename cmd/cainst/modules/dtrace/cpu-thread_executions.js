@@ -34,6 +34,14 @@ var desc = {
 	args: {
 	    label: 'process arguments',
 	    type: mod_ca.ca_type_string
+	},
+	pargs: {
+	    label: 'parent process arguments',
+	    type: mod_ca.ca_type_string
+	},
+	pexecname: {
+	    label: 'parent process application name',
+	    type: mod_ca.ca_type_string
 	}
     },
     metad: {
@@ -86,7 +94,10 @@ var desc = {
 		    '"user sync object with priority inheritence" : ' +
 		    'this->stype == SOBJ_SHUTTLE ? "shuttle synchronization ' +
 		    'object" : "unknown")',
-		args: 'curpsinfo->pr_psargs'
+		args: 'curpsinfo->pr_psargs',
+		pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+		pexecname: 'curthread->t_procp->p_parent->' +
+		    'p_user.u_comm'
 	    },
 	    aggregate: {
 		runtime: 'llquantize($0, 10, 3, 11, 100)',
@@ -97,7 +108,9 @@ var desc = {
 		zonename: 'count()',
 		leavereason: 'count()',
 		args: 'count()',
-		default: 'count()'
+		default: 'count()',
+		pargs: 'count()',
+		pexecname: 'count()'
 	    },
 	    verify: {
 		runtime: '$0'

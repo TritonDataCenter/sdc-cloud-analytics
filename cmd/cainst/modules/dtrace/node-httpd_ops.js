@@ -9,16 +9,38 @@ var desc = {
     label: 'HTTP server operations',
     type: 'ops',
     fields: {
-	method: { label: 'method', type: mod_ca.ca_type_string },
-	url: { label: 'URL', type: mod_ca.ca_type_string },
-	hostname: { label: 'hostname', type: mod_ca.ca_type_string },
-	raddr: { label: 'remote IP address',
-	    type: mod_ca.ca_type_ipaddr },
-	rport: { label: 'remote TCP port',
-	    type: mod_ca.ca_type_string },
-	latency: { label: 'latency', type: mod_ca.ca_type_latency },
-	zonename: { label: 'zone name', type: mod_ca.ca_type_string },
-	pid: { label: 'process identifier', type: mod_ca.ca_type_string },
+	method: {
+	    label: 'method',
+	    type: mod_ca.ca_type_string
+	},
+	url: {
+	    label: 'URL',
+	    type: mod_ca.ca_type_string
+	},
+	hostname: {
+	    label: 'hostname',
+	    type: mod_ca.ca_type_string
+	},
+	raddr: {
+	    label: 'remote IP address',
+	    type: mod_ca.ca_type_ipaddr
+	},
+	rport: {
+	    label: 'remote TCP port',
+	    type: mod_ca.ca_type_string
+	},
+	latency: {
+	    label: 'latency',
+	    type: mod_ca.ca_type_latency
+	},
+	zonename: {
+	    label: 'zone name',
+	    type: mod_ca.ca_type_string
+	},
+	pid: {
+	    label: 'process identifier',
+	    type: mod_ca.ca_type_string
+	},
 	ppid: {
 	    label: 'parent process identifier',
 	    type: mod_ca.ca_type_string
@@ -29,6 +51,18 @@ var desc = {
 	},
 	args: {
 	    label: 'process arguments',
+	    type: mod_ca.ca_type_string
+	},
+	path: {
+	    label: 'URL Path',
+	    type: mod_ca.ca_type_string
+	},
+	pargs: {
+	    label: 'parent process arguments',
+	    type: mod_ca.ca_type_string
+	},
+	pexecname: {
+	    label: 'parent process application name',
 	    type: mod_ca.ca_type_string
 	}
     },
@@ -52,6 +86,12 @@ var desc = {
 				store: 'global[pid,this->fd]'
 			}, latency: {
 				gather: 'timestamp',
+				store: 'global[pid,this->fd]'
+			}, path: {
+				gather: 'strtok((xlate ' +
+				    '<node_http_request_t *> (' +
+				    '(node_dtrace_http_request_t *)' +
+				    'arg0))->url, "?")',
 				store: 'global[pid,this->fd]'
 			}
 		},
@@ -78,7 +118,10 @@ var desc = {
 			ppid: 'count()',
 			execname: 'count()',
 			args: 'count()',
-			pid: 'count()'
+			pid: 'count()',
+			path: 'count()',
+			pargs: 'count()',
+			pexecname: 'count()'
 		},
 		transforms: {
 			url: '$0[pid,this->fd]',
@@ -95,7 +138,11 @@ var desc = {
 			pid: 'lltostr(pid)',
 			ppid: 'lltostr(ppid)',
 			execname: 'execname',
-			args: 'curpsinfo->pr_psargs'
+			args: 'curpsinfo->pr_psargs',
+			path: '$0[pid,this->fd]',
+			pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+			pexecname: 'curthread->t_procp->p_parent->' +
+			    'p_user.u_comm'
 		},
 		verify: {
 			url: '$0[pid,((xlate <node_connection_t *>' +
@@ -103,6 +150,8 @@ var desc = {
 			latency: '$0[pid,((xlate <node_connection_t *>' +
 			    '((node_dtrace_connection_t *)arg0))->fd)]',
 			method: '$0[pid,((xlate <node_connection_t *>' +
+			    '((node_dtrace_connection_t *)arg0))->fd)]',
+			path: '$0[pid,((xlate <node_connection_t *>' +
 			    '((node_dtrace_connection_t *)arg0))->fd)]'
 		}
 	    },
@@ -115,7 +164,8 @@ var desc = {
 		clean: {
 			url: '$0[pid,this->fd]',
 			method: '$0[pid,this->fd]',
-			latency: '$0[pid,this->fd]'
+			latency: '$0[pid,this->fd]',
+			path: '$0[pid,this->fd]'
 		}
 	    }
 	],

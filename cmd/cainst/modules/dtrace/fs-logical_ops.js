@@ -59,6 +59,14 @@ var desc = {
 	    label: 'process arguments',
 	    type: mod_ca.ca_type_string
 	},
+	pargs: {
+	    label: 'parent process arguments',
+	    type: mod_ca.ca_type_string
+	},
+	pexecname: {
+	    label: 'parent process application name',
+	    type: mod_ca.ca_type_string
+	},
 	vnode: {
 	    internal: true
 	},
@@ -101,7 +109,10 @@ var desc = {
 		fstype: 'count()',
 		latency: 'llquantize($0, 10, 3, 11, 100)',
 		args: 'count()',
-		default: 'count()'
+		default: 'count()',
+		pargs: 'count()',
+		pexecname: 'count()'
+
 	    },
 	    local: [
 		       { fstype: 'stringof((*((vnode_t**)self->vnode0))->' +
@@ -118,7 +129,10 @@ var desc = {
 		latency: 'timestamp - $0',
 		args: 'curpsinfo->pr_psargs',
 		fstype: 'stringof((*((vnode_t**)self->vnode0))->' +
-		'v_op->vnop_name)'
+		'v_op->vnop_name)',
+		pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+		pexecname: 'curthread->t_procp->p_parent->' +
+		    'p_user.u_comm'
 	    },
 	    verify: {
 		latency: '$0',
@@ -141,7 +155,9 @@ var desc = {
 		fstype: 'count()',
 		args: 'count()',
 		latency: 'llquantize($0, 10, 3, 11, 100)',
-		default: 'count()'
+		default: 'count()',
+		pargs: 'count()',
+		pexecname: 'count()'
 	    },
 	    local: [ {  fstype: 'stringof(((vnode_t*)self->vnode0)->' +
 		'v_op->vnop_name)' } ],
@@ -161,7 +177,10 @@ var desc = {
 		latency: 'timestamp - $0',
 		args: 'curpsinfo->pr_psargs',
 		fstype: 'stringof(((vnode_t*)self->vnode0)->' +
-		'v_op->vnop_name)'
+		'v_op->vnop_name)',
+		pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+		pexecname: 'curthread->t_procp->p_parent->' +
+		    'p_user.u_comm'
 	    },
 	    predicate: '$depth0 == stackdepth && $vnode0 != NULL ' +
 		'&& ' + allowedfs_pred

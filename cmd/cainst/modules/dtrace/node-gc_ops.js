@@ -9,11 +9,26 @@ var desc = {
     label: 'garbage collection operations',
     type: 'ops',
     fields: {
-	type: { label: 'gc type', type: mod_ca.ca_type_string },
-	latency: { label: 'latency', type: mod_ca.ca_type_latency },
-	zonename: { label: 'zone name', type: mod_ca.ca_type_string },
-	hostname: { label: 'hostname', type: mod_ca.ca_type_string },
-	pid: { label: 'process identifier', type: mod_ca.ca_type_string },
+	type: {
+	    label: 'gc type',
+	    type: mod_ca.ca_type_string
+	},
+	latency: {
+	    label: 'latency',
+	    type: mod_ca.ca_type_latency
+	},
+	zonename: {
+	    label: 'zone name',
+	    type: mod_ca.ca_type_string
+	},
+	hostname: {
+	    label: 'hostname',
+	    type: mod_ca.ca_type_string
+	},
+	pid: {
+	    label: 'process identifier',
+	    type: mod_ca.ca_type_string
+	},
 	ppid: {
 	    label: 'parent process identifier',
 	    type: mod_ca.ca_type_string
@@ -24,6 +39,14 @@ var desc = {
 	},
 	args: {
 	    label: 'process arguments',
+	    type: mod_ca.ca_type_string
+	},
+	pargs: {
+	    label: 'parent process arguments',
+	    type: mod_ca.ca_type_string
+	},
+	pexecname: {
+	    label: 'parent process application name',
 	    type: mod_ca.ca_type_string
 	}
     },
@@ -49,7 +72,9 @@ var desc = {
 			ppid: 'count()',
 			execname: 'count()',
 			args: 'count()',
-			pid: 'count()'
+			pid: 'count()',
+			pargs: 'count()',
+			pexecname: 'count()'
 		},
 		transforms: {
 			hostname:
@@ -62,7 +87,10 @@ var desc = {
 			pid: 'lltostr(pid)',
 			ppid: 'lltostr(ppid)',
 			execname: 'execname',
-			args: 'curpsinfo->pr_psargs'
+			args: 'curpsinfo->pr_psargs',
+			pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+			pexecname: 'curthread->t_procp->p_parent->' +
+			    'p_user.u_comm'
 		},
 		verify: {
 			latency: '$0'

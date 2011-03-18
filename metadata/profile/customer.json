@@ -6,42 +6,44 @@
 		"stat": "thread_executions",
 		"fields": [
 		    "zonename", "execname", "pid", "leavereason", "runtime",
-		    "ppid", "args"
+		    "ppid", "args", "pargs", "pexecname"
 		]
 	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [
 		    "zonename", "execname", "pid", "operation", "fstype",
-		    "latency", "ppid", "args"
+		    "latency", "ppid", "args", "pargs", "pexecname"
 		]
 	}, {
 		"module": "node",
 		"stat": "gc_ops",
 		"fields": [
 		    "type", "latency", "zonename", "pid", "execname", "ppid",
-		    "args"
+		    "args", "pargs", "pexecname"
 		]
 	}, {
 		"module": "node",
 		"stat": "httpc_ops",
 		"fields": [
 		    "raddr", "rport", "method", "url", "latency", "zonename",
-		    "pid", "ppid", "execname", "args"
+		    "pid", "ppid", "execname", "args", "path", "pargs",
+		    "pexecname"
 		]
 	}, {
 		"module": "node",
 		"stat": "httpd_ops",
 		"fields": [
 		    "raddr", "rport", "method", "url", "latency", "zonename",
-		    "pid", "ppid", "execname", "args"
+		    "pid", "ppid", "execname", "args", "path", "pargs",
+		    "pexecname"
 		]
 	}, {
 		"module": "node",
 		"stat": "socket_ops",
 		"fields": [
 		    "raddr", "rport", "size", "type", "buffered", "zonename",
-		    "pid", "ppid", "execname", "args"
+		    "pid", "ppid", "execname", "args", "pargs", "pexecname"
 		]
 	} ]
 }

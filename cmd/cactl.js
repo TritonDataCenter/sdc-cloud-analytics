@@ -23,6 +23,7 @@ var cc_help = [
     '    <hostname> is a routing key identifying a single system',
     '    	hint: try "ca.config" for the config server',
     '    <command> is one of:',
+    '	     abort		panic remote service (use with caution)',
     '        ping		check connectivity',
     '        status [-v]	get detailed status info',
     '                           with -v, print additional unstructured info',
@@ -64,6 +65,7 @@ function main()
 	cc_cap = new mod_cap.capAmqpCap({
 	    log: log, amqp: cc_amqp, sysinfo: sysinfo
 	});
+	cc_cap.on('msg-ack-abort', ccAckAbort);
 	cc_cap.on('msg-ack-ping', ccAckPing);
 	cc_cap.on('msg-ack-status', ccAckStatus);
 
@@ -130,6 +132,7 @@ function ccRunCmdCmd(cmd)
 	return (msg);
 }
 
+cc_cmdswitch['abort'] = ccRunCmdCmd;
 cc_cmdswitch['ping'] = ccRunCmdCmd;
 cc_cmdswitch['status'] = ccRunCmdCmd;
 
@@ -162,6 +165,19 @@ function ccCheckMsg(msg)
 
 	printf('%-12s %d ms\n', 'Latency:', millis);
 	clearTimeout(cc_toid);
+}
+
+function ccAckAbort(msg)
+{
+	ccCheckMsg(msg);
+	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
+	printf('%-12s %s\n', 'Route key:', msg.ca_source);
+	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
+	    msg.ca_agent_version);
+	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
+	    msg.ca_os_release, msg.ca_os_revision);
+	printf('abort request %s\n', msg.a_ok ? 'accepted': 'rejected');
+	shutdown();
 }
 
 function ccAckPing(msg)

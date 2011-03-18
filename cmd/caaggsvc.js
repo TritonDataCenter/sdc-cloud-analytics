@@ -8,6 +8,7 @@ var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_caerr = require('../lib/ca/ca-error');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
+var mod_dbg = require('../lib/ca/ca-dbg');
 var mod_log = require('../lib/ca/ca-log');
 var mod_cageoip = require('../lib/ca/ca-geo');
 var mod_heatmap = require('heatmap');
@@ -49,16 +50,35 @@ function main()
 	var dbg_log;
 
 	agg_start = new Date().getTime();
+
+	mod_dbg.caEnablePanicOnCrash();
+	caDbg.set('agg_name', agg_name);
+	caDbg.set('agg_vers', agg_vers);
+	caDbg.set('agg_http_req_timeout', agg_http_req_timeout);
+	caDbg.set('agg_http_baseuri', agg_http_baseuri);
+	caDbg.set('agg_http_port_base', agg_http_port_base);
+	caDbg.set('agg_profile', agg_profile);
+	caDbg.set('agg_insts', agg_insts);
+	caDbg.set('agg_start', agg_start);
+	caDbg.set('agg_transforms', agg_transforms);
+	caDbg.set('agg_future_interval', agg_future_interval);
+	caDbg.set('agg_future_warns', agg_future_warns);
+	caDbg.set('agg_future_warn_interval', agg_future_warn_interval);
+
 	agg_sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
+	caDbg.set('agg_sysinfo', agg_sysinfo);
 	agg_broker = mod_ca.caBroker();
+	caDbg.set('agg_broker', agg_broker);
 
 	agg_log = new mod_log.caLog({ out: process.stdout });
+	caDbg.set('agg_log', agg_log);
 
 	if (process.argv.length > 2) {
 		dbg_log = mod_log.caLogFromFile(process.argv[2],
 		    { candrop: true }, mod_log.caLogError(agg_log));
 		agg_log.info('Logging AMQP debug messages to "%s"',
 		    process.argv[2]);
+		caDbg.set('amqp_debug_log', dbg_log);
 	}
 
 	agg_amqp = new mod_caamqp.caAmqp({
@@ -70,6 +90,7 @@ function main()
 	    bindings: [ mod_ca.ca_amqp_key_all ],
 	    log: agg_log
 	});
+	caDbg.set('agg_amqp', agg_amqp);
 	agg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
 	agg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
 
@@ -79,7 +100,9 @@ function main()
 	    log: agg_log,
 	    sysinfo: agg_sysinfo
 	});
-	agg_cap.on('msg-cmd-ping', aggCmdPing);
+	caDbg.set('agg_cap', agg_cap);
+	agg_cap.on('msg-cmd-abort', mod_cap.caAbortRemote(agg_cap));
+	agg_cap.on('msg-cmd-ping', mod_cap.caPingRemote(agg_cap));
 	agg_cap.on('msg-cmd-status', aggCmdStatus);
 	agg_cap.on('msg-cmd-enable_aggregation', aggCmdEnableAggregation);
 	agg_cap.on('msg-data', aggData);
@@ -97,9 +120,11 @@ function main()
 	    port_base: agg_http_port_base,
 	    router: aggHttpRouter
 	});
+	caDbg.set('agg_http', agg_http);
 
 	agg_http.start(function () {
 	    agg_http_port = agg_http.port();
+	    caDbg.set('agg_http_port', agg_http_port_base);
 	    agg_log.info('%-12s Port %d (started)',
 		'HTTP server:', agg_http_port);
 	    agg_amqp.start(aggStarted);
@@ -158,14 +183,6 @@ function aggCmdEnableAggregation(msg)
 	    };
 	    agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 	});
-}
-
-/*
- * Process AMQP ping command.
- */
-function aggCmdPing(msg)
-{
-	agg_cap.sendCmdAckPing(msg.ca_source, msg.ca_id);
 }
 
 /*

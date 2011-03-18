@@ -14,6 +14,7 @@ var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cainst = require('../lib/ca/ca-inst');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
+var mod_dbg = require('../lib/ca/ca-dbg');
 var mod_log = require('../lib/ca/ca-log');
 var mod_mapi = require('../lib/ca/ca-mapi');
 var mod_md = require('../lib/ca/ca-metadata');
@@ -76,23 +77,46 @@ function main()
 	var mapi, request_log, dbg_log;
 
 	cfg_start = new Date().getTime();
+
+	mod_dbg.caEnablePanicOnCrash();
+	caDbg.set('cfg_name', cfg_name);
+	caDbg.set('cfg_vers', cfg_vers);
+	caDbg.set('cfg_http_port', cfg_http_port);
+	caDbg.set('cfg_http_baseuri', cfg_http_baseuri);
+	caDbg.set('cfg_start', cfg_start);
+	caDbg.set('cfg_aggregators', cfg_aggregators);
+	caDbg.set('cfg_transformations', cfg_transformations);
+	caDbg.set('cfg_instrumenters', cfg_instrumenters);
+	caDbg.set('cfg_instn_max_peruser', cfg_instn_max_peruser);
+	caDbg.set('cfg_reaper_interval', cfg_reaper_interval);
+	caDbg.set('cfg_insts', cfg_insts);
+	caDbg.set('cfg_customers', cfg_customers);
+	caDbg.set('cfg_global_insts', cfg_global_insts);
+
 	cfg_sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
+	caDbg.set('cfg_sysinfo', cfg_sysinfo);
 	cfg_log = new mod_log.caLog({ out: process.stdout });
+	caDbg.set('cfg_log', cfg_log);
 	cfg_broker = mod_ca.caBroker();
+	caDbg.set('cfg_broker', cfg_broker);
 	cfg_mapi = mod_ca.caMapiConfig();
+	caDbg.set('cfg_mapi', cfg_mapi);
 	cfg_metrics = new mod_metric.caMetricSet();
+	caDbg.set('cfg_metrics', cfg_metrics);
 
 	if (process.argv.length > 2) {
 		dbg_log = mod_log.caLogFromFile(process.argv[2],
 		    { candrop: true }, mod_log.caLogError(cfg_log));
 		cfg_log.info('Logging AMQP debug messages to "%s"',
 		    process.argv[2]);
+		caDbg.set('amqp_dbg_log', dbg_log);
 	}
 
 	if (process.argv.length > 3) {
 		request_log = mod_log.caLogFromFile(process.argv[3],
 		    { candrop: true }, mod_log.caLogError(cfg_log));
 		cfg_log.info('Logging HTTP requests to "%s"', process.argv[3]);
+		caDbg.set('http_request_log', request_log);
 	}
 
 	cfg_amqp = new mod_caamqp.caAmqp({
@@ -104,6 +128,7 @@ function main()
 	    bindings: [ mod_ca.ca_amqp_key_config, mod_ca.ca_amqp_key_all ],
 	    log: cfg_log
 	});
+	caDbg.set('cfg_amqp', cfg_amqp);
 	cfg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError(cfg_log));
 	cfg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
 
@@ -113,7 +138,9 @@ function main()
 	    log: cfg_log,
 	    sysinfo: cfg_sysinfo
 	});
-	cfg_cap.on('msg-cmd-ping', cfgCmdPing);
+	caDbg.set('cfg_cap', cfg_cap);
+	cfg_cap.on('msg-cmd-abort', mod_cap.caAbortRemote(cfg_cap));
+	cfg_cap.on('msg-cmd-ping', mod_cap.caPingRemote(cfg_cap));
 	cfg_cap.on('msg-cmd-status', cfgCmdStatus);
 	cfg_cap.on('msg-notify-aggregator_online', cfgNotifyAggregatorOnline);
 	cfg_cap.on('msg-notify-configsvc_online', mod_ca.caNoop);
@@ -128,6 +155,7 @@ function main()
 	    router: cfgHttpRouter,
 	    log_requests: request_log
 	});
+	caDbg.set('cfg_http', cfg_http);
 
 	cfg_log.info('Config service starting up (%s/%s)', cfg_name, cfg_vers);
 	cfg_log.info('%-12s %s', 'Hostname:', cfg_sysinfo.ca_hostname);
@@ -139,6 +167,7 @@ function main()
 		cfg_log.info('%-12s %s:%s', 'MAPI host:', cfg_mapi.host,
 		    cfg_mapi.port);
 		mapi = new mod_mapi.caMapi(cfg_mapi);
+		caDbg.set('mapi', mapi);
 	} else {
 		cfg_log.warn('MAPI_HOST, MAPI_PORT, MAPI_USER, or ' +
 		    'MAPI_PASSWORD not set.  Per-customer use disabled.');
@@ -154,6 +183,7 @@ function main()
 	    uri_base: cfg_http_baseuri,
 	    mapi: mapi
 	});
+	caDbg.set('cfg_factory', cfg_factory);
 
 	cfgProfileInit(function () {
 		cfg_amqp.start(function () {
@@ -173,6 +203,7 @@ function main()
 function cfgProfileInit()
 {
 	cfg_metadata = new mod_md.caMetadataManager(cfg_log, './metadata');
+	caDbg.set('cfg_metadata', cfg_metadata);
 	cfg_metadata.load(function (err) {
 		if (err) {
 			cfg_log.error('fatal: failed to load metadata: %r',
@@ -181,6 +212,7 @@ function cfgProfileInit()
 		}
 
 		cfg_profiles = new mod_profile.caProfileManager();
+		caDbg.set('cfg_profiles', cfg_profiles);
 		cfg_profiles.load(cfg_metadata);
 
 		cfg_profile_customer = cfg_profiles.get('customer');
@@ -246,6 +278,7 @@ function cfgReaper()
 	}
 
 	cfg_reaper_last = now;
+	caDbg.set('cfg_reaper_last', now);
 	setTimeout(cfgReaper, cfg_reaper_interval);
 }
 
@@ -734,14 +767,6 @@ function cfgHttpInstValue(request, response)
 }
 
 /*
- * Handle AMQP "ping" message
- */
-function cfgCmdPing(msg)
-{
-	cfg_cap.sendCmdAckPing(msg.ca_source, msg.ca_id);
-}
-
-/*
  * Handle AMQP "status" message
  */
 function cfgCmdStatus(msg)
@@ -793,7 +818,6 @@ function cfgNotifyAggregatorOnline(msg)
 		    'transformations: %j', msg);
 		return;
 	}
-
 
 	if (msg.ca_hostname in cfg_aggregators) {
 		agg = cfg_aggregators[msg.ca_hostname];

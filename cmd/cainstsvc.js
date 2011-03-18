@@ -7,6 +7,7 @@ var ASSERT = require('assert').ok;
 var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
+var mod_dbg = require('../lib/ca/ca-dbg');
 var mod_log = require('../lib/ca/ca-log');
 var mod_capred = require('../lib/ca/ca-pred');
 
@@ -31,13 +32,26 @@ function main()
 	var hostname = sysinfo.ca_hostname;
 	var dbg_log;
 
+	mod_dbg.caEnablePanicOnCrash();
+	caDbg.set('broker', broker);
+	caDbg.set('sysinfo', sysinfo);
+	caDbg.set('hostname', hostname);
+
+	caDbg.set('ins_name', ins_name);
+	caDbg.set('ins_vers', ins_vers);
+	caDbg.set('ins_insts', ins_insts);
+	caDbg.set('ins_modules', ins_modules);
+	caDbg.set('ins_status_callbacks', ins_status_callbacks);
+
 	ins_log = new mod_log.caLog({ out: process.stdout });
+	caDbg.set('ins_log', ins_log);
 
 	if (process.argv.length > 2) {
 		dbg_log = mod_log.caLogFromFile(process.argv[2],
 		    { candrop: true }, mod_log.caLogError(ins_log));
 		ins_log.info('Logging AMQP debug messages to "%s"',
 		    process.argv[2]);
+		caDbg.set('amqp_dbg_log', dbg_log);
 	}
 
 	ins_amqp = new mod_caamqp.caAmqp({
@@ -49,6 +63,7 @@ function main()
 	    bindings: [ mod_ca.ca_amqp_key_all ],
 	    log: ins_log
 	});
+	caDbg.set('ins_amqp', ins_amqp);
 	ins_amqp.on('amqp-error', mod_caamqp.caAmqpLogError(ins_log));
 	ins_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(ins_log));
 
@@ -58,7 +73,9 @@ function main()
 	    log: ins_log,
 	    sysinfo: sysinfo
 	});
-	ins_cap.on('msg-cmd-ping', insCmdPing);
+	caDbg.set('ins_cap', ins_cap);
+	ins_cap.on('msg-cmd-abort', mod_cap.caAbortRemote(ins_cap));
+	ins_cap.on('msg-cmd-ping', mod_cap.caPingRemote(ins_cap));
 	ins_cap.on('msg-cmd-status', insCmdStatus);
 	ins_cap.on('msg-cmd-enable_instrumentation', insCmdEnable);
 	ins_cap.on('msg-cmd-disable_instrumentation', insCmdDisable);
@@ -378,14 +395,6 @@ function insTick()
 	}
 
 	ins_last = when;
-}
-
-/*
- * Process AMQP ping command.
- */
-function insCmdPing(msg)
-{
-	ins_cap.sendCmdAckPing(msg.ca_source, msg.ca_id);
 }
 
 /*

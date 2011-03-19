@@ -478,11 +478,12 @@ function insCmdEnable(msg)
 
 		if (!mod_ca.caIsEmpty(msg.is_predicate)) {
 			try {
-				mod_capred.caPredValidate(
+				mod_capred.caPredValidateSyntax(
+				    msg.is_predicate);
+				mod_capred.caPredValidateSemantics(
 				    metrics[ii].fieldtypes, msg.is_predicate);
 			} catch (ex) {
-				if (ex instanceof
-				    mod_capred.caPredValidationError)
+				if (ex instanceof caInvalidFieldError)
 					continue;
 
 				ins_log.error(

@@ -70,7 +70,7 @@ function main()
 	agg_broker = mod_ca.caBroker();
 	caDbg.set('agg_broker', agg_broker);
 
-	agg_log = new mod_log.caLog({ out: process.stdout });
+	agg_log = new mod_log.caLog({ out: process.stderr });
 	caDbg.set('agg_log', agg_log);
 
 	if (process.argv.length > 2) {

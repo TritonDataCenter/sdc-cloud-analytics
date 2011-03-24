@@ -95,7 +95,7 @@ function main()
 
 	cfg_sysinfo = mod_ca.caSysinfo(cfg_name, cfg_vers);
 	caDbg.set('cfg_sysinfo', cfg_sysinfo);
-	cfg_log = new mod_log.caLog({ out: process.stdout });
+	cfg_log = new mod_log.caLog({ out: process.stderr });
 	caDbg.set('cfg_log', cfg_log);
 	cfg_broker = mod_ca.caBroker();
 	caDbg.set('cfg_broker', cfg_broker);

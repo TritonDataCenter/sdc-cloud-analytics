@@ -23,8 +23,6 @@ var ins_cap;			/* cap wrapper */
 var ins_log;			/* log handle */
 var ins_amqp;
 
-var stdout = process.stdout;
-
 function main()
 {
 	var broker = mod_ca.caBroker();
@@ -43,7 +41,7 @@ function main()
 	caDbg.set('ins_modules', ins_modules);
 	caDbg.set('ins_status_callbacks', ins_status_callbacks);
 
-	ins_log = new mod_log.caLog({ out: process.stdout });
+	ins_log = new mod_log.caLog({ out: process.stderr });
 	caDbg.set('ins_log', ins_log);
 
 	if (process.argv.length > 2) {

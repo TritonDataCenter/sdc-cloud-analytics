@@ -4,8 +4,8 @@
 var mod_ca = require('../../../../lib/ca/ca-common');
 
 var desc = {
-    module: 'io',
-    stat: 'ops',
+    module: 'disk',
+    stat: 'physio_ops',
     label: 'operations',
     type: 'ops',
     fields: {
@@ -25,8 +25,8 @@ var desc = {
 	    label: 'size',
 	    type: mod_ca.ca_type_number
 	},
-	name: {
-	    label: 'device name',
+	disk: {
+	    label: 'disk',
 	    type: mod_ca.ca_type_string
 	},
 	offset: {
@@ -50,7 +50,7 @@ var desc = {
 		hostname: 'count()',
 		latency: 'llquantize($0, 10, 3, 11, 100)',
 		size: 'llquantize($0, 10, 3, 11, 100)',
-		name: 'count()',
+		disk: 'count()',
 		offset: 'llquantize($0, 10, 0, 11, 100)',
 		default: 'count()'
 	    },
@@ -58,7 +58,7 @@ var desc = {
 		optype: '(args[0]->b_flags & B_READ ? "read" : "write")',
 		hostname: '"' + mod_ca.caSysinfo().ca_hostname + '"',
 		latency: 'timestamp - $0[arg0]',
-		name: 'args[1]->dev_statname',
+		disk: 'args[1]->dev_statname',
 		size: 'args[0]->b_bcount',
 		offset: 'args[0]->b_blkno'
 	    },

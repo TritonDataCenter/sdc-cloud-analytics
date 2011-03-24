@@ -2,6 +2,12 @@
 	"name": "operator", "label": "Operator",
 	"metrics": [ {
 		"module": "cpu",
+		"stat": "cpus",
+		"fields": [
+		    "hostname", "cpu", "utilization"
+		]
+	}, {
+		"module": "cpu",
 		"stat": "thread_executions",
 		"fields": [
 		    "zonename", "execname", "pid", "leavereason", "runtime",
@@ -53,10 +59,24 @@
 		    "pid", "ppid", "args", "pargs", "pexecname", "cputime"
 		]
 	}, {
-		"module": "io",
-		"stat": "ops",
+		"module": "disk",
+		"stat": "physio_ops",
 		"fields": [
-		    "hostname", "optype", "latency", "size", "name", "offset"
+		    "hostname", "optype", "latency", "size", "disk", "offset"
+		]
+	}, {
+		"module": "disk",
+		"stat": "disks",
+		"fields": [
+		    "hostname", "disk", "iops", "bytes", "bytes_read",
+		    "bytes_written"
+		]
+	}, {
+		"module": "nic",
+		"stat": "nics",
+		"fields": [
+		    "hostname", "nic", "throughput", "in_throughput",
+		    "out_throughput"
 		]
 	} ]
 }

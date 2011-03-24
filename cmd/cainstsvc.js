@@ -256,6 +256,13 @@ insBackendInterface.prototype.registerMetric = function (args)
 	for (field in fields)
 		stat['fieldtypes'][field] = fields[field]['type'];
 
+	/*
+	 * This is a temporary workaround until kstat-based metrics support
+	 * predicates.
+	 */
+	if (args['nopredicates'])
+		stat['nopredicates'] = args['nopredicates'];
+
 	ins_modules[modname]['stats'][statname].push(stat);
 };
 
@@ -477,6 +484,9 @@ function insCmdEnable(msg)
 		}
 
 		if (!mod_ca.caIsEmpty(msg.is_predicate)) {
+			if (metrics[ii].nopredicates)
+				continue;
+
 			try {
 				mod_capred.caPredValidateSyntax(
 				    msg.is_predicate);

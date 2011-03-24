@@ -19,8 +19,8 @@ var insd_dt_libpath = [];		/* DTrace library Path (-L) */
 var insd_nenablings = 0;		/* number of active enablings */
 
 var insd_metrics = [ 'syscall-ops', 'node-gc_ops', 'node-httpd_ops',
-    'node-httpc_ops', 'node-socket_ops', 'io-ops', 'cpu-thread_executions',
-    'fs-logical_ops' ];
+    'node-httpc_ops', 'node-socket_ops', 'disk-physio_ops',
+    'cpu-thread_executions', 'fs-logical_ops' ];
 
 if (process.env['DTRACE_LIBPATH']) {
 	insd_dt_libpath = process.env['DTRACE_LIBPATH'].split(':');
@@ -48,7 +48,7 @@ exports.insinit = function (ins, log)
 
 	ins.registerModule({ name: 'syscall', label: 'System calls' });
 	ins.registerModule({ name: 'node', label: 'Node.js 0.4.x' });
-	ins.registerModule({ name: 'io', label: 'Disk I/O' });
+	ins.registerModule({ name: 'disk', label: 'Disk I/O' });
 	ins.registerModule({ name: 'fs', label: 'Filesystem' });
 	ins.registerModule({ name: 'cpu', label: 'CPU' });
 

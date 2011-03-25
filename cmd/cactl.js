@@ -215,12 +215,10 @@ function ccAckStatus(msg)
 			    elts[ii].sia_hostname, elts[ii].sia_ninsts);
 
 		elts = msg.s_instrumenters;
-		printf('%-28s    %-7s    %-6s\n', 'INSTRUMENTERS',
-		    'ACTIVE', 'METRICS');
+		printf('%-28s    %-7s\n', 'INSTRUMENTERS', 'ACTIVE');
 		for (ii = 0; ii < elts.length; ii++)
-			printf('  %3d.  %-20s    %6d    %7d\n', ii + 1,
-			    elts[ii].sii_hostname, elts[ii].sii_ninsts,
-			    elts[ii].sii_nmetrics_avail);
+			printf('  %3d.  %-20s    %6d\n', ii + 1,
+			    elts[ii].sii_hostname, elts[ii].sii_ninsts);
 		break;
 
 	case 'instrumenter':

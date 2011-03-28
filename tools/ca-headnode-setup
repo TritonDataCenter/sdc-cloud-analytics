@@ -187,6 +187,7 @@ mkdir -p /home/$sh_user/.ssh || fail "failed to create /home/$sh_user"
 useradd -c $sh_user -d /home/$sh_user -G staff -s /bin/bash \
     -K defaultpriv=basic,dtrace_user,dtrace_proc,dtrace_kernel $sh_user || \
     fail "failed to create user"
+passwd -N $sh_user || fail "passwd -N failed for $sh_user"
 cat > /home/$sh_user/.npmrc << NPMRC
 root = ~/.node_modules
 tar = gtar
@@ -214,4 +215,5 @@ chmod +x /zones/$sh_zonename/root/root/setup_zone.sh
 [[ $sh_skip_setup = true ]] || zlogin $sh_zonename /root/setup_zone.sh || fail
 
 echo "Setup complete for zone $sh_zonename at $sh_zoneip."
-echo "Remember to set the passwords for root and $sh_user manually before using ssh."
+echo "If you have not yet done so, you will need to set up a public key for the "
+echo "admin user in CAPI in order to log into the zone as either root or $sh_user."

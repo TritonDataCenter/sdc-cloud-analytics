@@ -15,6 +15,7 @@ var gZoomOptions = [ 10, 30, 60, 300, 600, 3600 ];	/* seconds */
 var gZoomDefault = 1;		/* default is 30 seconds */
 var gyMin = 0;			/* global/default ymin for heatmaps */
 var gyMax = 10000000000;	/* global/default ymax for heatmaps 10s */
+var gTypes;			/* global type information */
 
 /*
  *  Fix that Firefox < 4 doesn't have Object.keys(); -- Code from
@@ -60,6 +61,7 @@ var gVectorOptions = {
 
 window.onload = function ()
 {
+	gInitTypes();
 	gInitColors();
 	gInitMetrics();
 	setTimeout(gTick, 0);
@@ -84,6 +86,40 @@ function gInitColors()
 	}
 
 	gMaxSeries = gColors.length - 1;
+}
+
+/*
+ * Initialize the set of types and type information that we have
+ */
+function gInitTypes()
+{
+	var url = 'http://' + gServer + ':' + gPort + '/ca' +
+	    gCustUri() + '/types';
+	var request = new XMLHttpRequest();
+
+	request.open('GET', url, true);
+	request.send(null);
+	request.onreadystatechange = function () {
+		if (request.readyState != 4)
+			return;
+
+		if (request.status != 200) {
+			alert('failed to load type list');
+			return;
+		}
+
+		gTypes = JSON.parse(request.responseText);
+	};
+}
+
+function gTypeToArity(type)
+{
+	if (!(type in gTypes)) {
+		alert('error: asked about unknown type: ' + type);
+		return (null);
+	}
+
+	return (gTypes[type]['arity']);
 }
 
 /*
@@ -339,7 +375,7 @@ function gDecompSelected()
 {
 	var statsel, decompsel, decompsel2, metric;
 	var statoption, firstoption, option;
-	var field;
+	var field, arity;
 
 	decompsel = document.getElementById('gDecompositionSelector');
 	firstoption = decompsel.options[decompsel.selectedIndex];
@@ -356,14 +392,17 @@ function gDecompSelected()
 	statsel = document.getElementById('gStatSelector');
 	statoption = statsel.options[statsel.selectedIndex];
 	metric = gMetrics[statoption.value];
+	if (firstoption.value != '')
+		arity = gTypeToArity(metric.fields[firstoption.value]['type']);
+	else
+		arity = null;
 
 	for (field in metric.fields) {
 		if (field == firstoption.value)
 			continue;
 
 		if (firstoption.value !== '' &&
-		    metric.fields[field].type ==
-		    metric.fields[firstoption.value].type)
+		    gTypeToArity(metric.fields[field].type) == arity)
 			continue;
 
 		option = document.createElement('option');
@@ -515,9 +554,8 @@ gGraph.prototype.initDetails = function ()
 				if (decomps[ii] != fieldname)
 					continue;
 
-				if (metric.fields[fieldname].type ==
-				    'latency' || metric.fields[fieldname].type
-				    == 'number') {
+				if (gTypeToArity(metric.fields[fieldname].type)
+				    == 'numeric') {
 					this.g_subtype = 'heatmap';
 					continue;
 				}
@@ -949,7 +987,7 @@ gGraph.prototype.serverDelete = function (callback)
 		if (request.readyState != 4)
 			return;
 
-		if (request.status != 200)
+		if (request.status != 204)
 			callback('failed to delete stat: ' +
 			    request.statusText + ': ' + request.responseText);
 		else
@@ -1977,8 +2015,7 @@ function gDrillFieldChanged(graphId)
 	opt.value = 'ne';
 	opt.appendChild(document.createTextNode('!='));
 
-	if (metric.fields[field.value].type != 'latency' ||
-	    metric.fields[field.value].type != 'number')
+	if (gTypeToArity(metric.fields[field.value].type) != 'numeric')
 		return;
 
 	opt = opSel.appendChild(document.createElement('option'));
@@ -2031,11 +2068,11 @@ function gDrillSubmit(graphId, dialog)
 	val = valSel.value;
 
 	/* Potentially parse the value to a number if the field is numeric */
-	if (gGraphs[graphId].g_metric.fields[field].type == 'latency' ||
-	    gGraphs[graphId].g_metric.fields[field].type == 'number') {
+	if (gTypeToArity(gGraphs[graphId].g_metric.fields[field].type) ==
+	    'numeric') {
 		val = parseInt(val, 10);
 		if (isNaN(val)) {
-			alert('field is of type latency, must specify a ' +
+			alert('field has numeric arity, must specify a ' +
 			    'number');
 			return;
 		}
@@ -2153,21 +2190,10 @@ function gatherMetricFieldsByType(metric)
 	var ret = {};
 
 	for (key in fields) {
-		switch (fields[key]['type']) {
-		case 'string':
-		case 'ip_address':
-			ret[key] = {
-			    type: 'discrete',
-			    label: fields[key]['label']
-			};
-			break;
-		default:
-			ret[key] = {
-			    type: 'numeric',
-			    label: fields[key]['label']
-			};
-			break;
-		}
+		ret[key] = {
+		    type: gTypeToArity(fields[key]['type']),
+		    label: fields[key]['label']
+		};
 	}
 
 	return (ret);

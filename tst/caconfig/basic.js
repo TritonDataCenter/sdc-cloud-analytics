@@ -404,7 +404,7 @@ function walk_delete(test, callback)
 	var handler = function (err, response, rv) {
 		log.info('received DELETE response for test: %s', test.name);
 		ASSERT.ok(!err);
-		ASSERT.equal(response.statusCode, HTTP.OK);
+		ASSERT.equal(response.statusCode, HTTP.NOCONTENT);
 		callback();
 	};
 

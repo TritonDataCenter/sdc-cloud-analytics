@@ -209,7 +209,7 @@ var deleteInst = function (id)
 		if (err)
 			throw (err);
 
-		mod_assert.equal(response.statusCode, 200,
+		mod_assert.equal(response.statusCode, 204,
 		    'bad HTTP status: ' + response.statusCode);
 		mod_tl.ctStdout.info('Advancing from deleteInsts');
 		mod_tl.advance(id, []);

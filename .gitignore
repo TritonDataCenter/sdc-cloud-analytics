@@ -9,3 +9,4 @@ deps/node-install
 lib/ca/errno.js
 tools/webrev_support/bin/codereview
 webrev
+cacore.*

@@ -262,7 +262,9 @@ function aggData(msg)
 	 * get data from any of them for some previous time index.
 	 */
 	dataset = inst.agi_dataset;
-	ASSERT.ok(dataset.nreporting(time) <= dataset.nsources());
+	ASSERT.ok(dataset.nreporting(time) <= dataset.nsources(),
+	    caSprintf('nreporting: %d, nsources: %d', dataset.nreporting(time),
+	    dataset.nsources()));
 	if (dataset.nreporting(time) < aggExpected(dataset, time))
 		return;
 

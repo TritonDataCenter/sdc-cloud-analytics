@@ -151,6 +151,7 @@ var listInsts = function (id, inputExp)
 		name: 'value_raw',
 		uri: '/ca/instrumentations/1/value/raw'
 	    } ],
+	    'nsources': 1,
 	    transformations: {}
 	}];
 

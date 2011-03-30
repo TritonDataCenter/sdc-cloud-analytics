@@ -10,7 +10,8 @@ var mod_tl = require('../../lib/tst/ca-test');
 
 var dataset = mod_caagg.caDatasetForInstrumentation({
 	'value-arity': mod_ca.ca_arity_scalar,
-	'value-dimension': 1
+	'value-dimension': 1,
+	'nsources': 2
     });
 
 var source1 = 'source1';
@@ -20,7 +21,7 @@ var time1 = 12340;
 var time2 = 12345;
 
 /* initial state */
-mod_assert.equal(dataset.nsources(), 0);
+mod_assert.equal(dataset.nsources(), 2);
 mod_assert.equal(dataset.nreporting(time1, 1), 0);
 mod_assert.equal(dataset.nreporting(time2, 1), 0);
 mod_assert.equal(dataset.nreporting(time2 + 1, 1), 0);
@@ -33,7 +34,7 @@ mod_assert.equal(dataset.dataForTime(time2 + 1), 0);
 
 /* simple update */
 dataset.update(source1, time1, 10);
-mod_assert.equal(dataset.nsources(), 1);
+mod_assert.equal(dataset.nsources(), 2);
 mod_assert.equal(dataset.nreporting(time1, 1), 1);
 mod_assert.equal(dataset.nreporting(time1, 2), 0);
 mod_assert.equal(dataset.nreporting(time2, 1), 0);

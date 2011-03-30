@@ -519,9 +519,10 @@ var enableAgg = function (source)
 	    'value-dimension': dim,
 	    'enabled': true,
 	    'retention-time': 600,
+	    'nsources': nsources,
 	    transformations: []
 	};
-	mod_tl.ctStdout.info('Sending enable agg message');
+	mod_tl.ctStdout.info('Sending enable agg message: %j', inst);
 	fakeConfig.sendCmdEnableAgg(source, id, id, key, inst);
 };
 

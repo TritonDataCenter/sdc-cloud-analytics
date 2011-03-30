@@ -626,8 +626,8 @@ function cfgHttpInstCreate(request, response)
 	}
 
 	pset = cfgRequestProfileSet(request).intersection(cfg_metrics);
-	cfg_factory.create(custid, props, pset, function (err, inst) {
-		var headers, code;
+	cfg_factory.create(custid, props, pset, function (err, resp) {
+		var headers, code, inst;
 
 		if (err) {
 			cfg_log.error('failed to create instn: %r', err);
@@ -638,7 +638,9 @@ function cfgHttpInstCreate(request, response)
 			return;
 		}
 
-		props = inst.properties();
+		inst = resp.inst;
+		props = caDeepCopy(inst.properties());
+		props['warnings'] = resp['warnings'];
 		headers = { 'Location': props['uri'] };
 		cfg_insts[inst.fqid()] = { inst: inst, last: new Date() };
 		cfgInstrumentations(inst.custid())[inst.fqid()] = true;

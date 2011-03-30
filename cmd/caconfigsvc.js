@@ -697,7 +697,7 @@ function cfgHttpInstDelete(request, response)
 	 * commands to complete.
 	 */
 	cfgInstDelete(cfg_insts[fqid].inst);
-	response.send(HTTP.OK);
+	response.send(HTTP.NOCONTENT);
 }
 
 /*

@@ -61,7 +61,7 @@ function sh_load_dataset
 function sh_enable_provision
 {
 	local servers length ii entry
-	servers=$($sh_curlcmd --url $sh_urlbase/servers)
+	servers=$($sh_curlcmd -s --url $sh_urlbase/servers)
 	[[ $? -eq 0 ]] || fail "failed to list servers"
 	length=$(echo $servers | json length)
 	entry=""
@@ -73,8 +73,8 @@ function sh_enable_provision
 		fi	
 	}
 	[[ -z $entry ]] && fail "couldn't find $sh_head_hostname entry"
-	$sh_curlcmd -X PUT -F "api_provisionable=true" \
-	    --url $sh_urlbase/admin$entry
+	$sh_curlcmd -s -X PUT -F "api_provisionable=true" \
+	    --url $sh_urlbase/admin$entry >/dev/null
 	[[ $? -eq 0 ]] || fail "failed to make $sh_head_hostname provisionable"
 }
 

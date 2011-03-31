@@ -389,6 +389,40 @@ function inskTcpErrtypeValues(kstat, kprev)
 	}));
 }
 
+function inskAutoMetricValidate(desc)
+{
+	var fieldname, field, arity;
+
+	ASSERT(desc['module'] && typeof (desc['module']) == typeof (''));
+	ASSERT(desc['stat'] && typeof (desc['stat']) == typeof (''));
+	ASSERT(desc['label'] && typeof (desc['label']) == typeof (''));
+	ASSERT(desc['type'] && typeof (desc['type']) == typeof (''));
+	ASSERT(desc['kstat'] && desc['kstat'].constructor == Object);
+	ASSERT(!caIsEmpty(desc['kstat']));
+	ASSERT((!('filter' in desc)) || desc['filter'].constructor == Function);
+	ASSERT(desc['extract'] && desc['extract'].constructor == Function);
+	ASSERT(desc['fields'] && desc['fields'].constructor == Object);
+
+	for (fieldname in desc['fields']) {
+		field = desc['fields'][fieldname];
+		ASSERT(field.constructor == Object);
+		ASSERT(field['label'] &&
+		    typeof (field['label']) == typeof (''));
+		ASSERT((!('values' in field)) ||
+		    field['values'].constructor == Function);
+		ASSERT(field['type'] &&
+		    typeof (field['type']) == typeof (''));
+		arity = mod_ca.caTypeToArity(field['type']);
+		if (arity == mod_ca.ca_field_arity_discrete)
+			ASSERT(!('bucketize' in field));
+		else {
+			ASSERT(arity == mod_ca.ca_field_arity_numeric);
+			ASSERT(field['bucketize'] &&
+			    field['bucketize'].constructor == Function);
+		}
+	}
+}
+
 /*
  * Register the metrics defined above with the instrumenter backend.
  */
@@ -410,6 +444,13 @@ function inskInitAutoMetrics(ins)
 			type: mod_ca.ca_type_string,
 			values: function () { return ([ inskHostname ]); }
 		};
+
+		try {
+			inskAutoMetricValidate(inskMetrics[ii]);
+		} catch (ex) {
+			caPanic(caSprintf('metric is invalid: %j',
+			    inskMetrics[ii]), ex);
+		}
 
 		for (field in inskMetrics[ii]['fields']) {
 			fields[field] = {

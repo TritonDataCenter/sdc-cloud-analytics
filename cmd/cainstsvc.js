@@ -291,8 +291,8 @@ function insInitBackends()
 			plugin.insinit(bemgr, ins_log);
 			ins_log.info('Loaded module "%s".', backends[ii]);
 		} catch (ex) {
-			ins_log.warn('FAILED to load module "%s": %s',
-			    backends[ii], ex.toString());
+			ins_log.warn('FAILED to load module "%s": %r',
+			    backends[ii], ex);
 		}
 	}
 

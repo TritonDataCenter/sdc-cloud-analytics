@@ -15,6 +15,7 @@ sh_user="$1"
 sh_curlcmd="curl -u admin:tot@ls3crit"
 sh_skip_setup=false
 sh_dataset_name=smartos
+sh_head_hostname=headnode
 
 sh_dataset_version=
 sh_custuri=
@@ -57,6 +58,26 @@ function sh_load_dataset
 	    json 0.version)
 }
 
+function sh_enable_provision
+{
+	local servers length ii entry
+	servers=$($sh_curlcmd --url $sh_urlbase/servers)
+	[[ $? -eq 0 ]] || fail "failed to list servers"
+	length=$(echo $servers | json length)
+	entry=""
+	for (( ii=0; ii < length; ii++)) {
+		if echo $servers | json $ii.hostname | \
+		    egrep -s "^$sh_head_hostname$";
+		then
+			entry=$(echo $servers | json $ii.uri)
+		fi	
+	}
+	[[ -z $entry ]] && fail "couldn't find $sh_head_hostname entry"
+	$sh_curlcmd -X PUT -F "api_provisionable=true" \
+	    --url $sh_urlbase/admin$entry
+	[[ $? -eq 0 ]] || fail "failed to make $sh_head_hostname provisionable"
+}
+
 function sh_provision
 {
         local custuri=$1 dataset=$2
@@ -96,6 +117,9 @@ echo "Finding version of dataset "$sh_dataset_name" ... \c"
 sh_load_dataset || fail "failed"
 [[ -n $sh_dataset_version ]] || fail "no version found"
 echo "$sh_dataset_version"
+
+echo "Making headnode API provisionable"
+sh_enable_provision
 
 echo "Provisioning $sh_dataset_name-$sh_dataset_version zone ... \c"
 sh_provision $sh_custuri "$sh_dataset_name-$sh_dataset_version" || fail "failed"

@@ -20,6 +20,7 @@ exports.insinit = function (ins, log)
 	ins.registerModule({ name: 'cpu', label: 'CPU' });
 	ins.registerModule({ name: 'disk', label: 'Disk I/O' });
 	ins.registerModule({ name: 'nic', label: 'Network interfaces' });
+	ins.registerModule({ name: 'tcp', label: 'TCP' });
 
 	inskInitAutoMetrics(ins);
 };
@@ -269,7 +270,124 @@ var inskMetrics = [ {
 			}
 		}
 	}
+}, {
+	module: 'tcp',
+	stat: 'connections',
+	label: 'connections',
+	type: 'ops',
+	kstat: { module: 'tcp', class: 'mib2' },
+	extract: inskTcpConnectionsExtract,
+	fields: {
+		tcpstack: {
+			label: 'tcp instance',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ 'tcp' + kstat['instance'] ]);
+			}
+		},
+		conntype: {
+			label: 'active/passive',
+			type: mod_ca.ca_type_string,
+			values: function () {
+				return ([ 'active', 'passive' ]);
+			}
+		}
+	}
+}, {
+	module: 'tcp',
+	stat: 'segments',
+	label: 'segments',
+	type: 'ops',
+	kstat: { module: 'tcp', class: 'mib2' },
+	extract: inskTcpSegmentsExtract,
+	fields: {
+		tcpstack: {
+			label: 'tcp instance',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ 'tcp' + kstat['instance'] ]);
+			}
+		},
+		direction: {
+			label: 'sent/received',
+			type: mod_ca.ca_type_string,
+			values: function () {
+				return ([ 'sent', 'received' ]);
+			}
+		}
+	}
+}, {
+	module: 'tcp',
+	stat: 'errors',
+	label: 'errors',
+	type: 'ops',
+	kstat: { module: 'tcp', class: 'mib2' },
+	extract: inskTcpErrorExtract,
+	fields: {
+		tcpstack: {
+			label: 'tcp instance',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ 'tcp' + kstat['instance'] ]);
+			}
+		},
+		errtype: {
+			label: 'error type',
+			type: mod_ca.ca_type_string,
+			values: inskTcpErrtypeValues
+		}
+	}
 } ];
+
+function inskTcpConnectionsExtract(fields, kstat, kprev)
+{
+	var conntype, kstatkey;
+
+	conntype = fields['conntype'];
+	kstatkey = conntype + 'Opens';
+	return (kstat['data'][kstatkey] - kprev['data'][kstatkey]);
+}
+
+function inskTcpSegmentsExtract(fields, kstat, kprev)
+{
+	var direction, kstatkey;
+
+	direction = fields['direction'];
+	kstatkey = direction == 'sent' ? 'outSegs' : 'inSegs';
+	return (kstat['data'][kstatkey] - kprev['data'][kstatkey]);
+}
+
+var inskTcpErrors = {
+	'attemptFails': 'failed connection attempt',
+	'retransSegs': 'retransmitted segment',
+	'inDupAck': 'duplicate ACK',
+	'listenDrop': 'connection refused because backlog full',
+	'listenDropQ0': 'connection refused from full half-open queue',
+	'halfOpenDrop': 'connection dropped from a full half-open queue',
+	'timRetransDrop': 'connection dropped due to retransmit timeout'
+};
+
+function inskTcpErrorExtract(fields, kstat, kprev)
+{
+	var errtype, kstatkey;
+
+	errtype = fields['errtype'];
+
+	for (kstatkey in inskTcpErrors) {
+		if (inskTcpErrors[kstatkey] == errtype)
+			break;
+	}
+
+	ASSERT(typeof (kstat['data'][kstatkey]) == 'number');
+	return (kstat['data'][kstatkey] - kprev['data'][kstatkey]);
+}
+
+function inskTcpErrtypeValues(kstat, kprev)
+{
+	return (Object.keys(inskTcpErrors).map(function (elt) {
+		return (inskTcpErrors[elt]);
+	}));
+}
 
 /*
  * Register the metrics defined above with the instrumenter backend.

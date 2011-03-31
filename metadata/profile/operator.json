@@ -84,10 +84,6 @@
 		"fields": [ "hostname", "tcpstack", "conntype" ]
 	}, {
 		"module": "tcp",
-		"stat": "segments",
-		"fields": [ "hostname", "tcpstack", "direction" ]
-	}, {
-		"module": "tcp",
 		"stat": "errors",
 		"fields": [ "hostname", "tcpstack", "errtype" ]
 	} ]

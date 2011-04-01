@@ -81,7 +81,7 @@ mod_assert.deepEqual({ 'sd0': 102, 'sd1': 201 }, value);
 
 value = metric.addDecompositions(data, [ 'bytes_read' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by bytes_read = %j', value);
-mod_assert.deepEqual([[[1000, 1099], 303]], value);
+mod_assert.deepEqual([[[1000, 1090], 303]], value);
 
 value = metric.addDecompositions(data, [ 'hostname', 'disk' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by hostname and disk = %j', value);
@@ -90,7 +90,7 @@ mod_assert.deepEqual({ 'testhostname': { sd0: 102, sd1: 101 },
 
 value = metric.addDecompositions(data, [ 'disk', 'bytes_read' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by disk and bytes_read = %j', value);
-mod_assert.deepEqual({ 'sd0': [[[1000, 1099], 102 ]],
-    'sd1': [[[1000, 1099], 201]] }, value);
+mod_assert.deepEqual({ 'sd0': [[[1000, 1090], 102 ]],
+    'sd1': [[[1000, 1090], 201]] }, value);
 
 process.exit(0);

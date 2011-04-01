@@ -18,7 +18,8 @@ exports.insinit = function (ins, log)
 	inskHostname = mod_ca.caSysinfo().ca_hostname;
 
 	ins.registerModule({ name: 'cpu', label: 'CPU' });
-	ins.registerModule({ name: 'disk', label: 'Disk I/O' });
+	ins.registerModule({ name: 'disk', label: 'Disk' });
+	ins.registerModule({ name: 'fs', label: 'Filesystem' });
 	ins.registerModule({ name: 'nic', label: 'Network interfaces' });
 	ins.registerModule({ name: 'tcp', label: 'TCP' });
 
@@ -90,7 +91,7 @@ var inskMetrics = [ {
 	label: 'CPUs',
 	type: 'size',
 	kstat: { module: 'cpu', class: 'misc', name: 'sys' },
-	extract: function () { return (1); },
+	extract: inskResourceExtract,
 	fields: {
 		cpu: {
 			label: 'CPU identifier',
@@ -122,27 +123,51 @@ var inskMetrics = [ {
 	label: 'NICs',
 	type: 'size',
 	kstat: { module: 'link', class: 'net' },
-	filter: function (kstat) {
-		/*
-		 * The "link" module includes the links visible inside the zone
-		 * in which we're running.  On a COAL headnode GZ, this includes
-		 * the "physical" links (e1000g{0,1}), the VMware bridge
-		 * (vmwarebr0), and the VNICs inside each zone (as
-		 * z{zoneid}_{identifier}0.  Inside a provisioned zone, this is
-		 * just "net0".  Currently we only want to include hardware NICs
-		 * here, but for testing it's convenient to include "net0" as
-		 * well, which should be fine because it will never show up in
-		 * the global zone where we run in production.
-		 */
-		return (/^(e1000g|bnx|net)\d+$/.test(kstat['name']));
-	},
-	extract: function () { return (1); },
+	filter: inskNicFilter,
+	extract: inskResourceExtract,
 	fields: {
 		nic: {
 			label: 'NIC name',
 			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
+			}
+		},
+		packets: {
+			label: 'total packets sent/received',
+			type: mod_ca.ca_type_number,
+			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			values: function (kstat, kprev) {
+				var oldd, newd, oldsum, newsum;
+				oldd = kprev['data'];
+				newd = kstat['data'];
+				oldsum = oldd['ipackets64'] +
+				    oldd['opackets64'];
+				newsum = newd['ipackets64'] +
+				    newd['opackets64'];
+				return ([ newsum - oldsum ]);
+			}
+		},
+		in_packets: {
+			label: 'packets received',
+			type: mod_ca.ca_type_number,
+			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			values: function (kstat, kprev) {
+				var newd = kstat['data'];
+				var oldd = kprev['data'];
+				return ([newd['ipackets64'] -
+				    oldd['ipackets64']]);
+			}
+		},
+		out_packets: {
+			label: 'packets sent',
+			type: mod_ca.ca_type_number,
+			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			values: function (kstat, kprev) {
+				var newd = kstat['data'];
+				var oldd = kprev['data'];
+				return ([newd['opackets64'] -
+				    oldd['opackets64']]);
 			}
 		},
 		throughput: {
@@ -180,15 +205,69 @@ var inskMetrics = [ {
 		}
 	}
 }, {
+	module: 'nic',
+	stat: 'bytes',
+	label: 'bytes sent/received',
+	type: 'size',
+	kstat: { module: 'link', class: 'net' },
+	filter: inskNicFilter,
+	extract: function (fields, kstat, kprev) {
+		var newd = kstat['data'];
+		var oldd = kprev['data'];
+		var key = (fields['direction'] == 'sent') ?
+		    'obytes64' : 'rbytes64';
+		return (newd[key] - oldd[key]);
+	},
+	fields: {
+		nic: {
+			label: 'NIC name',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ kstat['name'] ]);
+			}
+		},
+		direction: {
+			label: 'sent/received',
+			type: mod_ca.ca_type_string,
+			values: function () { return ([ 'sent', 'received' ]); }
+		}
+	}
+}, {
+	module: 'nic',
+	stat: 'packets',
+	label: 'packets sent/received',
+	type: 'size',
+	kstat: { module: 'link', class: 'net' },
+	filter: inskNicFilter,
+	extract: function (fields, kstat, kprev) {
+		var newd = kstat['data'];
+		var oldd = kprev['data'];
+		var key = (fields['direction'] == 'sent') ?
+		    'opackets64' : 'ipackets64';
+		return (newd[key] - oldd[key]);
+	},
+	fields: {
+		nic: {
+			label: 'NIC name',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ kstat['name'] ]);
+			}
+		},
+		direction: {
+			label: 'sent/received',
+			type: mod_ca.ca_type_string,
+			values: function () { return ([ 'sent', 'received' ]); }
+		}
+	}
+}, {
 	module: 'disk',
 	stat: 'disks',
 	label: 'disks',
 	type: 'size',
 	kstat: { class: 'disk' },
-	filter: function (kstat) {
-		return (kstat['module'] == 'cmdk' || kstat['module'] == 'sd');
-	},
-	extract: function () { return (1); },
+	filter: inskDiskFilter,
+	extract: inskResourceExtract,
 	fields: {
 		disk: {
 			label: 'device name',
@@ -198,15 +277,35 @@ var inskMetrics = [ {
 			}
 		},
 		iops: {
-			label: 'number of I/O operations',
+			label: 'total number of I/O operations',
 			type: mod_ca.ca_type_number,
-			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
+			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
 				var newsum = newd['writes'] + newd['reads'];
 				var oldsum = oldd['writes'] + oldd['reads'];
 				return ([ newsum - oldsum ]);
+			}
+		},
+		iops_read: {
+			label: 'read I/O operations',
+			type: mod_ca.ca_type_number,
+			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			values: function (kstat, kprev) {
+				var newd = kstat['data'];
+				var oldd = kprev['data'];
+				return ([ newd['reads'] - oldd['reads'] ]);
+			}
+		},
+		iops_write: {
+			label: 'write I/O operations',
+			type: mod_ca.ca_type_number,
+			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			values: function (kstat, kprev) {
+				var newd = kstat['data'];
+				var oldd = kprev['data'];
+				return ([ newd['writes'] - oldd['writes'] ]);
 			}
 		},
 		bytes: {
@@ -241,6 +340,17 @@ var inskMetrics = [ {
 				return ([ newd['nwritten'] -
 				    oldd['nwritten'] ]);
 			}
+		},
+		utilization: {
+			label: 'percent of time with outstanding i/o',
+			type: mod_ca.ca_type_number,
+			bucketize: caMakeLinearBucketize(1),
+			values: function (kstat, kprev, interval) {
+				var newd = kstat['data'];
+				var oldd = kprev['data'];
+				return ([ Math.floor(100 * (newd['rtime'] -
+				    oldd['rtime']) / interval) ]);
+			}
 		}
 	}
 }, {
@@ -249,25 +359,42 @@ var inskMetrics = [ {
 	label: 'operations',
 	type: 'ops',
 	kstat: { class: 'disk' },
-	filter: function (kstat) {
-		return (kstat['module'] == 'cmdk' || kstat['module'] == 'sd');
-	},
-	extract: function (fields, kstat, klast) {
-		var key = (fields['optype'] == 'read') ? 'reads' : 'writes';
-		return (kstat['data'][key] - klast['data'][key]);
-	},
+	filter: inskDiskFilter,
+	extract: inskIoExtractOps,
 	fields: {
-		optype: {
-			label: 'type',
-			type: mod_ca.ca_type_string,
-			values: function () { return ([ 'read', 'write' ]); }
-		},
 		disk: {
 			label: 'device name',
 			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
+		},
+		optype: {
+			label: 'type',
+			type: mod_ca.ca_type_string,
+			values: function () { return ([ 'read', 'write' ]); }
+		}
+	}
+}, {
+	module: 'disk',
+	stat: 'physio_bytes',
+	label: 'bytes read/written',
+	type: 'size',
+	kstat: { class: 'disk' },
+	filter: inskDiskFilter,
+	extract: inskIoExtractBytes,
+	fields: {
+		disk: {
+			label: 'device name',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ kstat['name'] ]);
+			}
+		},
+		optype: {
+			label: 'type',
+			type: mod_ca.ca_type_string,
+			values: function () { return ([ 'read', 'write' ]); }
 		}
 	}
 }, {
@@ -337,7 +464,90 @@ var inskMetrics = [ {
 			values: inskTcpErrtypeValues
 		}
 	}
+}, {
+	module: 'fs',
+	stat: 'logical_rwops',
+	type: 'ops',
+	label: 'logical filesystem read/write operations',
+	kstat: { module: 'zone_vfs' },
+	extract: inskIoExtractOps,
+	fields: {
+		zonename: {
+			label: 'zone name',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ kstat['name'] ]);
+			}
+		},
+		optype: {
+			label: 'type',
+			type: mod_ca.ca_type_string,
+			values: function () { return ([ 'read', 'write' ]); }
+		}
+	}
+}, {
+	module: 'fs',
+	stat: 'logical_rwbytes',
+	type: 'size',
+	label: 'logical filesystem bytes read/written',
+	kstat: { module: 'zone_vfs' },
+	extract: inskIoExtractBytes,
+	fields: {
+		zonename: {
+			label: 'zone name',
+			type: mod_ca.ca_type_string,
+			values: function (kstat) {
+				return ([ kstat['name'] ]);
+			}
+		},
+		optype: {
+			label: 'type',
+			type: mod_ca.ca_type_string,
+			values: function () { return ([ 'read', 'write' ]); }
+		}
+	}
 } ];
+
+function inskNicFilter(kstat)
+{
+	/*
+	 * The "link" module includes the links visible inside the zone in which
+	 * we're running.  On a COAL headnode GZ, this includes the "physical"
+	 * links (e1000g{0,1}), the VMware bridge (vmwarebr0), and the VNICs
+	 * inside each zone (as z{zoneid}_{identifier}0.  Inside a provisioned
+	 * zone, this is just "net0".  Currently we only want to include
+	 * hardware NICs here, but for testing it's convenient to include "net0"
+	 * as well, which should be fine because it will never show up in the
+	 * global zone where we run in production.
+	 */
+	return (/^(e1000g|bnx|net)\d+$/.test(kstat['name']));
+}
+
+function inskDiskFilter(kstat)
+{
+	return (kstat['module'] == 'cmdk' || kstat['module'] == 'sd');
+}
+
+function inskIoExtractOps(fields, kstat, kprev)
+{
+	var key = (fields['optype'] == 'read') ? 'reads' : 'writes';
+	return (kstat['data'][key] - kprev['data'][key]);
+}
+
+function inskIoExtractBytes(fields, kstat, klast)
+{
+	var key = (fields['optype'] == 'read') ? 'nread' : 'nwritten';
+	return (kstat['data'][key] - klast['data'][key]);
+}
+
+/*
+ * "Resource" metrics return "1" for each kstat, since they're just counting up
+ * the instances of a resource.
+ */
+function inskResourceExtract()
+{
+	return (1);
+}
 
 function inskTcpConnectionsExtract(fields, kstat, kprev)
 {
@@ -516,11 +726,37 @@ function insKstatAutoMetric(desc, metric)
 		this.iam_zero = [];
 	else
 		this.iam_zero = 0;
+
+	/*
+	 * For kstats, instrumenting particular zones is only possible for
+	 * metrics which provide a "zonename" field.  All we need do is add a
+	 * predicate that selects these zonenames.
+	 */
+	if (metric.is_zones) {
+		this.iam_predicate = {
+		    and: [
+			{ or: metric.is_zones.map(function (zone) {
+				return ({ eq: [ 'zonename', zone ] });
+				}) },
+			metric.is_predicate
+		    ]
+		};
+	} else {
+		this.iam_predicate = metric.is_predicate;
+	}
 }
 
 exports.insKstatAutoMetric = insKstatAutoMetric; /* for testing */
 
-insKstatAutoMetric.prototype.instrument = function (callback) { callback(); };
+insKstatAutoMetric.prototype.instrument = function (callback)
+{
+	if (inskLog)
+		inskLog.info('kstat: %j\ndecomps: %j\npredicate: %j',
+		    this.iam_kstat, this.iam_decompositions,
+		    this.iam_predicate);
+	callback();
+};
+
 insKstatAutoMetric.prototype.deinstrument = function (callback) { callback(); };
 
 /*
@@ -557,7 +793,7 @@ insKstatAutoMetric.prototype.read = function ()
  */
 insKstatAutoMetric.prototype.applyPredicate = function (datapts)
 {
-	var predicate = this.iam_metric.is_predicate;
+	var predicate = this.iam_predicate;
 
 	return (datapts.filter(function (elt) {
 		return (mod_capred.caPredEval(predicate, elt['fields']));
@@ -760,6 +996,7 @@ insKstatAutoMetric.prototype.kstatDataPointsFrom = function (rv, kstat, klast,
 		fieldvalues = fieldinfo['values'](kstat, klast, interval);
 	else
 		fieldvalues = [ fieldname ];
+	ASSERT(fieldvalues instanceof Array);
 	ASSERT(fieldvalues.length > 0);
 
 	/*
@@ -872,7 +1109,7 @@ function caLogLinearBucketize(rv, value, card, base, min, max, nbuckets)
 
 		ent[0][0] = Math.pow(base, logbase) +
 		    (Math.floor(offset / step) * step);
-		ent[0][1] = ent[0][0] + step - 1;
+		ent[0][1] = ent[0][0] + step - (step / base);
 	}
 
 	rv.splice(ii, 0, ent);

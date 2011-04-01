@@ -48,7 +48,7 @@ exports.insinit = function (ins, log)
 
 	ins.registerModule({ name: 'syscall', label: 'System calls' });
 	ins.registerModule({ name: 'node', label: 'Node.js 0.4.x' });
-	ins.registerModule({ name: 'disk', label: 'Disk I/O' });
+	ins.registerModule({ name: 'disk', label: 'Disk' });
 	ins.registerModule({ name: 'fs', label: 'Filesystem' });
 	ins.registerModule({ name: 'cpu', label: 'CPU' });
 

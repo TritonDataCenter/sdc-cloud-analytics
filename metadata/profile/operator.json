@@ -60,24 +60,36 @@
 		]
 	}, {
 		"module": "disk",
-		"stat": "physio_ops",
+		"stat": "disks",
 		"fields": [
-		    "hostname", "optype", "latency", "size", "disk", "offset"
+		    "hostname", "disk", "iops", "iops_read", "iops_write",
+		    "bytes", "bytes_read", "bytes_written", "utilization"
 		]
 	}, {
 		"module": "disk",
-		"stat": "disks",
+		"stat": "physio_bytes",
+		"fields": [ "hostname", "disk", "optype" ]
+	}, {
+		"module": "disk",
+		"stat": "physio_ops",
 		"fields": [
-		    "hostname", "disk", "iops", "bytes", "bytes_read",
-		    "bytes_written"
+		    "hostname", "disk", "optype", "latency", "size", "offset"
 		]
 	}, {
 		"module": "nic",
 		"stat": "nics",
 		"fields": [
-		    "hostname", "nic", "throughput", "in_throughput",
-		    "out_throughput"
+		    "hostname", "nic", "packets", "in_packets", "out_packets",
+		    "throughput", "in_throughput", "out_throughput"
 		]
+	}, {
+		"module": "nic",
+		"stat": "bytes",
+		"fields": [ "hostname", "nic", "direction" ]
+	}, {
+		"module": "nic",
+		"stat": "packets",
+		"fields": [ "hostname", "nic", "direction" ]
 	}, {
 		"module": "tcp",
 		"stat": "connections",

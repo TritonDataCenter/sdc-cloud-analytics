@@ -2179,9 +2179,6 @@ gGraph.prototype.predName = function (pred)
 /*
  * Given a metric it returns an object with keys as types and values as the
  * keys of the field.
- *
- * XXX This information shouldn't really be hardcoded here, but rather should
- * use the missing /types API endpoint
  */
 function gatherMetricFieldsByType(metric)
 {

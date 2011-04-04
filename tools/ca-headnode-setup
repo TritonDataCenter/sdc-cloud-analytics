@@ -106,6 +106,28 @@ function sh_provision
 	[[ -n $sh_zoneip ]] || fail "no zone ip: $out"
 }
 
+function sh_upload_keys
+{
+	local nkeys
+
+	echo "Checking for existing authorized keys ... \c"
+	nkeys=$($sh_curlcmd -H "Accept: application/json" -s \
+	    --url $sh_capi$sh_custuri/keys | json length) || \
+	    fail "failed to list existing keys"
+	[[ $nkeys -gt 0 ]] && echo "keys present already" && return
+	echo "none."
+
+	local knum=0
+	while read key; do
+		knum=$(( knum + 1 ))
+		echo "Uploading key $knum ... \c"
+		$sh_curlcmd -f -s -i --url $sh_capi$sh_custuri/keys \
+		    -F "name=key$knum" -F "key=$key" > /dev/null || \
+		    fail "failed"
+		echo "done."
+	done < $HOME/.ssh/authorized_keys
+}
+
 [[ -n $sh_user ]] || fail "usage: $sh_arg0 <username>"
 
 echo "Retrieving customer uri ... \c"
@@ -113,13 +135,16 @@ sh_loadcust || fail "failed"
 [[ -n $sh_custuri ]] || fail "no customer uri found"
 echo "$sh_custuri"
 
+sh_upload_keys || fail "failed"
+
 echo "Finding version of dataset "$sh_dataset_name" ... \c"
 sh_load_dataset || fail "failed"
 [[ -n $sh_dataset_version ]] || fail "no version found"
 echo "$sh_dataset_version"
 
-echo "Making headnode API provisionable"
-sh_enable_provision
+echo "Marking headnode provisionable ... \c"
+sh_enable_provision || fail "failed"
+echo "done."
 
 echo "Provisioning $sh_dataset_name-$sh_dataset_version zone ... \c"
 sh_provision $sh_custuri "$sh_dataset_name-$sh_dataset_version" || fail "failed"

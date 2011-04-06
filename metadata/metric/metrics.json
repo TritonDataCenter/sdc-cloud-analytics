@@ -1,0 +1,230 @@
+{
+    "modules": {
+	"cpu":		{ "label": "CPU"			},
+	"disk":		{ "label": "Disk"			},
+	"fs":		{ "label": "Filesystem"			},
+	"nic":		{ "label": "Network interface"		},
+	"node":		{ "label": "Node.js 0.4.x"		},
+	"syscall":	{ "label": "System calls"		},
+	"tcp": 		{ "label": "TCP"			}
+    },
+
+    "types": {
+	"number": {
+	    "arity": "numeric"
+	},
+	"percent": {
+	    "arity": "numeric",
+	    "unit": "percent",
+	    "abbr": "%",
+	    "minmax": 100
+	},
+	"size":	 {
+	    "arity": "numeric",
+	    "unit": "bytes",
+	    "abbr": "B",
+	    "base": 2
+	},
+	"time": {
+	    "arity": "numeric",
+	    "unit": "seconds",
+	    "abbr": "s",
+	    "base": 10,
+	    "power": -9
+	}
+    },
+
+    "fields": {
+	"busytime":	{ "label": "non-idle time", "type": "percent" },
+	"bytes":	{ "label": "bytes read and written", "type": "size" },
+	"bytes_read":	{ "label": "bytes read", "type": "size" },
+	"bytes_write":	{ "label": "bytes written", "type": "size" },
+	"buffered":	{ "label": "bytes buffered on socket", "type": "size" },
+	"conntype":	{ "label": "connection type" },
+	"cpu":		{ "label": "CPU identifier" },
+	"cputime":	{ "label": "CPU time", "type": "time" },
+	"disk":		{ "label": "device name" },
+	"direction":	{ "label": "sent/received" },
+	"execname":	{ "label": "application name" },
+	"errtype":	{ "label": "error type" },
+	"fstype":	{ "label": "filesystem type" },
+	"gctype":	{ "label": "GC type" },
+	"hostname":	{ "label": "server hostname" },
+	"http_method":	{ "label": "method" },
+	"http_path":	{ "label": "URL path" },
+	"http_url":	{ "label": "URL" },
+	"iops":		{ "label": "I/O operations", "type": "number" },
+	"iops_read":	{ "label": "read I/O operations", "type": "number" },
+	"iops_write":	{ "label": "write I/O operations", "type": "number" },
+	"latency":	{ "label": "latency", "type": "time" },
+	"leavereason":	{ "label": "reason leaving CPU" },
+	"nic":		{ "label": "NIC name" },
+	"offset":	{ "label": "offset", "type": "size" },
+	"optype":	{ "label": "operation type" },
+	"packets":	{ "label": "packets sent and received",
+	    "type": "number" },
+	"packets_in":	{ "label": "packets received", "type": "number" },
+	"packets_out":	{ "label": "packets sent", "type": "number" },
+	"pexecname":	{ "label": "parent application name" },
+	"pid":		{ "label": "process identifier" },
+	"ppid":		{ "label": "parent process identifier" },
+	"psargs":	{ "label": "process arguments" },
+	"ppsargs":	{ "label": "parent process arguments" },
+	"raddr":	{ "label": "remote IP address" },
+	"rport":	{ "label": "remote TCP port" },
+	"runtime":	{ "label": "time on CPU", "type": "time" },
+	"size":		{ "label": "size", "type": "size" },
+	"syscall":	{ "label": "syscall" },
+	"tcpstack":	{ "label": "TCP instance" },
+	"utilization":	{ "label": "utilization", "type": "percent" },
+	"zonename":	{ "label": "zone name" }
+    },
+
+    "metrics": [ {
+	"module":	"cpu",
+	"stat":		"cpus",
+	"label":	"CPUs",
+	"unit":		"CPUs",
+	"fields":	[ "hostname", "cpu", "utilization" ]
+    }, {
+	"module":	"cpu",
+	"stat":		"thread_executions",
+	"label":	"thread executions",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "leavereason", "runtime"
+	]
+    }, {
+	"module":	"disk",
+	"stat":		"disks",
+	"label":	"disks",
+	"unit":		"disks",
+	"fields":	[
+	    "hostname", "disk", "iops", "iops_read", "iops_write", "bytes",
+	    "bytes_read", "bytes_write", "busytime"
+	]
+    }, {
+	"module":	"disk",
+	"stat":		"physio_bytes",
+	"label":	"bytes read and written",
+	"type":		"size",
+	"fields":	[ "hostname", "disk", "optype" ]
+    }, {
+	"module":	"disk",
+	"stat":		"physio_ops",
+	"label":	"I/O operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "disk", "optype", "latency", "size", "offset"
+	]
+    }, {
+	"module":	"fs",
+	"stat":		"logical_ops",
+	"label":	"logical filesystem operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "fstype", "optype", "latency"
+	]
+    }, {
+	"module":	"fs",
+	"stat":		"logical_rwbytes",
+	"label":	"logical bytes read/written",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename", "optype" ]
+    }, {
+	"module":	"fs",
+	"stat":		"logical_rwops",
+	"label":	"logical read/write operations",
+	"unit":		"operations",
+	"fields":	[ "hostname", "zonename", "optype" ]
+    }, {
+	"module":	"nic",
+	"stat":		"nics",
+	"label":	"NICs",
+	"unit":		"NICs",
+	"fields":	[
+	    "hostname", "nic", "packets", "packets_in", "packets_out", "bytes",
+	    "bytes_read", "bytes_write"
+	]
+    }, {
+	"module":	"nic",
+	"stat":		"bytes",
+	"label":	"bytes sent and received",
+	"type":		"size",
+	"fields":	[ "hostname", "nic", "direction" ]
+    }, {
+	"module":	"nic",
+	"stat":		"packets",
+	"label":	"packets sent and received",
+	"unit":		"packets",
+	"fields":	[ "hostname", "nic", "direction" ]
+    }, {
+	"module":	"node",
+	"stat":		"gc_ops",
+	"label":	"garbage collection operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "gctype", "latency"
+	]
+    }, {
+	"module":	"node",
+	"stat":		"httpc_ops",
+	"label":	"HTTP client operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "http_method", "http_url", "raddr",
+	    "rport", "http_path", "latency"
+	]
+    }, {
+	"module":	"node",
+	"stat":		"httpd_ops",
+	"label":	"HTTP server operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "http_method", "http_url", "raddr",
+	    "rport", "http_path", "latency"
+	]
+    }, {
+	"module":	"node",
+	"stat":		"socket_ops",
+	"label":	"socket operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "optype", "raddr", "rport", "size",
+	    "buffered"
+	]
+    }, {
+	"module":	"syscall",
+	"stat":		"syscalls",
+	"label":	"system calls",
+	"unit":		"syscalls",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "syscall", "latency", "cputime"
+	]
+    }, {
+	"module":	"tcp",
+	"stat":		"connections",
+	"label":	"connections",
+	"unit":		"connections",
+	"fields":	[ "hostname", "tcpstack", "conntype" ]
+    }, {
+	"module":	"tcp",
+	"stat":		"errors",
+	"label":	"errors",
+	"unit":		"errors",
+	"fields":	[ "hostname", "tcpstack", "errtype" ]
+    }, {
+	"module":	"tcp",
+	"stat":		"segments",
+	"label":	"segments",
+	"unit":		"segments",
+	"fields":	[ "hostname", "tcpstack", "direction" ]
+    } ]
+}

@@ -6,68 +6,15 @@ var mod_ca = require('../../../../lib/ca/ca-common');
 var desc = {
 	module: 'node',
 	stat: 'socket_ops',
-	type: 'ops',
-	label: 'socket operations',
-	fields: {
-	    type: {
-		label: 'type',
-		type: mod_ca.ca_type_string
-	    },
-	    raddr: {
-		label: 'remote host',
-		type: mod_ca.ca_type_string
-	    },
-	    rport: {
-		label: 'remote port',
-		type: mod_ca.ca_type_string
-	    },
-	    size: {
-		label: 'size',
-		type: mod_ca.ca_type_number
-	    },
-	    buffered: {
-		label: 'buffered data',
-		type: mod_ca.ca_type_number
-	    },
-	    zonename: {
-		label: 'zone name',
-		type: mod_ca.ca_type_string
-	    },
-	    hostname: {
-		label: 'hostname',
-		type: mod_ca.ca_type_string
-	    },
-	    pid: {
-		label: 'process identifier',
-		type: mod_ca.ca_type_string
-	    },
-	    ppid: {
-		label: 'parent process identifier',
-		type: mod_ca.ca_type_string
-	    },
-	    execname: {
-		label: 'application name',
-		type: mod_ca.ca_type_string
-	    },
-	    args: {
-		label: 'process arguments',
-		type: mod_ca.ca_type_string
-	    },
-	    pargs: {
-		label: 'parent process arguments',
-		type: mod_ca.ca_type_string
-	    },
-	    pexecname: {
-		label: 'parent process application name',
-		type: mod_ca.ca_type_string
-	    }
-	},
+	fields: [ 'hostname', 'zonename', 'pid', 'execname', 'psargs', 'ppid',
+	    'pexecname', 'ppsargs', 'optype', 'raddr', 'rport', 'size',
+	    'buffered' ],
 	metad: {
 	    probedesc: [ {
 		probes: [ 'node*:::net-socket-read',
 		    'node*:::net-socket-write' ],
 		aggregate: {
-		    type: 'count()',
+		    optype: 'count()',
 		    raddr: 'count()',
 		    rport: 'count()',
 		    size: 'llquantize($0, 10, 0, 11, 100)',
@@ -77,13 +24,14 @@ var desc = {
 		    hostname: 'count()',
 		    ppid: 'count()',
 		    execname: 'count()',
-		    args: 'count()',
+		    psargs: 'count()',
 		    pid: 'count()',
-		    pargs: 'count()',
+		    ppsargs: 'count()',
 		    pexecname: 'count()'
 		},
 		transforms: {
-		    type: '(probename == "net-socket-read" ? "read" : "write")',
+		    optype:
+			'(probename == "net-socket-read" ? "read" : "write")',
 		    hostname:
 			'"' + mod_ca.caSysinfo().ca_hostname + '"',
 		    raddr: '((xlate <node_connection_t *>' +
@@ -97,8 +45,8 @@ var desc = {
 		    pid: 'lltostr(pid)',
 		    ppid: 'lltostr(ppid)',
 		    execname: 'execname',
-		    args: 'curpsinfo->pr_psargs',
-		    pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+		    psargs: 'curpsinfo->pr_psargs',
+		    ppsargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
 		    pexecname: 'curthread->t_procp->p_parent->' +
 			'p_user.u_comm'
 		}

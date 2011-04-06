@@ -29,7 +29,7 @@ function simple()
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(Object.keys(metric.fieldTypes()).sort(),
+	mod_assert.deepEqual(metric.fields().sort(),
 	    [ 'f1', 'f2' ]);
 
 	ASSERT(set.baseMetric('mod1', 'stat12') === null);
@@ -52,12 +52,11 @@ function add_stat()
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(Object.keys(metric.fieldTypes()).sort(),
-	    [ 'f1', 'f2' ]);
+	mod_assert.deepEqual(metric.fields().sort(), [ 'f1', 'f2' ]);
 
 	metric = set.baseMetric('mod1', 'stat12');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(Object.keys(metric.fieldTypes()).sort(), [ 'f3' ]);
+	mod_assert.deepEqual(metric.fields().sort(), [ 'f3' ]);
 
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 	ASSERT(set.baseMetric('mod3', 'stat31') === null);
@@ -74,16 +73,16 @@ function add_module()
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(Object.keys(metric.fieldTypes()).sort(),
+	mod_assert.deepEqual(metric.fields().sort(),
 	    [ 'f1', 'f2' ]);
 
 	metric = set.baseMetric('mod1', 'stat12');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(Object.keys(metric.fieldTypes()).sort(), [ 'f3' ]);
+	mod_assert.deepEqual(metric.fields().sort(), [ 'f3' ]);
 
 	metric = set.baseMetric('mod3', 'stat31');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(Object.keys(metric.fieldTypes()), []);
+	mod_assert.deepEqual(metric.fields(), []);
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 
 	ASSERT(set.supports(metric, []));

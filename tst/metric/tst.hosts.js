@@ -48,8 +48,7 @@ function check_basic()
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(metric.fieldTypes(),
-	    { f1: 'string', f2: 'string' });
+	mod_assert.deepEqual(metric.fields().sort(), [ 'f1', 'f2' ]);
 	ASSERT(set.baseMetric('mod1', 'stat12') === null);
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 	ASSERT(set.baseMetric('mod3', 'stat31') === null);
@@ -96,8 +95,7 @@ function check_host2()
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(metric.fieldTypes(),
-	    { f1: 'string', f2: 'string' });
+	mod_assert.deepEqual(metric.fields().sort(), [ 'f1', 'f2' ]);
 	ASSERT(set.baseMetric('mod1', 'stat12') === null);
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 	ASSERT(set.baseMetric('mod3', 'stat31') === null);
@@ -154,8 +152,7 @@ function check_host3()
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(metric.fieldTypes(),
-	    { f1: 'string', f2: 'string', f4: 'string' });
+	mod_assert.deepEqual(metric.fields().sort(), [ 'f1', 'f2', 'f4' ]);
 	ASSERT(set.baseMetric('mod1', 'stat12') === null);
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 	ASSERT(set.baseMetric('mod3', 'stat31') === null);

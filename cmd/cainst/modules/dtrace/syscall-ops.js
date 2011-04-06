@@ -5,55 +5,9 @@ var mod_ca = require('../../../../lib/ca/ca-common');
 
 var desc = {
     module: 'syscall',
-    stat: 'ops',
-    label: 'syscalls',
-    type: 'ops',
-    fields: {
-	hostname: {
-	    label: 'hostname',
-	    type: mod_ca.ca_type_string
-	},
-	zonename: {
-	    label: 'zone name',
-	    type: mod_ca.ca_type_string
-	},
-	syscall: {
-	    label: 'system call',
-	    type: mod_ca.ca_type_string
-	},
-	pid: {
-	    label: 'process identifier',
-	    type: mod_ca.ca_type_string
-	},
-	execname: {
-	    label: 'application name',
-	    type: mod_ca.ca_type_string
-	},
-	latency: {
-	    label: 'latency',
-	    type: mod_ca.ca_type_latency
-	},
-	ppid: {
-	    label: 'parent process identifier',
-	    type: mod_ca.ca_type_string
-	},
-	args: {
-	    label: 'process arguments',
-	    type: mod_ca.ca_type_string
-	},
-	pargs: {
-	    label: 'parent process arguments',
-	    type: mod_ca.ca_type_string
-	},
-	pexecname: {
-	    label: 'parent process application name',
-	    type: mod_ca.ca_type_string
-	},
-	cputime: {
-	    label: 'CPU time',
-	    type: mod_ca.ca_type_latency
-	}
-    },
+    stat: 'syscalls',
+    fields: [ 'hostname', 'zonename', 'pid', 'execname', 'psargs', 'ppid',
+	'pexecname', 'ppsargs', 'syscall', 'latency', 'cputime' ],
     metad: {
 	probedesc: [
 	    {
@@ -78,10 +32,10 @@ var desc = {
 			hostname: 'count()',
 			pid: 'count()',
 			ppid: 'count()',
-			args: 'count()',
+			psargs: 'count()',
 			execname: 'count()',
 			latency: 'llquantize($0, 10, 3, 11, 100)',
-			pargs: 'count()',
+			ppsargs: 'count()',
 			pexecname: 'count()',
 			cputime: 'llquantize($0, 10, 3, 11, 100)'
 		},
@@ -93,9 +47,10 @@ var desc = {
 			syscall: 'probefunc',
 			pid: 'lltostr(pid)',
 			ppid: 'lltostr(pid)',
-			args: 'curpsinfo->pr_psargs',
+			psargs: 'curpsinfo->pr_psargs',
 			latency: 'timestamp - $0',
-			pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+			ppsargs:
+			    'curthread->t_procp->p_parent->p_user.u_psargs',
 			pexecname: 'curthread->t_procp->p_parent->' +
 			    'p_user.u_comm',
 			cputime: 'vtimestamp - $0'

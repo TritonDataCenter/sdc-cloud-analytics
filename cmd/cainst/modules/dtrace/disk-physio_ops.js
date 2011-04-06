@@ -6,34 +6,7 @@ var mod_ca = require('../../../../lib/ca/ca-common');
 var desc = {
     module: 'disk',
     stat: 'physio_ops',
-    label: 'operations',
-    type: 'ops',
-    fields: {
-	hostname: {
-	    label: 'hostname',
-	    type: mod_ca.ca_type_string
-	},
-	optype: {
-	    label: 'type',
-	    type: mod_ca.ca_type_string
-	},
-	latency: {
-	    label: 'latency',
-	    type: mod_ca.ca_type_latency
-	},
-	size: {
-	    label: 'size',
-	    type: mod_ca.ca_type_number
-	},
-	disk: {
-	    label: 'disk',
-	    type: mod_ca.ca_type_string
-	},
-	offset: {
-	    label: 'block offset',
-	    type: mod_ca.ca_type_number
-	}
-    },
+    fields: [ 'hostname', 'disk', 'optype', 'latency', 'size', 'offset' ],
     metad: {
 	probedesc: [ {
 	    probes: [ 'io:::start' ],

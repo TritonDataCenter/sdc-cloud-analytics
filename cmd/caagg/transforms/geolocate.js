@@ -14,7 +14,7 @@ exports.agginit = function (agg, log)
 	agg.registerTransformation({
 	    name: 'geolocate',
 	    label: 'geolocate IP addresses',
-	    types: [ mod_ca.ca_type_ipaddr ],
+	    fields: [ 'raddr' ],
 	    transform: transGeoIpProcess
 	});
 

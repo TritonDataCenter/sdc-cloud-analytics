@@ -6,6 +6,7 @@ var mod_ca = require('../lib/ca/ca-common');
 var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_log = require('../lib/ca/ca-log');
+var mod_metric = require('../lib/ca/ca-metric');
 var mod_sys = require('sys');
 
 var cc_timeout_msec = 3 * 1000;		/* timeout after 3s */
@@ -23,7 +24,7 @@ var cc_help = [
     '    <hostname> is a routing key identifying a single system',
     '    	hint: try "ca.config" for the config server',
     '    <command> is one of:',
-    '	     abort		panic remote service (use with caution)',
+    '        abort		panic remote service (use with caution)',
     '        ping		check connectivity',
     '        status [-v]	get detailed status info',
     '                           with -v, print additional unstructured info',
@@ -194,8 +195,8 @@ function ccAckPing(msg)
 
 function ccAckStatus(msg)
 {
-	var elts, elt, fields, ii, jj;
-	var metric, decomp;
+	var elts, ii;
+	var metric, decomp, metadata;
 
 	ccCheckMsg(msg);
 	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
@@ -223,45 +224,28 @@ function ccAckStatus(msg)
 
 	case 'instrumenter':
 		elts = msg.s_instrumentations;
-		if (elts.length > 0)
-			printf('%-6s  %-20s  %-5s  %s\n', 'INSTID', 'METRIC',
-			    'PRED?', 'DECOMP');
+		if (elts.length > 0) {
+			printf('\nActive Instrumentations:\n');
+			printf('    %-15s  %-20s  %-5s  %s\n', 'INSTN',
+			    'METRIC', 'PRED?', 'DECOMP');
+		}
+
 		for (ii = 0; ii < elts.length; ii++) {
 			metric = mod_ca.caSprintf('%s.%s',
 			    elts[ii].s_module, elts[ii].s_stat);
 			decomp = elts[ii].s_decomposition.join(', ');
 			if (!decomp)
 				decomp = 'None';
-			printf('%6s  %-20s  %-5s  %s\n', elts[ii].s_inst_id,
-			    metric, elts[ii].s_predicate.length > 0 ?
-			    'Yes' : 'No',
+			printf('    %-15s  %-20s  %-5s  %s\n',
+			    elts[ii].s_inst_id, metric,
+			    elts[ii].s_predicate.length > 0 ?  'Yes' : 'No',
 			    decomp);
 		}
 
-		elts = msg.s_modules;
-		if (elts.length > 0)
-			printf('  %-45s  %-8s %s\n', 'METRIC', 'TYPE',
-			    'FIELDS');
-
-		for (ii = 0; ii < elts.length; ii++) {
-			for (jj = 0; jj < elts[ii].cam_stats.length; jj++) {
-				elt = elts[ii].cam_stats[jj];
-				metric = mod_ca.caSprintf('%s: %s',
-				    elts[ii].cam_description,
-				    elt.cas_description);
-				fields = elt.cas_fields.map(function (field) {
-					return (field.caf_name);
-				});
-
-				decomp = 'None';
-				if (fields.length > 0)
-					decomp = fields.join(', ');
-
-				printf('  %-45s  %-8s %s\n', metric,
-				    elt.cas_type, decomp);
-			}
-		}
-
+		printf('\nAvailable metrics:\n');
+		metadata = new mod_metric.caMetricMetadata();
+		metadata.addFromHost(msg.s_metadata, 'remote host');
+		metadata.report(process.stdout, true);
 		break;
 
 	case 'aggregator':

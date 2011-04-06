@@ -4,41 +4,18 @@
  * pseudo-file cavars.js (included after caflot.js in graph.htm).
  */
 
+/*
+ * Static configuration
+ */
 var gServer = window.location.hostname;
 var gPort = 23181;		/* config service HTTP port */
 var gPlotWidth = 600;		/* plot width (pixels) */
 var gPlotHeight = 300;		/* plot height (pixels) */
 var gnBuckets = 50;		/* vertical buckets (for heatmaps) */
-var gMetrics = [];		/* all available metrics */
-var gGraphs = {};		/* currently active graphs */
 var gZoomOptions = [ 10, 30, 60, 300, 600, 3600 ];	/* seconds */
 var gZoomDefault = 1;		/* default is 30 seconds */
 var gyMin = 0;			/* global/default ymin for heatmaps */
 var gyMax = 10000000000;	/* global/default ymax for heatmaps 10s */
-var gTypes;			/* global type information */
-
-/*
- *  Fix that Firefox < 4 doesn't have Object.keys(); -- Code from
- *  developer.mozilla.org
- */
-if (!Object.keys)
-	Object.keys = function (o) {
-		var ret = [], p;
-
-		for (p in o) {
-			if (Object.prototype.hasOwnProperty.call(o, p))
-				ret.push(p);
-		}
-
-		return (ret);
-	};
-
-/*
- * Color management
- */
-var gBaseColors = [ '#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed' ];
-var gColors = [];
-var gMaxSeries;
 
 /*
  * Flot options
@@ -59,11 +36,45 @@ var gVectorOptions = {
 	grid: { clickable: true }
 };
 
+/*
+ * Dynamic (server-side) configuration
+ */
+var gFields;			/* global field information */
+var gTypes;			/* global type information */
+var gMetrics;			/* all available metrics */
+
+/*
+ * Color management
+ */
+var gBaseColors = [ '#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed' ];
+var gColors = [];
+var gMaxSeries;
+
+/*
+ * Global state
+ */
+var gGraphs = {};		/* currently active graphs */
+
+/*
+ * Fix that Firefox < 4 doesn't have Object.keys(); -- Code from
+ * developer.mozilla.org
+ */
+if (!Object.keys)
+	Object.keys = function (o) {
+		var ret = [], p;
+
+		for (p in o) {
+			if (Object.prototype.hasOwnProperty.call(o, p))
+				ret.push(p);
+		}
+
+		return (ret);
+	};
+
 window.onload = function ()
 {
-	gInitTypes();
 	gInitColors();
-	gInitMetrics();
+	gInitConfig();
 	setTimeout(gTick, 0);
 };
 
@@ -89,14 +100,15 @@ function gInitColors()
 }
 
 /*
- * Initialize the set of types and type information that we have
+ * Initialize our configuration of types, metrics, transformations, and such.
  */
-function gInitTypes()
+function gInitConfig()
 {
-	var url = 'http://' + gServer + ':' + gPort + '/ca' +
-	    gCustUri() + '/types';
-	var request = new XMLHttpRequest();
+	var url, request;
 
+	url = 'http://' + gServer + ':' + gPort + '/ca' + gCustUri();
+
+	request = new XMLHttpRequest();
 	request.open('GET', url, true);
 	request.send(null);
 	request.onreadystatechange = function () {
@@ -104,76 +116,36 @@ function gInitTypes()
 			return;
 
 		if (request.status != 200) {
-			alert('failed to load type list');
+			alert('failed to load configuration');
 			return;
 		}
 
-		gTypes = JSON.parse(request.responseText);
+		gInitConfigDone(JSON.parse(request.responseText));
 	};
 }
 
-function gTypeToArity(type)
+function gInitConfigDone(config)
 {
-	if (!(type in gTypes)) {
-		alert('error: asked about unknown type: ' + type);
-		return (null);
-	}
+	var metric, option, label, modules;
+	var elt, key, ii;
 
-	return (gTypes[type]['arity']);
-}
+	gTypes = config['types'];
+	gMetrics = config['metrics'];
+	gFields = config['fields'];
 
-/*
- * Load the available metrics from the server to populate the UI.
- */
-function gInitMetrics()
-{
-	var url = 'http://' + gServer + ':' + gPort + '/ca' +
-	    gCustUri() + '/metrics';
-	var request = new XMLHttpRequest();
-
-	request.open('GET', url, true);
-	request.send(null);
-	request.onreadystatechange = function () {
-		if (request.readyState != 4)
-			return;
-
-		if (request.status != 200) {
-			alert('failed to load metric list');
-			return;
-		}
-
-		gInitMetricsFini(JSON.parse(request.responseText));
-	};
-}
-
-function gInitMetricsFini(metrics)
-{
-	var modname, statname, optname, module, stat;
-	var elt, ii, option;
-
-	for (modname in metrics) {
-		module = metrics[modname];
-
-		for (statname in module['stats']) {
-			stat = module['stats'][statname];
-			optname = module['label'] + ': ' + stat['label'];
-			gMetrics.push({
-				module: modname,
-				modlabel: module['label'],
-				stat: statname,
-				statlabel: stat['label'],
-				label: optname,
-				fields: stat['fields'],
-				type: stat['type']
-			});
-		}
-	}
+	modules = {};
+	for (key in config['modules'])
+		modules[key] = config['modules'][key]['label'];
 
 	elt = document.getElementById('gStatSelector');
 	for (ii = 0; ii < gMetrics.length; ii++) {
+		metric = gMetrics[ii];
+		label = modules[metric['module']] + ': ' + metric['label'];
+		metric.ca_label = label;
+
 		option = elt.appendChild(document.createElement('option'));
 		option.value = ii;
-		option.appendChild(document.createTextNode(gMetrics[ii].label));
+		option.appendChild(document.createTextNode(metric.ca_label));
 	}
 
 	if (gMetrics.length > 0) {
@@ -181,6 +153,7 @@ function gInitMetricsFini(metrics)
 		elt = document.getElementById('gStatAddButton');
 		elt.disabled = false;
 	}
+
 	gInitInstrumentations();
 }
 
@@ -252,6 +225,103 @@ function gTick()
 		gGraphs[id].refresh();
 
 	setTimeout(gTick, 1000);
+}
+
+/*
+ * Returns the arity of a given field by name.
+ */
+function gFieldToArity(fieldname)
+{
+	var field = gFields[fieldname];
+	return (gTypes[field['type']]['arity']);
+}
+
+var gUnitPowers = [
+	{ exp: -9, prefix: 'n' },
+	{ exp: -6, prefix: 'u' },
+	{ exp: -3, prefix: 'm' },
+	{ exp:  0, prefix: ''  },
+	{ exp:  3, prefix: 'K' },
+	{ exp:  6, prefix: 'M' },
+	{ exp:  9, prefix: 'G' },
+	{ exp: 12, prefix: 'T' }
+];
+
+var gUnitBases = {
+	2: 10,		/* base  2: each prefix is 2^10 */
+	10: 3		/* base 10: each prefix is 10^3 */
+};
+
+/*
+ * Given a type and a value, return an object with the following members
+ * describing how to transform the value to a human-readable string:
+ *
+ *	divisor		how much to divide the value to get it in the new unit
+ *
+ *	label		the unit to display, including SI prefix if divisor is
+ *			not 1
+ */
+function gTypeTransform(type, value)
+{
+	var power, ii, divisor;
+
+	power = type['power'] || 0;
+
+	for (ii = 0; ii < gUnitPowers.length; ii++) {
+		if (gUnitPowers[ii]['exp'] == power)
+			break;
+	}
+
+	if (ii == gUnitPowers.length)
+		/* should be impossible if backend is behaving correctly */
+		return ({ divisor: 1, label: '' });
+
+	divisor = 1;
+	while (ii < gUnitPowers.length - 1 && value / divisor >=
+	    Math.pow(type['base'], gUnitBases[type['base']])) {
+		divisor *= Math.pow(type['base'], gUnitBases[type['base']]);
+		ii++;
+	}
+
+	return ({
+	    divisor: divisor,
+	    label: gUnitPowers[ii]['prefix'] +
+		('abbr' in type ? type['abbr'] : type['unit'])
+	});
+}
+
+/*
+ * Round a value up to 2 decimal places (for formatting).
+ */
+function gValueRound(value)
+{
+	return (Math.ceil(value * 100) / 100);
+}
+
+/*
+ * Given a base metric and a value, return the best human-readable label for the
+ * scalar quantity.
+ */
+function gMetricUnit(metric, value)
+{
+	var xform;
+
+	if (!('type' in metric))
+		return (value);
+
+	xform = gTypeTransform(gTypes[metric['type']], value);
+	return (gValueRound(value / xform['divisor']) + ' ' + xform['label']);
+}
+
+/*
+ * Given a metric, return a label for the base unit.
+ */
+function gMetricBase(metric)
+{
+	if ('unit' in metric)
+		return (metric['unit']);
+
+	return (gTypes[metric['type']]['unit']);
 }
 
 /*
@@ -334,8 +404,8 @@ function gRemoveStat(graph)
  */
 function gStatSelected()
 {
-	var statsel, decompsel, metric, option;
-	var field;
+	var statsel, decompsel, metric, fieldname, field, option;
+	var ii;
 
 	decompsel = document.getElementById('gDecompositionSelector');
 	decompsel.disabled = false;
@@ -350,12 +420,14 @@ function gStatSelected()
 	option.value = '';
 	option.appendChild(document.createTextNode('<none>'));
 
-	for (field in metric.fields) {
+	for (ii = 0; ii < metric['fields'].length; ii++) {
+		fieldname = metric['fields'][ii];
+		field = gFields[fieldname];
+
 		option = decompsel.appendChild(
 		    document.createElement('option'));
-		option.value = field;
-		option.appendChild(document.createTextNode(
-		    metric.fields[field].label));
+		option.value = fieldname;
+		option.appendChild(document.createTextNode(field['label']));
 	}
 
 	decompsel.selectedIndex = 0;
@@ -375,7 +447,7 @@ function gDecompSelected()
 {
 	var statsel, decompsel, decompsel2, metric;
 	var statoption, firstoption, option;
-	var field, arity;
+	var fieldname, field, arity, ii;
 
 	decompsel = document.getElementById('gDecompositionSelector');
 	firstoption = decompsel.options[decompsel.selectedIndex];
@@ -393,22 +465,24 @@ function gDecompSelected()
 	statoption = statsel.options[statsel.selectedIndex];
 	metric = gMetrics[statoption.value];
 	if (firstoption.value != '')
-		arity = gTypeToArity(metric.fields[firstoption.value]['type']);
+		arity = gFieldToArity(firstoption.value);
 	else
 		arity = null;
 
-	for (field in metric.fields) {
-		if (field == firstoption.value)
+	for (ii = 0; ii < metric['fields'].length; ii++) {
+		fieldname = metric['fields'][ii];
+		field = gFields[fieldname];
+
+		if (fieldname == firstoption.value)
 			continue;
 
 		if (firstoption.value !== '' &&
-		    gTypeToArity(metric.fields[field].type) == arity)
+		    gFieldToArity(fieldname) == arity)
 			continue;
 
 		option = document.createElement('option');
-		option.value = field;
-		option.appendChild(
-		    document.createTextNode(metric.fields[field].label));
+		option.value = fieldname;
+		option.appendChild(document.createTextNode(field['label']));
 		decompsel2.appendChild(option);
 	}
 
@@ -459,12 +533,12 @@ function gGraph(conf)
 	this.g_secondsback = 0;
 	this.g_legend_mode = 'summary';
 
-	this.g_title = conf.metric.modlabel + ': ' + conf.metric.statlabel;
+	this.g_title = conf.metric.ca_label;
 
 	if (conf.decomps.length !== 0) {
 		this.g_title += ' decomposed by ' +
 		    conf.decomps.map(function (elt) {
-			return (conf.metric.fields[elt].label);
+			return (gFields[elt]['label']);
 		    }).join(' and ');
 	}
 
@@ -531,15 +605,16 @@ gGraph.prototype.initUris = function (uris)
  */
 gGraph.prototype.initDetails = function ()
 {
-	var fieldname, discrete_decomp, ii;
+	var fieldname, discrete_decomp, label, ii, jj;
 	var metric = this.g_metric, decomps = this.g_decomps;
 
+	label = gMetricBase(this.g_metric);
 	this.g_body = 'module=' + metric.module + '&stat=' + metric.stat;
 
 	if (decomps.length === 0) {
 		this.g_type = 'scalar';
 		this.g_subtype = 'raw';
-		this.g_columns =  [ { sTitle: '' }, { sTitle: 'value' } ];
+		this.g_columns =  [ { sTitle: '' }, { sTitle: label } ];
 		this.g_options = gScalarOptions;
 	} else {
 		this.g_type = 'vector';
@@ -550,27 +625,31 @@ gGraph.prototype.initDetails = function ()
 		for (ii = 0; ii < decomps.length; ii++) {
 			this.g_body += '&decomposition=' + decomps[ii];
 
-			for (fieldname in metric.fields) {
+			for (jj = 0; jj < metric['fields'].length; jj++) {
+				fieldname = metric['fields'][jj];
 				if (decomps[ii] != fieldname)
 					continue;
 
-				if (gTypeToArity(metric.fields[fieldname].type)
-				    == 'numeric') {
+				if (gFieldToArity(fieldname) == 'numeric') {
 					this.g_subtype = 'heatmap';
+					this.g_numeric_decomp =
+					    gFields[fieldname];
 					continue;
 				}
 
-				discrete_decomp = metric.fields[decomps[ii]];
+				discrete_decomp = fieldname;
 			}
 		}
 
 		if (discrete_decomp) {
-			this.g_columns.push({ sTitle: discrete_decomp.label });
+			this.g_columns.push({
+			    sTitle: gFields[discrete_decomp]['label']
+			});
 		} else {
 			this.g_columns.push({ sTitle: '' });
 		}
 
-		this.g_columns.push({ sTitle: 'value' });
+		this.g_columns.push({ sTitle: label });
 	}
 
 	if (!isEmpty(this.g_predicate)) {
@@ -659,8 +738,8 @@ gGraph.prototype.initDom = function ()
 gGraph.prototype.createToolbar = function ()
 {
 	var graph = this;
-	var head, div, subdiv, drill;
-	var dialog, diadiv, diaform, diacur, enabDia, diaOpt, diasel;
+	var head, div, subdiv, drill, fieldname;
+	var dialog, diadiv, diaform, diacur, enabDia, diaOpt, diasel, ii;
 
 	head = document.createElement('p');
 	head.appendChild(document.createTextNode(this.g_title));
@@ -748,13 +827,14 @@ gGraph.prototype.createToolbar = function ()
 	diaOpt = diacur.appendChild(document.createElement('option'));
 	diaOpt.value = '';
 	diaOpt.appendChild(document.createTextNode('<None>'));
-	for (var field in graph.g_metric.fields) {
+	for (ii = 0; ii < graph.g_metric['fields'].length; ii++) {
+		fieldname = graph.g_metric['fields'][ii];
 		enabDia = true;
 		diaOpt = diacur.appendChild(
 		    document.createElement('option'));
-		diaOpt.value = field;
+		diaOpt.value = fieldname;
 		diaOpt.appendChild(document.createTextNode(
-		    graph.g_metric.fields[field].label));
+		    gFields[fieldname]['label']));
 	}
 
 	diapar = diaform.appendChild(document.createElement('p'));
@@ -1202,13 +1282,23 @@ gGraph.prototype.updateHeatmap = function (value)
 			stop: function (event, ui) {
 				graph.g_ymin = ui.values[0];
 				graph.g_ymax = ui.values[1];
-				$(graph.g_slider_text).text(
-				    graph.g_ymin + ' - ' + graph.g_ymax);
+				$(graph.g_slider_text).text(graph.sliderText());
 			}
 		});
 
-		$(this.g_slider_text).text(this.g_ymin + '-' + this.g_ymax);
+		$(this.g_slider_text).text(this.sliderText());
 	}
+};
+
+gGraph.prototype.sliderText = function ()
+{
+	var type, xform;
+
+	type = gTypes[this.g_numeric_decomp['type']];
+	xform = gTypeTransform(type, this.g_ymax);
+
+	return (gValueRound(this.g_ymin / xform['divisor']) + ' - ' +
+	    gValueRound(this.g_ymax / xform['divisor']) + ' ' + xform['label']);
 };
 
 /*
@@ -1463,7 +1553,9 @@ gGraph.prototype.clicked = function (pos)
 		legend = [];
 		for (ii = 0; ii < keys.length; ii++) {
 			legend.push({ key: keys[ii],
-			    val: [ keys[ii], datum[keys[ii]] ] });
+			    val: [ keys[ii],
+				gMetricUnit(this.g_metric,
+				    datum[keys[ii]]) ] });
 		}
 	}
 
@@ -1981,7 +2073,7 @@ gColor.prototype.toString = function ()
 
 function gDrillFieldChanged(graphId)
 {
-	var fieldSel, opSel, valSel, opt, field, metric, subSel;
+	var fieldSel, opSel, valSel, opt, field, subSel;
 
 	fieldSel = document.getElementById('gDrilldownField' + graphId);
 	field = fieldSel.options[fieldSel.selectedIndex];
@@ -2003,8 +2095,6 @@ function gDrillFieldChanged(graphId)
 	if (field.value === '')
 		return;
 
-	metric = gGraphs[graphId].g_metric;
-
 	opSel.disabled = false;
 
 	opt = opSel.appendChild(document.createElement('option'));
@@ -2015,7 +2105,7 @@ function gDrillFieldChanged(graphId)
 	opt.value = 'ne';
 	opt.appendChild(document.createTextNode('!='));
 
-	if (gTypeToArity(metric.fields[field.value].type) != 'numeric')
+	if (gFieldToArity(field.value) != 'numeric')
 		return;
 
 	opt = opSel.appendChild(document.createElement('option'));
@@ -2068,8 +2158,7 @@ function gDrillSubmit(graphId, dialog)
 	val = valSel.value;
 
 	/* Potentially parse the value to a number if the field is numeric */
-	if (gTypeToArity(gGraphs[graphId].g_metric.fields[field].type) ==
-	    'numeric') {
+	if (gFieldToArity(field) == 'numeric') {
 		val = parseInt(val, 10);
 		if (isNaN(val)) {
 			alert('field has numeric arity, must specify a ' +
@@ -2167,7 +2256,7 @@ gGraph.prototype.predName = function (pred)
 		ret = elts.join(' ' + predKeyMap[key] + ' ');
 		break;
 	default:
-		pname = this.g_metric.fields[pred[key][0]].label;
+		pname = gFields[pred[key][0]]['label'];
 		ret += pname + ' ' + predKeyMap[key] + ' ' +
 		    pred[key][1];
 		break;
@@ -2182,14 +2271,15 @@ gGraph.prototype.predName = function (pred)
  */
 function gatherMetricFieldsByType(metric)
 {
-	var key;
-	var fields = metric.fields;
+	var ii, fieldname;
+	var fields = metric['fields'];
 	var ret = {};
 
-	for (key in fields) {
-		ret[key] = {
-		    type: gTypeToArity(fields[key]['type']),
-		    label: fields[key]['label']
+	for (ii = 0; ii < fields.length; ii++) {
+		fieldname = fields[ii];
+		ret[fieldname] = {
+		    type: gFieldToArity(fieldname),
+		    label: gFields[fieldname]['label']
 		};
 	}
 
@@ -2283,11 +2373,7 @@ gGraph.prototype.legendRowRightClicked = function (event)
 	/* Put it all together */
 	dialog = document.createElement('div');
 	dialog.appendChild(form);
-	$(dialog).dialog({
-		autoOpen: true,
-		title: graph.g_metric.modlabel + ' : ' +
-		    graph.g_metric.statlabel
-	});
+	$(dialog).dialog({ autoOpen: true, title: graph.g_metric.ca_label });
 };
 
 function gInvestigateSubmit(graphId, dialog, rent)

@@ -30,23 +30,23 @@
 		"stat": "httpc_ops",
 		"fields": [
 		    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
-		    "pexecname", "ppsargs", "http_method", "http_url", "raddr",
-		    "rport", "http_path", "latency"
+		    "pexecname", "ppsargs", "raddr", "rport", "http_method",
+		    "http_url", "http_path", "latency"
 		]
 	}, {
 		"module": "node",
 		"stat": "httpd_ops",
 		"fields": [
-	    	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
-	    	    "pexecname", "ppsargs", "http_method", "http_url", "raddr",
-	    	    "rport", "http_path", "latency"
+		    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "raddr", "rport", "http_method",
+		    "http_url", "http_path", "latency"
 		]
 	}, {
 		"module": "node",
 		"stat": "socket_ops",
 		"fields": [
 	    	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
-	    	    "pexecname", "ppsargs", "optype", "raddr", "rport", "size",
+	    	    "pexecname", "ppsargs", "raddr", "rport", "optype", "size",
 	    	    "buffered"
 		]
 	}, {

@@ -949,7 +949,7 @@ function cfgNotifyInstrumenterOnline(msg)
 		 * error and then forget about this instrumenter.
 		 */
 		cfg_log.warn('instrumenter %s: error processing metric ' +
-		    'metadata: %r', ex);
+		    'metadata: %r', msg.ca_hostname, ex);
 		cfg_metrics.addFromHost([], msg.ca_hostname);
 		return;
 	}

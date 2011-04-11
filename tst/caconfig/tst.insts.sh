@@ -7,7 +7,7 @@
 
 source ../catestlib.sh
 
-TESTS="getmetrics.js insts.js basic.js multi_insts.js"
+TESTS="basic.js multi_insts.js"
 
 for test in $TESTS; do
 	printf "Running test %s\n" $test

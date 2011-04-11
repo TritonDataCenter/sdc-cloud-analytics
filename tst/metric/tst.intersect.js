@@ -11,7 +11,14 @@ var mod_metric = require('../../lib/ca/ca-metric');
 
 mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
 
-var xform = mod_metric.caMetricsExpand;
+function metric_to_obj(metric)
+{
+	return ({
+	    module: metric.module(),
+	    stat: metric.stat(),
+	    fields: metric.fields()
+	});
+}
 
 /*
  * Checks intersection of one set based on input we'd get from the profile
@@ -19,7 +26,7 @@ var xform = mod_metric.caMetricsExpand;
  */
 function check_profile()
 {
-	var profset, instset, ret;
+	var profset, instset, isectsetl, isectsetr, metricsl, metricsr;
 
 	profset = new mod_metric.caMetricSet();
 	profset.addMetric('mod1', 'stat1', [ 'f1', 'f2', 'f3' ]);
@@ -28,159 +35,70 @@ function check_profile()
 	profset.addMetric('mod3', 'stat9', [ 'f21', 'f22' ]);
 
 	instset = new mod_metric.caMetricSet();
-	instset.addFromHost(xform({
-		mod1: {
-			label: 'module 1',
-			stats: {
-				stat1: {
-					label: 'stat 1',
-					type: 'ops',
-					fields: {
-						f0: {
-							label: 'field 0',
-							type: 'string'
-						},
-						f1: {
-							label: 'field 1',
-							type: 'string'
-						},
-						f2: {
-							label: 'field 2',
-							type: 'latency'
-						},
-						f3: {
-							label: 'field 3',
-							type: 'string'
-						},
-						f4: {
-							label: 'field 4',
-							type: 'string'
-						}
-					}
-				},
-				stat2: {
-					label: 'stat 2',
-					type: 'ops',
-					fields: {
-						f31: {
-							label: 'field 31',
-							type: 'string'
-						}
-					}
-				},
-				stat3: {
-					label: 'stat 3',
-					type: 'ops',
-					fields: {
-						f41: {
-							label: 'field 41',
-							type: 'string'
-						}
-					}
-				}
-			}
-		},
-		mod2: {
-			label: 'module 2',
-			stats: {
-				stat1: {
-					label: 'stat 1',
-					type: 'ops',
-					fields: {
-						f20: {
-							label: 'field 20',
-							type: 'string'
-						},
-						f21: {
-							label: 'field 21',
-							type: 'string'
-						}
-					}
-				},
-				stat2: {
-					label: 'stat 2',
-					type: 'ops',
-					fields: {
-						f51: {
-							label: 'field 51',
-							type: 'string'
-						}
-					}
-				}
-			}
-		},
-		mod3: {
-			label: 'module 3',
-			stats: {
-				stat8: {
-					label: 'stat 8',
-					type: 'ops',
-					fields: {
-						f71: {
-							label: 'field 71',
-							type: 'string'
-						}
-					}
-				}
-			}
-		}
-	}), 'test_host');
-
-	ret = profset.intersection(instset).toJson();
+	instset.addFromHost([ {
+	    module: 'mod1',
+	    stat: 'stat1',
+	    label: 'stat 1',
+	    unit: 'ops',
+	    fields: [ 'f0', 'f1', 'f2', 'f3', 'f4' ]
+	}, {
+	    module: 'mod1',
+	    stat: 'stat2',
+	    label: 'stat 2',
+	    unit: 'ops',
+	    fields: [ 'f31' ]
+	}, {
+	    module: 'mod1',
+	    stat: 'stat3',
+	    label: 'stat 3',
+	    unit: 'ops',
+	    fields: [ 'f41' ]
+	}, {
+	    module: 'mod2',
+	    stat: 'stat1',
+	    label: 'stat 1',
+	    unit: 'ops',
+	    fields: [ 'f20', 'f21' ]
+	}, {
+	    module: 'mod2',
+	    stat: 'stat1',
+	    label: 'stat 1',
+	    unit: 'ops',
+	    fields: [ 'f20', 'f21' ]
+	}, {
+	    module: 'mod3',
+	    stat: 'stat8',
+	    label: 'stat 8',
+	    unit: 'ops',
+	    fields: [ 'f71' ]
+	} ], 'test_host');
 
 	/*
 	 * Check commutativity.
 	 */
-	mod_assert.deepEqual(ret, instset.intersection(profset).toJson());
+	isectsetl = profset.intersection(instset);
+	isectsetr = instset.intersection(profset);
+
+	metricsl = isectsetl.baseMetrics().map(metric_to_obj);
+	metricsr = isectsetr.baseMetrics().map(metric_to_obj);
+	mod_assert.deepEqual(metricsl, metricsr);
 
 	/*
 	 * Check that the result is what we expect.
 	 */
-	mod_assert.deepEqual(ret, {
-		mod1: {
-			label: 'module 1',
-			stats: {
-				stat1: {
-					label: 'stat 1',
-					type: 'ops',
-					fields: {
-						f1: {
-							label: 'field 1',
-							type: 'string'
-						},
-						f2: {
-							label: 'field 2',
-							type: 'latency'
-						},
-						f3: {
-							label: 'field 3',
-							type: 'string'
-						}
-					}
-				},
-				stat2: {
-					label: 'stat 2',
-					type: 'ops',
-					fields: {}
-				}
-			}
-		},
-		mod2: {
-			label: 'module 2',
-			stats: {
-				stat1: {
-					label: 'stat 1',
-					type: 'ops',
-					fields: {
-						f21: {
-							label: 'field 21',
-							type: 'string'
-						}
-					}
-				}
-			}
-		}
-	});
+	mod_assert.deepEqual(metricsl, [ {
+	    module: 'mod1',
+	    stat: 'stat1',
+	    fields: [ 'f1', 'f2', 'f3' ]
+	}, {
+	    module: 'mod1',
+	    stat: 'stat2',
+	    fields: []
+	}, {
+	    module: 'mod2',
+	    stat: 'stat1',
+	    fields: [ 'f21' ]
+	} ]);
 
 	mod_tl.advance();
 }

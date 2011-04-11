@@ -42,50 +42,50 @@ var metric_instr2 = [ {
 } ];
 
 /* Backend list of metrics supported by "instr1" */
-var metrics1 = mod_metric.caMetricsExpand({
-    syscall: {
-	label: 'system calls',
-	stats: {
-	    ops: {
-		label: 'operations',
-		type: 'ops',
-		fields: {
-		    f1: { label: 'field 1', type: 'string' },
-		    f2: { label: 'field 2', type: 'latency' },
-		    f3: { label: 'field 3', type: 'string' }
-		}
-	    }
-	}
-    }
-});
+var metrics1 = {
+    modules: { syscall: { label: 'system calls' } },
+    types: { time: { arity: 'numeric' } },
+    fields: {
+	f1: { label: 'field 1' },
+	f2: { label: 'field 2', type: 'time' },
+	f3: { label: 'field 3' }
+    },
+    metrics: [ {
+	module: 'syscall',
+	stat: 'ops',
+	label: 'operations',
+	unit: 'ops',
+	fields: [ 'f1', 'f2', 'f3' ]
+    } ]
+};
 
 /* Backend list of metrics supported by "instr2" */
-var metrics2 = mod_metric.caMetricsExpand({
-    syscall: {
-	label: 'system calls',
-	stats: {
-	    ops: {
-		label: 'operations',
-		type: 'ops',
-		fields: {
-		    f1: { label: 'field 1', type: 'string' },
-		    f2: { label: 'field 2', type: 'latency' },
-		    f4: { label: 'field 4', type: 'string' }
-		}
-	    }
-	}
+var metrics2 = {
+    modules: {
+	syscall: { label: 'system calls' },
+	instr2: { label: 'instrumenter two-specific metrics' }
     },
-    instr2: {
-	label: 'instrumenter two-specific metric',
-	stats: {
-	    jobs: {
-		label: 'instrumenter two-specific jobs',
-		type: 'ops',
-		fields: {}
-	    }
-	}
-    }
-});
+    types: { time: { arity: 'numeric' } },
+    fields: {
+	f1: { label: 'field 1' },
+	f2: { label: 'field 2', type: 'time' },
+	f3: { label: 'field 3' },
+	f4: { label: 'field 4' }
+    },
+    metrics: [ {
+	module: 'syscall',
+	stat: 'ops',
+	label: 'operations',
+	unit: 'ops',
+	fields: [ 'f1', 'f2', 'f4' ]
+    }, {
+	module: 'instr2',
+	stat: 'jobs',
+	label: 'instrumenter two-specific jobs',
+	unit: 'jobs',
+	fields: [ 'f1', 'f2', 'f3' ]
+    } ]
+};
 
 /*
  * Setup test scaffolding

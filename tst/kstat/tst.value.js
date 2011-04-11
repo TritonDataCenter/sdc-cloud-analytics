@@ -40,30 +40,23 @@ var desc = {
 	}
 };
 
-var metadata = new mod_metric.caMetricMetadata('in-core', {
+var metadata = new mod_metric.caMetricMetadata();
+metadata.addFromHost({
 	modules: { 'disk': { label: 'Disk I/O' } },
+	types: { number: { arity: 'numeric' } },
 	fields: {
-		hostname: {
-			type: mod_ca.ca_type_string,
-			label: 'system name'
-		},
-		disk: {
-			type: mod_ca.ca_type_string,
-			label: 'disk name'
-		},
-		bytes_read: {
-			type: mod_ca.ca_type_number,
-			label: 'bytes read'
-		}
+		hostname:	{ label: 'system name' },
+		disk:		{ label: 'disk name' },
+		bytes_read:	{ label: 'bytes read', type: 'number' }
 	},
 	metrics: [ {
 		module: 'disk',
 		stat: 'disks',
 		label: 'disks',
-		type: 'resource',
+		unit: 'disks',
 		fields: [ 'hostname', 'disk', 'bytes_read' ]
 	} ]
-});
+}, 'in-core');
 mod_tl.ctStdout.info('%j', metadata);
 ASSERT(metadata.problems().length === 0);
 

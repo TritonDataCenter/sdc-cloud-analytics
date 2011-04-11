@@ -622,7 +622,6 @@ function cfgHttpLegacyTypesList(request, response)
  */
 function cfgHttpLegacyTransformsList(request, response)
 {
-	/* XXX does this work? */
 	response.send(HTTP.OK, cfg_transformations);
 }
 

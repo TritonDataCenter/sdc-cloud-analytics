@@ -286,7 +286,7 @@ function gTypeTransform(type, value)
 	return ({
 	    divisor: divisor,
 	    label: gUnitPowers[ii]['prefix'] +
-		('abbr' in type ? type['abbr'] : type['unit'])
+		('abbr' in type ? type['abbr'] : (type['unit'] || ''))
 	});
 }
 

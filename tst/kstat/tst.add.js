@@ -6,6 +6,7 @@ var mod_assert = require('assert');
 var ASSERT = mod_assert.ok;
 
 var mod_ca = require('../../lib/ca/ca-common');
+var mod_metric = require('../../lib/ca/ca-metric');
 var mod_tl = require('../../lib/tst/ca-test');
 var mod_cakstat = require('../../cmd/cainst/modules/kstat');
 
@@ -22,20 +23,14 @@ desc = {
 	},
 	fields: {
 		hostname: {
-			label: 'system name',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'testhostname' ]); }
 		},
 		disk: {
-			label: 'disk name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 			    return ([ kstat['name'] ]);
 			}
 		},
 		bytes_read: {
-			label: 'bytes read',
-			type: mod_ca.ca_type_number,
 			bucketize: mod_cakstat.caMakeLogLinearBucketize(
 			    10, 2, 11, 100),
 			values: function (kstat, klast) {
@@ -47,12 +42,32 @@ desc = {
 	}
 };
 
+var metadata = new mod_metric.caMetricMetadata();
+metadata.addFromHost({
+	modules: { 'disk': { label: 'Disk I/O' } },
+	types: { number: { arity: 'numeric' } },
+	fields: {
+		hostname:	{ label: 'system name' },
+		disk:		{ label: 'disk name' },
+		bytes_read:	{ label: 'bytes read', type: 'number' }
+	},
+	metrics: [ {
+		module: 'disk',
+		stat: 'disks',
+		label: 'disks',
+		unit: 'disks',
+		fields: [ 'hostname', 'disk', 'bytes_read' ]
+	} ]
+}, 'in-core');
+mod_tl.ctStdout.info('%j', metadata);
+ASSERT(metadata.problems().length === 0);
+
 metric = new mod_cakstat.insKstatAutoMetric(desc, {
     is_module: desc['module'],
     is_stat: desc['stat'],
     is_predicate: {},
     is_decomposition: []
-});
+}, metadata);
 
 var value, data;
 

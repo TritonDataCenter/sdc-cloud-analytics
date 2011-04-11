@@ -27,7 +27,7 @@ exports.agginit = function (agg, log)
 	agg.registerTransformation({
 	    name: 'reversedns',
 	    label: 'reverse dns IP addresses lookup',
-	    types: [ mod_ca.ca_type_ipaddr ],
+	    fields: [ 'raddr' ],
 	    transform: transReverseDNS
 	});
 

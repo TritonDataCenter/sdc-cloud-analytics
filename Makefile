@@ -32,6 +32,7 @@ CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
 CAPROF		 = node $(TOOLSDIR)/caprof.js
+CAMCHK		 = node $(TOOLSDIR)/camchk.js > /dev/null
 CAMD		 = node $(TOOLSDIR)/camd.js
 XMLLINT		 = xmllint --noout
 TAR		 = tar
@@ -96,6 +97,7 @@ PKGDIRS_cabase := \
 	$(PKGROOT)/cabase/lib/ca		\
 	$(PKGROOT)/cabase/lib/tst		\
 	$(PKGROOT)/cabase/metadata		\
+	$(PKGROOT)/cabase/metadata/metric	\
 	$(PKGROOT)/cabase/metadata/profile	\
 	$(PKGROOT)/cabase/pkg			\
 	$(PKGROOT)/cabase/smf			\
@@ -239,8 +241,11 @@ check-metadata: $(METADATA_FILES:%=%.check)
 check-metad:
 	$(CAMD) $(METAD_FILES)
 
-metadata/%.json.check: metadata/%.json
+metadata/profile/%.json.check: metadata/profile/%.json
 	$(CAPROF) $^
+
+metadata/metric/%.json.check: metadata/metric/%.json
+	$(CAMCHK) $^
 
 check-manifests: $(SMF_MANIFESTS)
 	$(XMLLINT) --dtdvalid $(SMF_DTD) $(SMF_MANIFESTS)

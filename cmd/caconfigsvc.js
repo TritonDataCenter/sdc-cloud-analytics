@@ -30,7 +30,7 @@ var cfg_factory;		/* instrumentation factory */
 var cfg_mapi;			/* mapi config */
 var cfg_broker;			/* AMQP broker config */
 var cfg_sysinfo;		/* system config */
-var cfg_metadata;		/* metadata manager */
+var cfg_mdmgr;			/* metadata manager */
 var cfg_profiles;		/* profile manager */
 var cfg_profile_customer;	/* customer profile */
 var cfg_profile_operator;	/* operator profile */
@@ -45,6 +45,7 @@ var cfg_aggregators = {};	/* all aggregators, by hostname */
 var cfg_transformations = {};	/* all transformations, by name */
 var cfg_instrumenters = {};	/* all instrumenters, by hostname */
 var cfg_metrics;		/* all metrics */
+var cfg_metadata;		/* metric metadata */
 
 var cfg_instn_max_peruser = 10;		/* maximum allowed instns per user */
 var cfg_reaper_interval = 60 * 1000;	/* time between reaps (ms) */
@@ -103,6 +104,8 @@ function main()
 	caDbg.set('cfg_mapi', cfg_mapi);
 	cfg_metrics = new mod_metric.caMetricSet();
 	caDbg.set('cfg_metrics', cfg_metrics);
+	cfg_metadata = new mod_metric.caMetricMetadata();
+	caDbg.set('cfg_metadata', cfg_metadata);
 
 	if (process.argv.length > 2) {
 		dbg_log = mod_log.caLogFromFile(process.argv[2],
@@ -177,6 +180,7 @@ function main()
 	    cap: cfg_cap,
 	    log: cfg_log,
 	    metrics: cfg_metrics,
+	    metadata: cfg_metadata,
 	    transformations: cfg_transformations,
 	    aggregators: cfg_aggregators,
 	    instrumenters: cfg_instrumenters,
@@ -202,9 +206,9 @@ function main()
  */
 function cfgProfileInit()
 {
-	cfg_metadata = new mod_md.caMetadataManager(cfg_log, './metadata');
-	caDbg.set('cfg_metadata', cfg_metadata);
-	cfg_metadata.load(function (err) {
+	cfg_mdmgr = new mod_md.caMetadataManager(cfg_log, './metadata');
+	caDbg.set('cfg_mdmgr', cfg_mdmgr);
+	cfg_mdmgr.load(function (err) {
 		if (err) {
 			cfg_log.error('fatal: failed to load metadata: %r',
 			    err);
@@ -213,7 +217,7 @@ function cfgProfileInit()
 
 		cfg_profiles = new mod_profile.caProfileManager();
 		caDbg.set('cfg_profiles', cfg_profiles);
-		cfg_profiles.load(cfg_metadata);
+		cfg_profiles.load(cfg_mdmgr);
 
 		cfg_profile_customer = cfg_profiles.get('customer');
 		if (!cfg_profile_customer) {
@@ -321,9 +325,10 @@ function cfgHttpRouter(server)
 
 	for (ii = 0; ii < infixes.length; ii++) {
 		base = cfg_http_baseuri + infixes[ii];
-		server.get(base + metrics, cfgHttpMetricsList);
-		server.get(base + types, cfgHttpTypesList);
-		server.get(base + transforms, cfgHttpTransformsList);
+		server.get(base, cfgHttpConfigList);
+		server.get(base + metrics, cfgHttpLegacyMetricsList);
+		server.get(base + types, cfgHttpLegacyTypesList);
+		server.get(base + transforms, cfgHttpLegacyTransformsList);
 		server.get(base + instrumentations,
 		    cfgHttpInstrumentationsList);
 		server.post(base + instrumentations, cfgHttpInstCreate);
@@ -406,6 +411,7 @@ function cfgAdminStatus(callback, recurse, timeout)
 	ret['cfg_reaper_interval'] = cfg_reaper_interval;
 	ret['cfg_reaper_last'] = cfg_reaper_last;
 	ret['cfg_factory'] = cfg_factory.info();
+	ret['cfg_metadata'] = cfg_metadata;
 
 	ret['cfg_aggregators'] = {};
 	for (key in cfg_aggregators) {
@@ -530,39 +536,91 @@ function cfgHttpAdminStatus(request, response)
 }
 
 /*
- * Handle GET /ca/[customers/:custid]/metrics
+ * Handle GET /ca/[customers/:custid]
  */
-function cfgHttpMetricsList(request, response)
+function cfgHttpConfigList(request, response)
 {
-	var pset;
+	var pset, mset, ret;
 
 	pset = cfgRequestProfileSet(request);
-	response.send(HTTP.OK, cfg_metrics.intersection(pset).toJson());
+	mset = pset.intersection(cfg_metrics);
+	ret = mod_metric.caMetricHttpSerialize(mset, cfg_metadata);
+	ret['transformations'] = cfg_transformations;
+	response.send(HTTP.OK, ret);
 }
 
 /*
- * Handle GET /ca/[customers/:custid]/types
+ * Handle GET /ca/[customers/:custid]/metrics.  Fake up the old data.
+ * This endpoint will be removed once the portal and adminui are using /ca.
  */
-function cfgHttpTypesList(request, response)
+function cfgHttpLegacyMetricsList(request, response)
 {
-	var types, mset, ii, ret;
+	var pset, mset, metrics, metric, module, stat, fields, field;
+	var fieldtype, md, ret, ii, jj;
 
-	mset = cfg_metrics.intersection(cfgRequestProfileSet(request));
-	types = mset.types();
+	md = cfg_metadata;
+	pset = cfgRequestProfileSet(request);
+	mset = pset.intersection(cfg_metrics);
 	ret = {};
 
-	for (ii = 0; ii < types.length; ii++)
-		ret[types[ii]] = {
-		    arity: mod_ca.caTypeToArity(types[ii])
+	metrics = mset.baseMetrics();
+	for (ii = 0; ii < metrics.length; ii++) {
+		metric = metrics[ii];
+		module = metric.module();
+		stat = metric.stat();
+
+		if (!(module in ret))
+			ret[module] = {
+			    label: md.moduleLabel(module),
+			    stats: {}
+			};
+
+		ret[module]['stats'][stat] = {
+		    label: md.metricLabel(module, stat),
+		    type: 'unused',
+		    fields: {}
 		};
+
+		fields = metric.fields();
+		for (jj = 0; jj < fields.length; jj++) {
+			field = fields[jj];
+
+			if (field == 'latency' || field == 'runtime' ||
+			    field == 'cputime')
+				fieldtype = 'latency';
+			else if (md.fieldArity(field) == 'numeric')
+				fieldtype = 'number';
+			else
+				fieldtype = 'string';
+
+			ret[module]['stats'][stat]['fields'][field] = {
+			    label: md.fieldLabel(field),
+			    type: fieldtype
+			};
+		}
+	}
 
 	response.send(HTTP.OK, ret);
 }
 
 /*
- * Handle GET /ca/[customers/:custid]/transformations
+ * Handle GET /ca/[customers/:custid]/types.  Fake up the old data.
+ * This endpoint will be removed once the portal and adminui are using /ca.
  */
-function cfgHttpTransformsList(request, response)
+function cfgHttpLegacyTypesList(request, response)
+{
+	response.send(HTTP.OK, {
+	    latency: 'numeric',
+	    string: 'discrete',
+	    number: 'numeric'
+	});
+}
+
+/*
+ * Handle GET /ca/[customers/:custid]/transforms.
+ * This endpoint will be removed once the portal and adminui are using /ca.
+ */
+function cfgHttpLegacyTransformsList(request, response)
 {
 	response.send(HTTP.OK, cfg_transformations);
 }
@@ -577,7 +635,7 @@ function cfgHttpInstrumentationsList(request, response)
 
 	cfgInstrumentationsListCustomer(rv, cfgInstrumentations(custid));
 
-	if (custid === undefined) {
+	if (custid === undefined && request.ca_params['all'] === 'true') {
 		for (custid in cfg_customers)
 			cfgInstrumentationsListCustomer(rv,
 			    cfgInstrumentations(custid));
@@ -870,6 +928,8 @@ function cfgNotifyInstrumenterOnline(msg)
 		inst.ins_ninsts = 0;
 	}
 
+	cfg_log.info('instrumenter %s: %s', action, msg.ca_hostname);
+
 	inst.ins_hostname = msg.ca_hostname;
 	inst.ins_routekey = msg.ca_source;
 	inst.ins_agent_name = msg.ca_agent_name;
@@ -878,7 +938,23 @@ function cfgNotifyInstrumenterOnline(msg)
 	inst.ins_os_release = msg.ca_os_release;
 	inst.ins_os_revision = msg.ca_os_revision;
 
-	cfg_metrics.addFromHost(msg.ca_modules, msg.ca_hostname);
+	try {
+		cfg_metadata.addFromHost(msg.ca_metadata, msg.ca_hostname);
+	} catch (ex) {
+		if (!(ex instanceof caError && ex.code() == ECA_INVAL))
+			throw (ex);
+
+		/*
+		 * There's a conflict or otherwise invalid metadata.  Log the
+		 * error and then forget about this instrumenter.
+		 */
+		cfg_log.warn('instrumenter %s: error processing metric ' +
+		    'metadata: %r', msg.ca_hostname, ex);
+		cfg_metrics.addFromHost([], msg.ca_hostname);
+		return;
+	}
+
+	cfg_metrics.addFromHost(msg.ca_metadata['metrics'], msg.ca_hostname);
 
 	for (id in inst.ins_insts) {
 		cfg_factory.enableInstrumenter(cfg_insts[id].inst,
@@ -889,8 +965,6 @@ function cfgNotifyInstrumenterOnline(msg)
 			}
 		    });
 	}
-
-	cfg_log.info('instrumenter %s: %s', action, msg.ca_hostname);
 }
 
 /*

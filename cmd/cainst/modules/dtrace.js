@@ -26,10 +26,10 @@ if (process.env['DTRACE_LIBPATH']) {
 	insd_dt_libpath = process.env['DTRACE_LIBPATH'].split(':');
 }
 
-function insdGenerateMetricFunc(desc)
+function insdGenerateMetricFunc(desc, metadata)
 {
 	return (function (metric) {
-	    var res = mod_cametad.mdGenerateDScript(desc, metric);
+	    var res = mod_cametad.mdGenerateDScript(desc, metric, metadata);
 	    var progs = res['scripts'].map(function (s) {
 	        return (new insDTraceVectorMetric(s, res['hasdecomps'],
 		    res['zero'], res['hasdists']));
@@ -40,28 +40,17 @@ function insdGenerateMetricFunc(desc)
 
 exports.insinit = function (ins, log)
 {
-	var ii, metric, mod, key;
+	var ii, metric, mod;
 
 	insd_log = log;
 
 	ins.registerReporter('dtrace', insdStatus);
 
-	ins.registerModule({ name: 'syscall', label: 'System calls' });
-	ins.registerModule({ name: 'node', label: 'Node.js 0.4.x' });
-	ins.registerModule({ name: 'disk', label: 'Disk' });
-	ins.registerModule({ name: 'fs', label: 'Filesystem' });
-	ins.registerModule({ name: 'cpu', label: 'CPU' });
-
 	for (ii = 0; ii < insd_metrics.length; ii++) {
 		metric = require(caSprintf('./dtrace/%s', insd_metrics[ii]));
 		mod = caDeepCopy(metric['cadMetricDesc']);
-		mod['metric'] =
-		    insdGenerateMetricFunc(metric['cadMetricDesc']);
-		for (key in metric['cadMetricDesc']['fields']) {
-			if ('internal' in
-			    metric['cadMetricDesc']['fields'][key])
-				delete (mod['fields'][key]);
-		}
+		mod['impl'] = insdGenerateMetricFunc(metric['cadMetricDesc'],
+		    ins.metadata());
 		ins.registerMetric(mod);
 	}
 };

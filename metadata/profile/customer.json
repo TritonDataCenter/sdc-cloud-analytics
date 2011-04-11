@@ -5,45 +5,46 @@
 		"module": "cpu",
 		"stat": "thread_executions",
 		"fields": [
-		    "zonename", "execname", "pid", "leavereason", "runtime",
-		    "ppid", "args", "pargs", "pexecname"
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "leavereason", "runtime"
 		]
 	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [
-		    "zonename", "execname", "pid", "operation", "fstype",
-		    "latency", "ppid", "args", "pargs", "pexecname"
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "fstype", "optype", "latency"	
 		]
 	}, {
 		"module": "node",
 		"stat": "gc_ops",
 		"fields": [
-		    "type", "latency", "zonename", "pid", "execname", "ppid",
-		    "args", "pargs", "pexecname"
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "gctype", "latency"
 		]
 	}, {
 		"module": "node",
 		"stat": "httpc_ops",
 		"fields": [
-		    "raddr", "rport", "method", "url", "latency", "zonename",
-		    "pid", "ppid", "execname", "args", "path", "pargs",
-		    "pexecname"
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "raddr", "rport", "http_method",
+		    "http_url", "http_path", "latency"
 		]
 	}, {
 		"module": "node",
 		"stat": "httpd_ops",
 		"fields": [
-		    "raddr", "rport", "method", "url", "latency", "zonename",
-		    "pid", "ppid", "execname", "args", "path", "pargs",
-		    "pexecname"
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "raddr", "rport", "http_method",
+		    "http_url", "http_path", "latency"
 		]
 	}, {
 		"module": "node",
 		"stat": "socket_ops",
 		"fields": [
-		    "raddr", "rport", "size", "type", "buffered", "zonename",
-		    "pid", "ppid", "execname", "args", "pargs", "pexecname"
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "optype", "raddr", "rport", "size",
+	    	    "buffered"
 		]
 	} ]
 }

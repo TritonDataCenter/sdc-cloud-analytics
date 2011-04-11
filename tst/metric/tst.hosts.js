@@ -13,7 +13,6 @@ var mod_metric = require('../../lib/ca/ca-metric');
 mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
 
 var set, metric;
-var xform = mod_metric.caMetricsExpand;
 
 function setup()
 {
@@ -30,26 +29,15 @@ function setup()
  */
 function check_basic()
 {
-	set.addFromHost(xform({
-	    mod1: {
-		label: 'module 1',
-		stats: {
-		    stat11: {
-			type: 'ops',
-			label: 'stat 11',
-			fields: {
-			    f1: { label: 'field1', type: 'string' },
-			    f2: { label: 'field2', type: 'string' }
-			}
-		    }
-		}
-	    }
-	}), 'host1');
+	set.addFromHost([ {
+	    module: 'mod1',
+	    stat: 'stat11',
+	    fields: [ 'f1', 'f2' ]
+	} ], 'host1');
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(metric.fieldTypes(),
-	    { f1: 'string', f2: 'string' });
+	mod_assert.deepEqual(metric.fields(), [ 'f1', 'f2' ]);
 	ASSERT(set.baseMetric('mod1', 'stat12') === null);
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 	ASSERT(set.baseMetric('mod3', 'stat31') === null);
@@ -79,25 +67,15 @@ function check_basic()
  */
 function check_host2()
 {
-	set.addFromHost(xform({
-	    mod1: {
-		label: 'module 1',
-		stats: {
-		    stat11: {
-			type: 'ops',
-			label: 'stat 11',
-			fields: {
-			    f2: { label: 'field2', type: 'string' }
-			}
-		    }
-		}
-	    }
-	}), 'host2');
+	set.addFromHost([ {
+	    module: 'mod1',
+	    stat: 'stat11',
+	    fields: [ 'f2' ]
+	} ], 'host2');
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(metric.fieldTypes(),
-	    { f1: 'string', f2: 'string' });
+	mod_assert.deepEqual(metric.fields(), [ 'f1', 'f2' ]);
 	ASSERT(set.baseMetric('mod1', 'stat12') === null);
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 	ASSERT(set.baseMetric('mod3', 'stat31') === null);
@@ -136,26 +114,15 @@ function check_host2()
  */
 function check_host3()
 {
-	set.addFromHost(xform({
-	    mod1: {
-		label: 'module 1',
-		stats: {
-		    stat11: {
-			type: 'ops',
-			label: 'stat 11',
-			fields: {
-			    f2: { label: 'field2', type: 'string' },
-			    f4: { label: 'field4', type: 'string' }
-			}
-		    }
-		}
-	    }
-	}), 'host4');
+	set.addFromHost([ {
+	    module: 'mod1',
+	    stat: 'stat11',
+	    fields: [ 'f2', 'f4' ]
+	} ], 'host4');
 
 	metric = set.baseMetric('mod1', 'stat11');
 	ASSERT(metric !== null);
-	mod_assert.deepEqual(metric.fieldTypes(),
-	    { f1: 'string', f2: 'string', f4: 'string' });
+	mod_assert.deepEqual(metric.fields(), [ 'f1', 'f2', 'f4' ]);
 	ASSERT(set.baseMetric('mod1', 'stat12') === null);
 	ASSERT(set.baseMetric('mod2', 'stat21') === null);
 	ASSERT(set.baseMetric('mod3', 'stat31') === null);

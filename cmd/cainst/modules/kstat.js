@@ -12,19 +12,80 @@ var mod_capred = require('../../../lib/ca/ca-pred');
 var inskLog;
 var inskHostname;
 
-exports.insinit = function (ins, log)
+/*
+ * Invoked by the instrumenter service to initialize the kstat-based metrics.
+ */
+exports.insinit = function (instr, log)
 {
 	inskLog = log;
 	inskHostname = mod_ca.caSysinfo().ca_hostname;
-
-	ins.registerModule({ name: 'cpu', label: 'CPU' });
-	ins.registerModule({ name: 'disk', label: 'Disk' });
-	ins.registerModule({ name: 'fs', label: 'Filesystem' });
-	ins.registerModule({ name: 'nic', label: 'Network interfaces' });
-	ins.registerModule({ name: 'tcp', label: 'TCP' });
-
-	inskInitAutoMetrics(ins);
+	inskInitAutoMetrics(instr);
 };
+
+/*
+ * Registers the metrics defined below with the instrumenter service.
+ */
+function inskInitAutoMetrics(instr)
+{
+	var metadata, impl, ii;
+
+	metadata = instr.metadata();
+	impl = function (desc) {
+		return (function (mm) {
+			return (new insKstatAutoMetric(desc, mm, metadata));
+		});
+	};
+
+	for (ii = 0; ii < inskMetrics.length; ii++) {
+		inskLog.dbg('loading kstat metric ' + (ii + 1));
+
+		inskMetrics[ii]['fields']['hostname'] = {
+			values: function () { return ([ inskHostname ]); }
+		};
+
+		inskAutoMetricValidate(inskMetrics[ii], metadata);
+
+		instr.registerMetric({
+			module: inskMetrics[ii]['module'],
+			stat: inskMetrics[ii]['stat'],
+			fields: Object.keys(inskMetrics[ii]['fields']),
+			impl: impl(inskMetrics[ii])
+		});
+	}
+}
+
+/*
+ * Validates a metric description of the form used below.
+ */
+function inskAutoMetricValidate(desc, metadata)
+{
+	var fieldname, field, arity;
+
+	ASSERT(desc['module'] && typeof (desc['module']) == typeof (''));
+	ASSERT(desc['stat'] && typeof (desc['stat']) == typeof (''));
+	ASSERT(desc['kstat'] && desc['kstat'].constructor == Object);
+	ASSERT(!caIsEmpty(desc['kstat']));
+	ASSERT((!('filter' in desc)) || desc['filter'].constructor == Function);
+	ASSERT(desc['extract'] && desc['extract'].constructor == Function);
+	ASSERT(desc['fields'] && desc['fields'].constructor == Object);
+
+	for (fieldname in desc['fields']) {
+		field = desc['fields'][fieldname];
+		ASSERT(field.constructor == Object);
+		ASSERT((!('values' in field)) ||
+		    field['values'].constructor == Function);
+
+		arity = metadata.fieldArity(fieldname);
+
+		if (arity == mod_ca.ca_field_arity_discrete)
+			ASSERT(!('bucketize' in field));
+		else {
+			ASSERT(arity == mod_ca.ca_field_arity_numeric);
+			ASSERT(field['bucketize'] &&
+			    field['bucketize'].constructor == Function);
+		}
+	}
+}
 
 /*
  * KSTAT METRICS
@@ -38,8 +99,6 @@ exports.insinit = function (ins, log)
  * Each kstat-based metric description defines the following fields:
  *
  *	module, stat	Specifies which metric is being defined
- *
- *	label, type	Metric metadata
  *
  *	kstat		Specifies a set of kstats to examine when computing the
  *			value of this metric.  This is an object specifying one
@@ -61,8 +120,6 @@ exports.insinit = function (ins, log)
  *			point.
  *
  * Each field specifies the following members:
- *
- *	label, type	Metric metadata
  *
  *	values		as values(kstat, klast, interval): List of possible
  *			values of this field in the given kstat.  For static
@@ -88,21 +145,15 @@ exports.insinit = function (ins, log)
 var inskMetrics = [ {
 	module: 'cpu',
 	stat: 'cpus',
-	label: 'CPUs',
-	type: 'size',
 	kstat: { module: 'cpu', class: 'misc', name: 'sys' },
 	extract: inskResourceExtract,
 	fields: {
 		cpu: {
-			label: 'CPU identifier',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ 'cpu' + kstat['instance'] ]);
 			}
 		},
 		utilization: {
-			label: 'utilization',
-			type: mod_ca.ca_type_number,
 			bucketize: caMakeLinearBucketize(1),
 			values: function (kstat, kprev, interval) {
 				var oldd, newd, oldsum, newsum;
@@ -120,22 +171,16 @@ var inskMetrics = [ {
 }, {
 	module: 'nic',
 	stat: 'nics',
-	label: 'NICs',
-	type: 'size',
 	kstat: { module: 'link', class: 'net' },
 	filter: inskNicFilter,
 	extract: inskResourceExtract,
 	fields: {
 		nic: {
-			label: 'NIC name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		packets: {
-			label: 'total packets sent/received',
-			type: mod_ca.ca_type_number,
 			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var oldd, newd, oldsum, newsum;
@@ -148,9 +193,7 @@ var inskMetrics = [ {
 				return ([ newsum - oldsum ]);
 			}
 		},
-		in_packets: {
-			label: 'packets received',
-			type: mod_ca.ca_type_number,
+		packets_in: {
 			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -159,9 +202,7 @@ var inskMetrics = [ {
 				    oldd['ipackets64']]);
 			}
 		},
-		out_packets: {
-			label: 'packets sent',
-			type: mod_ca.ca_type_number,
+		packets_out: {
 			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -170,9 +211,7 @@ var inskMetrics = [ {
 				    oldd['opackets64']]);
 			}
 		},
-		throughput: {
-			label: 'total throughput',
-			type: mod_ca.ca_type_number,
+		bytes: {
 			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var oldd, newd, oldsum, newsum;
@@ -183,9 +222,7 @@ var inskMetrics = [ {
 				return ([ newsum - oldsum ]);
 			}
 		},
-		in_throughput: {
-			label: 'inbound throughput',
-			type: mod_ca.ca_type_number,
+		bytes_read: {
 			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -193,9 +230,7 @@ var inskMetrics = [ {
 				return ([newd['rbytes64'] - oldd['rbytes64']]);
 			}
 		},
-		out_throughput: {
-			label: 'outbound throughput',
-			type: mod_ca.ca_type_number,
+		bytes_write: {
 			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -207,8 +242,6 @@ var inskMetrics = [ {
 }, {
 	module: 'nic',
 	stat: 'bytes',
-	label: 'bytes sent/received',
-	type: 'size',
 	kstat: { module: 'link', class: 'net' },
 	filter: inskNicFilter,
 	extract: function (fields, kstat, kprev) {
@@ -220,23 +253,17 @@ var inskMetrics = [ {
 	},
 	fields: {
 		nic: {
-			label: 'NIC name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		direction: {
-			label: 'sent/received',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'sent', 'received' ]); }
 		}
 	}
 }, {
 	module: 'nic',
 	stat: 'packets',
-	label: 'packets sent/received',
-	type: 'size',
 	kstat: { module: 'link', class: 'net' },
 	filter: inskNicFilter,
 	extract: function (fields, kstat, kprev) {
@@ -248,37 +275,27 @@ var inskMetrics = [ {
 	},
 	fields: {
 		nic: {
-			label: 'NIC name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		direction: {
-			label: 'sent/received',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'sent', 'received' ]); }
 		}
 	}
 }, {
 	module: 'disk',
 	stat: 'disks',
-	label: 'disks',
-	type: 'size',
 	kstat: { class: 'disk' },
 	filter: inskDiskFilter,
 	extract: inskResourceExtract,
 	fields: {
 		disk: {
-			label: 'device name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		iops: {
-			label: 'total number of I/O operations',
-			type: mod_ca.ca_type_number,
 			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -289,8 +306,6 @@ var inskMetrics = [ {
 			}
 		},
 		iops_read: {
-			label: 'read I/O operations',
-			type: mod_ca.ca_type_number,
 			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -299,8 +314,6 @@ var inskMetrics = [ {
 			}
 		},
 		iops_write: {
-			label: 'write I/O operations',
-			type: mod_ca.ca_type_number,
 			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -309,8 +322,6 @@ var inskMetrics = [ {
 			}
 		},
 		bytes: {
-			label: 'total bytes transferred',
-			type: mod_ca.ca_type_number,
 			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -321,8 +332,6 @@ var inskMetrics = [ {
 			}
 		},
 		bytes_read: {
-			label: 'bytes read',
-			type: mod_ca.ca_type_number,
 			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -330,9 +339,7 @@ var inskMetrics = [ {
 				return ([ newd['nread'] - oldd['nread'] ]);
 			}
 		},
-		bytes_written: {
-			label: 'bytes written',
-			type: mod_ca.ca_type_number,
+		bytes_write: {
 			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
@@ -341,9 +348,7 @@ var inskMetrics = [ {
 				    oldd['nwritten'] ]);
 			}
 		},
-		utilization: {
-			label: 'percent of time with outstanding i/o',
-			type: mod_ca.ca_type_number,
+		busytime: {
 			bucketize: caMakeLinearBucketize(1),
 			values: function (kstat, kprev, interval) {
 				var newd = kstat['data'];
@@ -356,65 +361,47 @@ var inskMetrics = [ {
 }, {
 	module: 'disk',
 	stat: 'physio_ops',
-	label: 'operations',
-	type: 'ops',
 	kstat: { class: 'disk' },
 	filter: inskDiskFilter,
 	extract: inskIoExtractOps,
 	fields: {
 		disk: {
-			label: 'device name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		optype: {
-			label: 'type',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'read', 'write' ]); }
 		}
 	}
 }, {
 	module: 'disk',
 	stat: 'physio_bytes',
-	label: 'bytes read/written',
-	type: 'size',
 	kstat: { class: 'disk' },
 	filter: inskDiskFilter,
 	extract: inskIoExtractBytes,
 	fields: {
 		disk: {
-			label: 'device name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		optype: {
-			label: 'type',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'read', 'write' ]); }
 		}
 	}
 }, {
 	module: 'tcp',
 	stat: 'connections',
-	label: 'connections',
-	type: 'ops',
 	kstat: { module: 'tcp', class: 'mib2' },
 	extract: inskTcpConnectionsExtract,
 	fields: {
 		tcpstack: {
-			label: 'tcp instance',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ 'tcp' + kstat['instance'] ]);
 			}
 		},
 		conntype: {
-			label: 'active/passive',
-			type: mod_ca.ca_type_string,
 			values: function () {
 				return ([ 'active', 'passive' ]);
 			}
@@ -423,21 +410,15 @@ var inskMetrics = [ {
 }, {
 	module: 'tcp',
 	stat: 'segments',
-	label: 'segments',
-	type: 'ops',
 	kstat: { module: 'tcp', class: 'mib2' },
 	extract: inskTcpSegmentsExtract,
 	fields: {
 		tcpstack: {
-			label: 'tcp instance',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ 'tcp' + kstat['instance'] ]);
 			}
 		},
 		direction: {
-			label: 'sent/received',
-			type: mod_ca.ca_type_string,
 			values: function () {
 				return ([ 'sent', 'received' ]);
 			}
@@ -446,63 +427,45 @@ var inskMetrics = [ {
 }, {
 	module: 'tcp',
 	stat: 'errors',
-	label: 'errors',
-	type: 'ops',
 	kstat: { module: 'tcp', class: 'mib2' },
 	extract: inskTcpErrorExtract,
 	fields: {
 		tcpstack: {
-			label: 'tcp instance',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ 'tcp' + kstat['instance'] ]);
 			}
 		},
 		errtype: {
-			label: 'error type',
-			type: mod_ca.ca_type_string,
 			values: inskTcpErrtypeValues
 		}
 	}
 }, {
 	module: 'fs',
 	stat: 'logical_rwops',
-	type: 'ops',
-	label: 'logical filesystem read/write operations',
 	kstat: { module: 'zone_vfs' },
 	extract: inskIoExtractOps,
 	fields: {
 		zonename: {
-			label: 'zone name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		optype: {
-			label: 'type',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'read', 'write' ]); }
 		}
 	}
 }, {
 	module: 'fs',
 	stat: 'logical_rwbytes',
-	type: 'size',
-	label: 'logical filesystem bytes read/written',
 	kstat: { module: 'zone_vfs' },
 	extract: inskIoExtractBytes,
 	fields: {
 		zonename: {
-			label: 'zone name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 				return ([ kstat['name'] ]);
 			}
 		},
 		optype: {
-			label: 'type',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'read', 'write' ]); }
 		}
 	}
@@ -599,95 +562,14 @@ function inskTcpErrtypeValues(kstat, kprev)
 	}));
 }
 
-function inskAutoMetricValidate(desc)
-{
-	var fieldname, field, arity;
-
-	ASSERT(desc['module'] && typeof (desc['module']) == typeof (''));
-	ASSERT(desc['stat'] && typeof (desc['stat']) == typeof (''));
-	ASSERT(desc['label'] && typeof (desc['label']) == typeof (''));
-	ASSERT(desc['type'] && typeof (desc['type']) == typeof (''));
-	ASSERT(desc['kstat'] && desc['kstat'].constructor == Object);
-	ASSERT(!caIsEmpty(desc['kstat']));
-	ASSERT((!('filter' in desc)) || desc['filter'].constructor == Function);
-	ASSERT(desc['extract'] && desc['extract'].constructor == Function);
-	ASSERT(desc['fields'] && desc['fields'].constructor == Object);
-
-	for (fieldname in desc['fields']) {
-		field = desc['fields'][fieldname];
-		ASSERT(field.constructor == Object);
-		ASSERT(field['label'] &&
-		    typeof (field['label']) == typeof (''));
-		ASSERT((!('values' in field)) ||
-		    field['values'].constructor == Function);
-		ASSERT(field['type'] &&
-		    typeof (field['type']) == typeof (''));
-		arity = mod_ca.caTypeToArity(field['type']);
-		if (arity == mod_ca.ca_field_arity_discrete)
-			ASSERT(!('bucketize' in field));
-		else {
-			ASSERT(arity == mod_ca.ca_field_arity_numeric);
-			ASSERT(field['bucketize'] &&
-			    field['bucketize'].constructor == Function);
-		}
-	}
-}
-
-/*
- * Register the metrics defined above with the instrumenter backend.
- */
-function inskInitAutoMetrics(ins)
-{
-	var metric, ii, fields, field;
-
-	metric = function (desc) {
-		return (function (mm) {
-			return (new insKstatAutoMetric(desc, mm));
-		});
-	};
-
-	for (ii = 0; ii < inskMetrics.length; ii++) {
-		fields = {};
-
-		inskMetrics[ii]['fields']['hostname'] = {
-			label: 'hostname',
-			type: mod_ca.ca_type_string,
-			values: function () { return ([ inskHostname ]); }
-		};
-
-		try {
-			inskAutoMetricValidate(inskMetrics[ii]);
-		} catch (ex) {
-			caPanic(caSprintf('metric is invalid: %j',
-			    inskMetrics[ii]), ex);
-		}
-
-		for (field in inskMetrics[ii]['fields']) {
-			fields[field] = {
-			    type: inskMetrics[ii]['fields'][field]['type'],
-			    label: inskMetrics[ii]['fields'][field]['label']
-			};
-		}
-
-		ins.registerMetric({
-			module: inskMetrics[ii]['module'],
-			stat: inskMetrics[ii]['stat'],
-			label: inskMetrics[ii]['label'],
-			type: inskMetrics[ii]['type'],
-			fields: fields,
-			metric: metric(inskMetrics[ii])
-		});
-	}
-}
-
 /*
  * Implements the instrumenter's Metric interface for the kstat-based metric
  * desribed by "desc" and the actual instrumentation request described by
  * "metric".
  */
-function insKstatAutoMetric(desc, metric)
+function insKstatAutoMetric(desc, metric, metadata)
 {
-	var field, ndiscrete, nnumeric, ii;
+	var field, arity, ndiscrete, nnumeric, ii;
 
 	this.iam_kstat = caDeepCopy(desc.kstat);
 	this.iam_fields = caDeepCopy(desc.fields);
@@ -697,6 +579,7 @@ function insKstatAutoMetric(desc, metric)
 	this.iam_reader = new mod_kstat.Reader(this.iam_kstat);
 	this.iam_last = null;
 	this.iam_decompositions = [];
+	this.iam_metadata = metadata;
 
 	/*
 	 * Discrete decompositions must come first, and there can be at most one
@@ -707,9 +590,9 @@ function insKstatAutoMetric(desc, metric)
 	for (ii = 0; ii < metric.is_decomposition.length; ii++) {
 		field = metric.is_decomposition[ii];
 		ASSERT(field in desc['fields']);
+		arity = metadata.fieldArity(field);
 
-		if (mod_ca.caTypeToArity(desc['fields'][field]['type']) ==
-		    mod_ca.ca_field_arity_discrete) {
+		if (arity == mod_ca.ca_field_arity_discrete) {
 			this.iam_decompositions.unshift(field);
 			ndiscrete++;
 		} else {
@@ -897,7 +780,7 @@ insKstatAutoMetric.prototype.addDecompositions = function (datapts, decomps, ii)
 	}
 
 	field = this.iam_fields[decomps[ii]];
-	arity = mod_ca.caTypeToArity(field['type']);
+	arity = this.iam_metadata.fieldArity(decomps[ii]);
 
 	if (arity == mod_ca.ca_field_arity_numeric) {
 		/* numeric decompositions must be last */

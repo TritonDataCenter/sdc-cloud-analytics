@@ -52,13 +52,13 @@ function runtests()
 	    method: 'GET',
 	    path: '/ca',
 	    port: CFGSVC_PORT
-	}, 404);
+	}, 200);
 
 	runRequest({
 	    method: 'GET',
 	    path: '/ca/',
 	    port: CFGSVC_PORT
-	}, 404);
+	}, 200);
 
 	runRequest({
 	    method: 'GET',

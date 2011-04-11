@@ -70,8 +70,15 @@ function check_instrumentation(test, code, response, rv)
 	ASSERT.deepEqual(rv['decomposition'], decomp);
 	ASSERT.deepEqual(rv['predicate'], pred);
 	ASSERT.equal(rv['retention-time'], 600);
+	ASSERT.equal(rv['idle-max'], 3600);
 	ASSERT.equal(rv['enabled'], true);
 	ASSERT.deepEqual(rv['transformations'], trans);
+	ASSERT.ok(rv['uri'].lastIndexOf('/ca/instrumentations/') === 0);
+	ASSERT.ok(rv['uris'].length > 0);
+	ASSERT.ok(rv['uris'].filter(function (elt) {
+		return (elt['name'] == 'value_raw');
+	}).length == 1);
+	ASSERT.ok(rv['nsources'] === 1);
 
 	exp = test.expect || {};
 	for (key in test.expect) {
@@ -236,7 +243,34 @@ function check_global_uris()
 		check_stage_done();
 	});
 
-	/* /ca/metrics should exist with the correct metrics. */
+	/* /ca should exist with correct metadata */
+	http.sendEmpty('GET', '/ca?profile=none', true,
+	    function (err, response, rv) {
+		ASSERT.ok(response.statusCode == HTTP.OK);
+		ASSERT.deepEqual(rv, {
+		    types: {
+			string: { name: 'string', arity: 'discrete' },
+			time: { name: 'time', arity: 'numeric' }
+		    },
+		    transformations: {},
+		    fields: {
+			hostname: { label: 'server host name', type: 'string' },
+			latency: { label: 'duration of op', type: 'time' }
+		    },
+		    modules: {
+			test_module: { label: 'test module description' }
+		    },
+		    metrics: [ {
+			module: 'test_module',
+			stat: 'ops1',
+			label: 'test ops 1',
+			type: 'time',
+			fields: [ 'hostname', 'latency' ]
+		    } ]
+		});
+	});
+
+	/* /ca/metrics should exist with the correct metrics (legacy only) */
 	http.sendEmpty('GET', '/ca/metrics?profile=none', true,
 	    function (err, response, rv) {
 		var mod = rv['test_module'], stat = mod['stats']['ops1'];
@@ -245,12 +279,11 @@ function check_global_uris()
 		ASSERT.ok(response.statusCode == HTTP.OK);
 		ASSERT.ok(mod['label'] == 'test module description');
 		ASSERT.ok(stat['label'] == 'test ops 1');
-		ASSERT.ok(stat['type'] == 'ops');
-		ASSERT.ok(fields['hostname']['type'] == mod_ca.ca_type_string);
+		ASSERT.ok(stat['type'] == 'unused');
+		ASSERT.ok(fields['hostname']['type'] == 'string');
 		ASSERT.ok(fields['hostname']['label'] == 'server host name');
-		ASSERT.ok(fields['latency']['type'] == mod_ca.ca_type_latency);
-		ASSERT.ok(fields['latency']['label'] ==
-		    'duration of operation');
+		ASSERT.ok(fields['latency']['type'] == 'latency');
+		ASSERT.ok(fields['latency']['label'] == 'duration of op');
 		check_stage_done();
 	});
 

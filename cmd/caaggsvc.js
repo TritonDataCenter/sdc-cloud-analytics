@@ -1018,7 +1018,7 @@ function aggTick()
  *	label			The human readable name for this transformation
  *				as a string
  *
- *	types			An array of types that this transformation
+ *	fields			An array of fields that this transformation
  *				supports operating on
  *
  *	transform		A function of the form object (*transform)(raw).
@@ -1041,11 +1041,11 @@ function aggBackendInterface() {}
  */
 aggBackendInterface.prototype.registerTransformation = function (args)
 {
-	var name, label, types, transform;
+	var name, label, fields, transform;
 
 	name = mod_ca.caFieldExists(args, 'name', '');
 	label = mod_ca.caFieldExists(args, 'label', '');
-	types = mod_ca.caFieldExists(args, 'types', []);
+	fields = mod_ca.caFieldExists(args, 'fields', []);
 	transform = mod_ca.caFieldExists(args, 'transform',
 	    aggBackendInterface);
 
@@ -1055,7 +1055,7 @@ aggBackendInterface.prototype.registerTransformation = function (args)
 
 	agg_transforms[name] = {
 	    label: label,
-	    types: types,
+	    fields: fields,
 	    transform: transform
 	};
 };

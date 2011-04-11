@@ -6,44 +6,8 @@ var mod_ca = require('../../../../lib/ca/ca-common');
 var desc = {
     module: 'cpu',
     stat: 'thread_executions',
-    type: 'ops',
-    label: 'thread executions',
-    fields: {
-	runtime: { label: 'runtime', type: mod_ca.ca_type_latency },
-	hostname: { label: 'hostname', type: mod_ca.ca_type_string },
-	pid: {
-	    label: 'process identifier',
-	    type: mod_ca.ca_type_string
-	},
-	ppid: {
-	    label: 'parent process identifier',
-	    type: mod_ca.ca_type_string
-	},
-	execname: {
-	    label: 'application name',
-	    type: mod_ca.ca_type_string
-	},
-	zonename: {
-	    label: 'zone name',
-	    type: mod_ca.ca_type_string
-	},
-	leavereason: {
-	    label: 'reason leaving cpu',
-	    type: mod_ca.ca_type_string
-	},
-	args: {
-	    label: 'process arguments',
-	    type: mod_ca.ca_type_string
-	},
-	pargs: {
-	    label: 'parent process arguments',
-	    type: mod_ca.ca_type_string
-	},
-	pexecname: {
-	    label: 'parent process application name',
-	    type: mod_ca.ca_type_string
-	}
-    },
+    fields: [ 'hostname', 'zonename', 'pid', 'execname', 'psargs', 'ppid',
+	'pexecname', 'ppsargs', 'leavereason', 'runtime' ],
     metad: {
 	locals: [
 	    { state: 'int' },
@@ -94,8 +58,8 @@ var desc = {
 		    '"user sync object with priority inheritence" : ' +
 		    'this->stype == SOBJ_SHUTTLE ? "shuttle synchronization ' +
 		    'object" : "unknown")',
-		args: 'curpsinfo->pr_psargs',
-		pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+		psargs: 'curpsinfo->pr_psargs',
+		ppsargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
 		pexecname: 'curthread->t_procp->p_parent->' +
 		    'p_user.u_comm'
 	    },
@@ -107,9 +71,9 @@ var desc = {
 		execname: 'count()',
 		zonename: 'count()',
 		leavereason: 'count()',
-		args: 'count()',
+		psargs: 'count()',
 		default: 'count()',
-		pargs: 'count()',
+		ppsargs: 'count()',
 		pexecname: 'count()'
 	    },
 	    verify: {

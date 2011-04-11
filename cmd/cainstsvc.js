@@ -10,15 +10,21 @@ var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_dbg = require('../lib/ca/ca-dbg');
 var mod_log = require('../lib/ca/ca-log');
 var mod_capred = require('../lib/ca/ca-pred');
+var mod_md = require('../lib/ca/ca-metadata');
+var mod_metric = require('../lib/ca/ca-metric');
 
 var ins_name = 'instsvc';	/* component name */
 var ins_vers = '0.0';		/* component version */
 
-var ins_insts = {};		/* active instrumentations by id */
-var ins_modules = {};		/* registered stat modules */
-var ins_status_callbacks = {};	/* callbacks for getting status info */
 var ins_iid;			/* interval timer id */
+var ins_insts = {};		/* active instrumentations by id */
+var ins_impls = {};		/* metric implementations */
+var ins_status_callbacks = {};	/* callbacks for getting status info */
 
+var ins_metadata_raw;		/* metric metadata (JSON) */
+var ins_metadata;		/* metric metadata (object) */
+var ins_metrics_global;		/* MetricSet for all defined metrics */
+var ins_metrics_impl;		/* MetricSet for implemented metrics */
 var ins_cap;			/* cap wrapper */
 var ins_log;			/* log handle */
 var ins_amqp;
@@ -28,7 +34,7 @@ function main()
 	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(ins_name, ins_vers);
 	var hostname = sysinfo.ca_hostname;
-	var dbg_log;
+	var mdmgr, dbg_log;
 
 	mod_dbg.caEnablePanicOnCrash();
 	caDbg.set('broker', broker);
@@ -38,7 +44,7 @@ function main()
 	caDbg.set('ins_name', ins_name);
 	caDbg.set('ins_vers', ins_vers);
 	caDbg.set('ins_insts', ins_insts);
-	caDbg.set('ins_modules', ins_modules);
+	caDbg.set('ins_impls', ins_impls);
 	caDbg.set('ins_status_callbacks', ins_status_callbacks);
 
 	ins_log = new mod_log.caLog({ out: process.stderr });
@@ -84,9 +90,25 @@ function main()
 	ins_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
 	ins_log.info('%-12s %s', 'Routing key:', ins_amqp.routekey());
 
-	insInitBackends();
+	mdmgr = new mod_md.caMetadataManager(ins_log, './metadata');
+	mdmgr.load(function (err) {
+		if (err)
+			caPanic('failed to load metadata', err);
 
-	ins_amqp.start(insStarted);
+		ins_metadata_raw = mdmgr.get('metric', 'metrics');
+		ins_metadata = new mod_metric.caMetricMetadata();
+		caDbg.set('ins_metadata', ins_metadata);
+		ins_metadata.addFromHost(ins_metadata_raw, 'metrics.json');
+
+		ins_metrics_global = ins_metadata.metricSet();
+		caDbg.set('ins_metrics_global', ins_metrics_global);
+
+		ins_metrics_impl = new mod_metric.caMetricSet();
+		caDbg.set('ins_metrics_impl', ins_metrics_impl);
+
+		insInitBackends();
+		ins_amqp.start(insStarted);
+	});
 }
 
 /*
@@ -96,46 +118,9 @@ function main()
  */
 function insBackendInterface() {}
 
-/*
- * Register a new metric module.  'args' must specify the following fields:
- *
- *	name	String identifier that names this module
- *
- *	label	Human-readable label for this module
- *
- * Each backend must register a given module before registering metrics in that
- * module.  Multiple backends may register modules with the same name but they
- * must all have the same label as well.
- */
-insBackendInterface.prototype.registerModule = function (args)
+insBackendInterface.prototype.metadata = function ()
 {
-	var name, label;
-
-	name = mod_ca.caFieldExists(args, 'name', '');
-	label = mod_ca.caFieldExists(args, 'label', '');
-
-	if (!(name in ins_modules)) {
-		ins_modules[name] = { label: label, stats: {} };
-		return;
-	}
-
-	/*
-	 * We want backends to be able to redeclare modules declared by other
-	 * backends because we may have multiple implementations of the same
-	 * metrics provided by the different backends.  For example, io.ops is
-	 * implemented by both the kstat and dtrace backends.  The kstat version
-	 * is cheaper but can't be used for predicates and decompositions.  When
-	 * users enable one of these metrics, we use the lowest-cost
-	 * implementation that can provide the desired predicates and
-	 * decompositions.
-	 *
-	 * However, we don't want modules inadvertently reusing module names, so
-	 * we check here to make sure the human-readable names match.  This is
-	 * kinda hokey but should work for the foreseeable future.
-	 */
-	if (ins_modules[name].label != label)
-		throw (new Error('module "' + name +
-		    '" redeclared with different label'));
+	return (ins_metadata);
 };
 
 /*
@@ -157,28 +142,14 @@ insBackendInterface.prototype.registerModule = function (args)
  *			Instrumenter uses the one that supports all desired
  *			breakdowns and decompositions that has the lowest cost.
  *
- *	label		Human-readable label for this metric
+ *	fields		Array of supported field names based on which data can
+ *			be filtered or decomposed.
  *
- *	type		String type name for the scalar unit of this metric.
- *			May be one of "ops", "size", "throughput", "time", or
- *			"percent".
- *
- *	fields		Set of fields based on which data can be filtered or
- *			decomposed.  'fields' is an object whose keys are field
- *			names (identifiers) and whose values are objects with
- *			the following members:
- *
- *		label	Human-readable name for this field
- *
- *		type	Either 'scalar', 'string'.  Scalar fields allow
- *			predicates using numeric inequalities (e.g., ops > 500)
- *			and decompositions on scalar axes (e.g., x-axis,
- *			y-axis).  String fields only allow predicates using
- *			strict equality, and decompositions only use non-scalar
- *			axes (e.g., color).
- *
- *	metric		Function that returns a new instance of a class meeting
+ *	impl		Function that returns a new instance of a class meeting
  *			the insMetric interface.
+ *
+ * The module, stat, and all of the field names must be contained within the
+ * global set of available metrics (defined in metadata).
  *
  * The insMetric interface is used to implement individual metrics.  When a new
  * instrumentation is created based on this metric, a new instance of this class
@@ -198,42 +169,30 @@ insBackendInterface.prototype.registerModule = function (args)
  *				when deinstrumentation is complete.
  *
  *	value():		Retrieve the current value of the metric.
- *				XXX is this since some time in the past?  Last
- *				read?
  */
 insBackendInterface.prototype.registerMetric = function (args)
 {
-	var modname, statname, label, type, fields, field, metric, stat;
+	var module, stat, fields, func;
+	var basemetric, impl, seenfields, field, ii;
 
-	modname = mod_ca.caFieldExists(args, 'module', '');
-	statname = mod_ca.caFieldExists(args, 'stat', '');
-	label = mod_ca.caFieldExists(args, 'label', '');
-	type = mod_ca.caFieldExists(args, 'type', '');
+	module = mod_ca.caFieldExists(args, 'module', '');
+	stat = mod_ca.caFieldExists(args, 'stat', '');
 	fields = mod_ca.caFieldExists(args, 'fields', []);
-	metric = mod_ca.caFieldExists(args, 'metric');
+	func = mod_ca.caFieldExists(args, 'impl');
 
-	if (!(modname in ins_modules))
-		throw (new Error('attempted declaration of metric in ' +
-		    'undeclared module "' + modname + '"'));
+	basemetric = ins_metrics_global.baseMetric(module, stat);
+	if (!basemetric)
+		throw (new Error(caSprintf('attempted to register metric ' +
+		    'implementation for non-existent module "%s" stat "%s"',
+		    module, stat)));
 
-	switch (type) {
-	case 'ops':
-	case 'size':
-	case 'throughput':
-	case 'time':
-	case 'percent':
-		break;
-	default:
-		throw (new Error('metric has invalid type: ' + type));
-	}
+	ins_metrics_impl.addMetric(module, stat, fields);
 
-	if (!(statname in ins_modules[modname]['stats']))
-		ins_modules[modname]['stats'][statname] = [];
+	if (!(module in ins_impls))
+		ins_impls[module] = {};
 
-	stat = {};
-	stat['label'] = label;
-	stat['type'] = type;
-	stat['metric'] = metric;
+	if (!(stat in ins_impls[module]))
+		ins_impls[module][stat] = [];
 
 	/*
 	 * XXX it should be illegal (and we should check for this here) to
@@ -248,13 +207,29 @@ insBackendInterface.prototype.registerMetric = function (args)
 	 * what we need, rather than having to expose multiple implementations
 	 * to the config svc.
 	 */
-	stat['fields'] = mod_ca.caDeepCopy(fields);
-	stat['fieldtypes'] = {};
+	impl = {};
+	impl['impl'] = func;
+	impl['fields'] = [];
+	seenfields = {};
 
-	for (field in fields)
-		stat['fieldtypes'][field] = fields[field]['type'];
+	for (ii = 0; ii < fields.length; ii++) {
+		field = fields[ii];
 
-	ins_modules[modname]['stats'][statname].push(stat);
+		if (!basemetric.containsField(field))
+			throw (new Error(caSprintf('attempted to register ' +
+			    'metric with invalid field: module "%s" stat ' +
+			    '"%s" field "%s"', module, stat, field)));
+
+		if (field in seenfields)
+			throw (new Error(caSprintf('attempted to register ' +
+			    'duplicate field "%s" in module "%s" stat "%s"',
+			    field, module, stat)));
+
+		impl['fields'].push(field);
+		seenfields[field] = true;
+	}
+
+	ins_impls[module][stat].push(impl);
 };
 
 /*
@@ -288,79 +263,36 @@ function insInitBackends()
 	for (ii = 0; ii < backends.length; ii++) {
 		try {
 			plugin = require('./cainst/modules/' + backends[ii]);
-			plugin.insinit(bemgr, ins_log);
-			ins_log.info('Loaded module "%s".', backends[ii]);
 		} catch (ex) {
 			ins_log.warn('FAILED to load module "%s": %r',
 			    backends[ii], ex);
 		}
+
+		plugin.insinit(bemgr, ins_log);
+		ins_log.info('Loaded module "%s".', backends[ii]);
 	}
 
-	if (mod_ca.caIsEmpty(ins_modules))
-		throw (new Error('No modules.  Bailing out.'));
+	if (mod_ca.caIsEmpty(ins_impls))
+		throw (new Error('No metrics registered.  Bailing out.'));
 
 	ins_log.info('Finished loading modules.');
 }
 
 function insGetModules()
 {
-	var modname, statname, fieldname;
-	var mod, stat, mstats, mstat, mfield, ii;
-	var donefields;
-	var ret = [];
-
-	for (modname in ins_modules) {
-		mod = {};
-		mod.cam_name = modname;
-		mod.cam_description = ins_modules[modname]['label'];
-		mod.cam_stats = [];
-
-		for (statname in ins_modules[modname]['stats']) {
-			donefields = {};
-			mstats = ins_modules[modname]['stats'][statname];
-			stat = {
-			    cas_name: statname,
-			    cas_fields: []
-			};
-
-			for (ii = 0; ii < mstats.length; ii++) {
-				mstat = mstats[ii];
-				stat.cas_description = mstat['label'];
-				stat.cas_type = mstat['type'];
-
-				for (fieldname in mstat['fields']) {
-					if (fieldname in donefields)
-						continue;
-					donefields[fieldname] = true;
-					mfield = mstat['fields'][fieldname];
-					stat.cas_fields.push({
-					    caf_name: fieldname,
-					    caf_description: mfield['label'],
-					    caf_type: mfield['type']
-					});
-				}
-			}
-
-			mod.cam_stats.push(stat);
-		}
-
-		ret.push(mod);
-	}
-
-	return (ret);
+	return (mod_metric.caMetricHttpSerialize(ins_metrics_impl,
+	    ins_metadata));
 }
 
 function insNotifyConfig()
 {
-	var mods = insGetModules();
-	ins_cap.sendNotifyInstOnline(mod_ca.ca_amqp_key_config, mods);
+	var metadata = insGetModules();
+	ins_cap.sendNotifyInstOnline(mod_ca.ca_amqp_key_config, metadata);
 }
 
 function insStarted()
 {
 	ins_log.info('AMQP broker connected.');
-
-	/* XXX should we send this periodically too?  every 5 min or whatever */
 	insNotifyConfig();
 	ins_iid = setInterval(insTick, 1000);
 }
@@ -374,7 +306,7 @@ function insTick()
 {
 	var id, when, value;
 
-	when = new Date().getTime(); /* XXX should this come from mod? */
+	when = new Date().getTime();
 
 	/*
 	 * If for some reason we get invoked multiple times within the same
@@ -418,7 +350,8 @@ function insCmdStatus(msg)
 		});
 	}
 
-	sendmsg.s_modules = insGetModules();
+	sendmsg.s_metadata = insGetModules();
+	sendmsg.s_modules = [];
 	sendmsg.s_status = {
 		instrumentations: sendmsg.s_instrumentations,
 		amqp: ins_amqp.info()
@@ -431,13 +364,28 @@ function insCmdStatus(msg)
 }
 
 /*
+ * Given an array of fields, return true if the specified metric implementation
+ * supports all of the fields.
+ */
+function insImplSupportsFields(impl, fields)
+{
+	var ii;
+
+	for (ii = 0; ii < fields.length; ii++) {
+		if (!caArrayContains(impl['fields'], fields[ii]))
+			return (false);
+	}
+
+	return (true);
+}
+
+/*
  * Process AMQP command to enable an instrumentation.
  */
 function insCmdEnable(msg)
 {
 	var destkey = msg.ca_source;
-	var id, metric, metrics, inst;
-	var ii, jj;
+	var id, basemetric, impl, impls, inst, ii;
 
 	if (!('is_inst_id' in msg) || !('is_module' in msg) ||
 	    !('is_stat' in msg) || !('is_predicate' in msg) ||
@@ -459,48 +407,29 @@ function insCmdEnable(msg)
 		return;
 	}
 
-	if (!(msg.is_module in ins_modules) ||
-	    !(msg.is_stat in ins_modules[msg.is_module]['stats'])) {
+	basemetric = ins_metrics_impl.baseMetric(msg.is_module, msg.is_stat);
+	if (!basemetric) {
 		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
 		    'unknown module or stat', id);
 		return;
 	}
 
-	metrics = ins_modules[msg.is_module]['stats'][msg.is_stat];
+	impls = ins_impls[msg.is_module][msg.is_stat];
 
-	for (ii = 0; ii < metrics.length; ii++) {
-		for (jj = 0; jj < msg.is_decomposition.length; jj++) {
-			if (!(msg.is_decomposition[jj] in metrics[ii].fields))
-				break;
-		}
-
-		if (!mod_ca.caIsEmpty(msg.is_predicate)) {
-			try {
-				mod_capred.caPredValidateSyntax(
-				    msg.is_predicate);
-				mod_capred.caPredValidateSemantics(
-				    metrics[ii].fieldtypes, msg.is_predicate);
-			} catch (ex) {
-				if (ex instanceof caInvalidFieldError)
-					continue;
-
-				ins_log.error(
-				    'error validating predicate: %r', ex);
-				continue;
-			}
-		}
-
-		if (jj == msg.is_decomposition.length)
+	for (ii = 0; ii < impls.length; ii++) {
+		if (insImplSupportsFields(impls[ii], msg.is_decomposition) &&
+		    insImplSupportsFields(impls[ii],
+		    mod_capred.caPredFields(msg.is_predicate)))
 			break;
 	}
 
-	if (ii == metrics.length) {
+	if (ii == impls.length) {
 		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
-		    'unsupported decomposition and/or predicate', id);
+		    'unsupported decomposition or predicate', id);
 		return;
 	}
 
-	metric = ins_modules[msg.is_module]['stats'][msg.is_stat][ii];
+	impl = impls[ii];
 
 	inst = {};
 	inst.is_module = msg.is_module;
@@ -509,14 +438,14 @@ function insCmdEnable(msg)
 	inst.is_decomposition = mod_ca.caDeepCopy(msg.is_decomposition);
 	if (msg.is_zones)
 		inst.is_zones = mod_ca.caDeepCopy(msg.is_zones);
-	inst.is_impl = metric.metric(mod_ca.caDeepCopy(inst));
+	inst.is_impl = impl.impl(mod_ca.caDeepCopy(inst));
 	inst.is_inst_key = msg.is_inst_key;
 	inst.is_since = new Date();
 
 	ins_insts[id] = inst;
 	inst.is_impl.instrument(function (err) {
 		if (err) {
-			delete ins_insts[id];
+			delete (ins_insts[id]);
 			ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
 			    'instrumenter error: ' + err, id);
 			return;

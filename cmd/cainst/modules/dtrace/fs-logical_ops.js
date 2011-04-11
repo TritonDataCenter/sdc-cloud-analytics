@@ -26,54 +26,9 @@ returnprobes.push('fbt::fop_open:entry');
 var desc = {
     module: 'fs',
     stat: 'logical_ops',
-    type: 'ops',
-    label: 'logical filesystem operations',
-    fields: {
-	pid: {
-	    label: 'process identifier',
-	    type: mod_ca.ca_type_string
-	},
-	ppid: {
-	    label: 'parent process identifier',
-	    type: mod_ca.ca_type_string
-	},
-	hostname: { label: 'hostname', type: mod_ca.ca_type_string },
-	execname: {
-	    label: 'application name',
-	    type: mod_ca.ca_type_string
-	},
-	zonename: {
-	    label: 'zone name',
-	    type: mod_ca.ca_type_string
-	},
-	operation: {
-	    label: 'operation type',
-	    type: mod_ca.ca_type_string
-	},
-	fstype: {
-	    label: 'filesystem type',
-	    type: mod_ca.ca_type_string
-	},
-	latency: { label: 'latency', type: mod_ca.ca_type_latency },
-	args: {
-	    label: 'process arguments',
-	    type: mod_ca.ca_type_string
-	},
-	pargs: {
-	    label: 'parent process arguments',
-	    type: mod_ca.ca_type_string
-	},
-	pexecname: {
-	    label: 'parent process application name',
-	    type: mod_ca.ca_type_string
-	},
-	vnode: {
-	    internal: true
-	},
-	depth: {
-	    internal: true
-	}
-    },
+    fields: [ 'hostname', 'zonename', 'pid', 'execname', 'psargs', 'ppid',
+	'pexecname', 'ppsargs', 'fstype', 'optype', 'latency' ],
+    fields_internal: [ 'vnode', 'depth' ],
     metad: {
 	locals: [
 	    { fstype: 'string' }
@@ -104,13 +59,13 @@ var desc = {
 		ppid: 'count()',
 		execname: 'count()',
 		zonename: 'count()',
-		operation: 'count()',
+		optype: 'count()',
 		hostname: 'count()',
 		fstype: 'count()',
 		latency: 'llquantize($0, 10, 3, 11, 100)',
-		args: 'count()',
+		psargs: 'count()',
 		default: 'count()',
-		pargs: 'count()',
+		ppsargs: 'count()',
 		pexecname: 'count()'
 
 	    },
@@ -125,12 +80,12 @@ var desc = {
 		    '"' + mod_ca.caSysinfo().ca_hostname + '"',
 		execname: 'execname',
 		zonename: 'zonename',
-		operation: '(probefunc + 4)',
+		optype: '(probefunc + 4)',
 		latency: 'timestamp - $0',
-		args: 'curpsinfo->pr_psargs',
+		psargs: 'curpsinfo->pr_psargs',
 		fstype: 'stringof((*((vnode_t**)self->vnode0))->' +
 		'v_op->vnop_name)',
-		pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+		ppsargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
 		pexecname: 'curthread->t_procp->p_parent->' +
 		    'p_user.u_comm'
 	    },
@@ -150,13 +105,13 @@ var desc = {
 		ppid: 'count()',
 		execname: 'count()',
 		zonename: 'count()',
-		operation: 'count()',
+		optype: 'count()',
 		hostname: 'count()',
 		fstype: 'count()',
-		args: 'count()',
+		psargs: 'count()',
 		latency: 'llquantize($0, 10, 3, 11, 100)',
 		default: 'count()',
-		pargs: 'count()',
+		ppsargs: 'count()',
 		pexecname: 'count()'
 	    },
 	    local: [ {  fstype: 'stringof(((vnode_t*)self->vnode0)->' +
@@ -173,12 +128,12 @@ var desc = {
 		    '"' + mod_ca.caSysinfo().ca_hostname + '"',
 		execname: 'execname',
 		zonename: 'zonename',
-		operation: '(probefunc + 4)',
+		optype: '(probefunc + 4)',
 		latency: 'timestamp - $0',
-		args: 'curpsinfo->pr_psargs',
+		psargs: 'curpsinfo->pr_psargs',
 		fstype: 'stringof(((vnode_t*)self->vnode0)->' +
 		'v_op->vnop_name)',
-		pargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
+		ppsargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
 		pexecname: 'curthread->t_procp->p_parent->' +
 		    'p_user.u_comm'
 	    },

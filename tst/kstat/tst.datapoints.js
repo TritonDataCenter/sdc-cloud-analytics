@@ -42,13 +42,9 @@ var simple_desc = {
 	},
 	fields: {
 		hostname: {
-			label: 'system name',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'testhostname' ]); }
 		},
 		disk: {
-			label: 'disk name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 			    return ([ kstat['name'] ]);
 			}
@@ -94,20 +90,14 @@ var simple_numeric_desc = {
 	},
 	fields: {
 		hostname: {
-			label: 'system name',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'testhostname' ]); }
 		},
 		disk: {
-			label: 'disk name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 			    return ([ kstat['name'] ]);
 			}
 		},
 		bytes: {
-			label: 'disk bytes transferred',
-			type: mod_ca.ca_type_number,
 			values: function (kst1, kst0, einterval) {
 				return ([ kst1['data']['nread'] -
 				    kst0['data']['nread'] ]);
@@ -157,20 +147,14 @@ var multivalue_desc = {
 	},
 	fields: {
 		hostname: {
-			label: 'system name',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'testhostname' ]); }
 		},
 		disk: {
-			label: 'disk name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 			    return ([ kstat['name'] ]);
 			}
 		},
 		optype: {
-			label: 'operation type',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'read', 'write' ]); }
 		}
 	}

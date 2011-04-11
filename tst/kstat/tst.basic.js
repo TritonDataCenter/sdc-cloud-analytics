@@ -22,13 +22,9 @@ desc = {
 	},
 	fields: {
 		hostname: {
-			label: 'system name',
-			type: mod_ca.ca_type_string,
 			values: function () { return ([ 'testhostname' ]); }
 		},
 		disk: {
-			label: 'disk name',
-			type: mod_ca.ca_type_string,
 			values: function (kstat) {
 			    return ([ kstat['name'] ]);
 			}

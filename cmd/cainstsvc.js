@@ -5,7 +5,6 @@
 var ASSERT = require('assert').ok;
 
 var mod_ca = require('../lib/ca/ca-common');
-var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_dbg = require('../lib/ca/ca-dbg');
 var mod_log = require('../lib/ca/ca-log');
@@ -31,15 +30,11 @@ var ins_amqp;
 
 function main()
 {
-	var broker = mod_ca.caBroker();
 	var sysinfo = mod_ca.caSysinfo(ins_name, ins_vers);
-	var hostname = sysinfo.ca_hostname;
-	var mdmgr, dbg_log;
+	var mdmgr, dbg_log, queue;
 
 	mod_dbg.caEnablePanicOnCrash();
-	caDbg.set('broker', broker);
 	caDbg.set('sysinfo', sysinfo);
-	caDbg.set('hostname', hostname);
 
 	caDbg.set('ins_name', ins_name);
 	caDbg.set('ins_vers', ins_vers);
@@ -58,37 +53,28 @@ function main()
 		caDbg.set('amqp_dbg_log', dbg_log);
 	}
 
-	ins_amqp = new mod_caamqp.caAmqp({
-	    broker: broker,
-	    exchange: mod_ca.ca_amqp_exchange,
-	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
-	    basename: mod_ca.ca_amqp_key_base_instrumenter,
-	    hostname: hostname,
-	    bindings: [ mod_ca.ca_amqp_key_all ],
-	    log: ins_log
-	});
-	caDbg.set('ins_amqp', ins_amqp);
-	ins_amqp.on('amqp-error', mod_caamqp.caAmqpLogError(ins_log));
-	ins_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(ins_log));
+	queue = mod_cap.ca_amqp_key_base_instrumenter + sysinfo.ca_hostname;
 
 	ins_cap = new mod_cap.capAmqpCap({
-	    amqp: ins_amqp,
 	    dbglog: dbg_log,
 	    log: ins_log,
+	    queue: queue,
 	    sysinfo: sysinfo
 	});
+
 	caDbg.set('ins_cap', ins_cap);
-	ins_cap.on('msg-cmd-abort', mod_cap.caAbortRemote(ins_cap));
-	ins_cap.on('msg-cmd-ping', mod_cap.caPingRemote(ins_cap));
+	ins_cap.bind(mod_cap.ca_amqp_key_all);
 	ins_cap.on('msg-cmd-status', insCmdStatus);
 	ins_cap.on('msg-cmd-enable_instrumentation', insCmdEnable);
 	ins_cap.on('msg-cmd-disable_instrumentation', insCmdDisable);
 	ins_cap.on('msg-notify-configsvc_online', insNotifyConfigRestarted);
+	ins_cap.on('msg-notify-config_reset', insNotifyConfigReset);
 
 	ins_log.info('Instrumenter starting up (%s/%s)', ins_name, ins_vers);
-	ins_log.info('%-12s %s', 'Hostname:', hostname);
-	ins_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(broker));
-	ins_log.info('%-12s %s', 'Routing key:', ins_amqp.routekey());
+	ins_log.info('%-12s %s', 'Hostname:', sysinfo.ca_hostname);
+	ins_log.info('%-12s %s', 'AMQP broker:',
+	    JSON.stringify(ins_cap.broker()));
+	ins_log.info('%-12s %s', 'Routing key:', queue);
 
 	mdmgr = new mod_md.caMetadataManager(ins_log, './metadata');
 	mdmgr.load(function (err) {
@@ -107,7 +93,8 @@ function main()
 		caDbg.set('ins_metrics_impl', ins_metrics_impl);
 
 		insInitBackends();
-		ins_amqp.start(insStarted);
+		ins_cap.on('connected', insStarted);
+		ins_cap.start();
 	});
 }
 
@@ -287,14 +274,16 @@ function insGetModules()
 function insNotifyConfig()
 {
 	var metadata = insGetModules();
-	ins_cap.sendNotifyInstOnline(mod_ca.ca_amqp_key_config, metadata);
+	ins_cap.sendNotifyInstOnline(mod_cap.ca_amqp_key_config, metadata);
 }
 
 function insStarted()
 {
 	ins_log.info('AMQP broker connected.');
 	insNotifyConfig();
-	ins_iid = setInterval(insTick, 1000);
+
+	if (!ins_iid)
+		ins_iid = setInterval(insTick, 1000);
 }
 
 /*
@@ -354,7 +343,7 @@ function insCmdStatus(msg)
 	sendmsg.s_modules = [];
 	sendmsg.s_status = {
 		instrumentations: sendmsg.s_instrumentations,
-		amqp: ins_amqp.info()
+		amqp_cap: ins_cap.info()
 	};
 
 	for (id in ins_status_callbacks)
@@ -495,25 +484,26 @@ function insCmdDisable(msg)
  * Invoked when the configuration service restarts.  Because instrumentations
  * are not yet persistent, we drop all the data we have and start again.
  */
-function insNotifyConfigRestarted()
+function insNotifyConfigReset()
 {
 	var id;
 
-	ins_log.info('config service restarted');
+	ins_log.info('config reset');
 
-	if (mod_ca.caIsEmpty(ins_insts)) {
-		insNotifyConfig();
+	if (mod_ca.caIsEmpty(ins_insts))
 		return;
-	}
 
 	for (id in ins_insts) {
 		ins_insts[id].is_impl.deinstrument(function (err) {
 		    delete (ins_insts[id]);
-
-		    if (mod_ca.caIsEmpty(ins_insts))
-			insNotifyConfig();
 		});
 	}
+}
+
+function insNotifyConfigRestarted()
+{
+	ins_log.info('config service restarted');
+	insNotifyConfig();
 }
 
 main();

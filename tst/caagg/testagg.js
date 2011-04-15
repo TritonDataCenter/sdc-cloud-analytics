@@ -1,5 +1,6 @@
 var mod_assert = require('assert');
 var mod_ca = require('../../lib/ca/ca-common');
+var mod_cap = require('../../lib/ca/ca-amqp-cap');
 var mod_tl = require('../../lib/tst/ca-test');
 
 /*
@@ -477,7 +478,7 @@ function createInst(host)
 	return (mod_tl.ctCreateCap({
 		host: 'inst-' + host,
 		type: 'instrumenter',
-		bind: [ mod_ca.ca_amqp_key_all ]
+		bind: [ mod_cap.ca_amqp_key_all ]
 	}));
 }
 
@@ -488,7 +489,7 @@ for (var kk = 0; kk < nsources; kk++) {
 var fakeConfig = mod_tl.ctCreateCap({
 	host: 'config',
 	type: 'config',
-	bind: [ mod_ca.ca_amqp_key_config, mod_ca.ca_amqp_key_all ]
+	bind: [ mod_cap.ca_amqp_key_config, mod_cap.ca_amqp_key_all ]
 });
 
 fakeConfig.on('msg-notify-aggregator_online', aggOnline);
@@ -501,19 +502,21 @@ fakeConfig.on('msg-ack-enable_aggregation', aggEnabledAck);
 var startWorld = function ()
 {
 	for (var ii = 0; ii < nsources; ii++) {
-		insts[ii].cap_amqp.start();
+		insts[ii].start();
 	}
 
-	fakeConfig.cap_amqp.start(function () {
+	fakeConfig.on('connected', function () {
 		mod_tl.ctStdout.info('Called config service Online');
 		mod_assert.ok(!notified);
-		fakeConfig.sendNotifyCfgOnline(mod_ca.ca_amqp_key_all);
+		fakeConfig.sendNotifyCfgOnline(mod_cap.ca_amqp_key_all);
 	});
+
+	fakeConfig.start();
 };
 
 var enableAgg = function (source)
 {
-	var key = mod_ca.caRouteKeyForInst(id);
+	var key = mod_cap.caRouteKeyForInst(id);
 	var inst = {
 	    'value-arity': arity,
 	    'value-dimension': dim,

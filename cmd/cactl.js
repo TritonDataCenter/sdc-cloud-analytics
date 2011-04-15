@@ -3,32 +3,35 @@
  */
 
 var mod_ca = require('../lib/ca/ca-common');
-var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_log = require('../lib/ca/ca-log');
 var mod_metric = require('../lib/ca/ca-metric');
 var mod_sys = require('sys');
 
 var cc_timeout_msec = 3 * 1000;		/* timeout after 3s */
-var cc_verbose = false;
+var cc_argv;				/* arguments */
+var cc_optind;				/* current argument */
+var cc_verbose = false;			/* extended "status" message */
+var cc_debug = false;			/* debug mode */
 var cc_cmdswitch = {};			/* dispatch cmds */
-var cc_amqp;				/* ca-amqp handle */
 var cc_cap;				/* cap wrapper */
 var cc_toid;				/* timeout handle */
 var cc_cmd;				/* command sent */
 var cc_start;				/* time cmd was sent */
 var cc_arg0 = process.argv[1];
 var cc_help = [
-    'usage: cactl <hostname> <command>',
+    'usage: cactl [-d] <hostname> <command>',
     'Poke a cloud analytics instance via AMQP.',
     '    <hostname> is a routing key identifying a single system',
-    '    	hint: try "ca.config" for the config server',
+    '    	hint: try "ca.config" for the config server\n',
     '    <command> is one of:',
     '        abort		panic remote service (use with caution)',
     '        ping		check connectivity',
     '        status [-v]	get detailed status info',
-    '                           with -v, print additional unstructured info',
-    '        log <msg>		report log message'
+    '                   	with -v, print additional unstructured info',
+    '        log <msg>		report log message\n',
+    '    Global Options:',
+    '        -d		print AMQP debug messages'
 ].join('\n');
 
 function printf()
@@ -39,38 +42,43 @@ function printf()
 
 function main()
 {
-	if (process.argv.length <= 2)
+	var sysinfo, queuename, loglevel, log, capconf;
+
+	cc_argv = process.argv;
+	cc_optind = 2;
+
+	if (cc_argv[cc_optind] == '-d') {
+		cc_debug = true;
+		loglevel = mod_log.caLog.DBG;
+		cc_optind++;
+	} else {
+		loglevel = mod_log.caLog.INFO;
+	}
+
+	if (cc_argv.length - cc_optind < 2)
 		usage();
 
-	var broker = mod_ca.caBroker();
-	var sysinfo = mod_ca.caSysinfo('cactl', '0.1');
-	var hostname = sysinfo.ca_hostname+ '.' + process.pid;
-	var log = new mod_log.caLog({ out: process.stdout });
+	sysinfo = mod_ca.caSysinfo('cactl', '0.1');
+	queuename = mod_cap.ca_amqp_key_base_tool + sysinfo.ca_hostname +
+	    '.' + process.pid;
+	log = new mod_log.caLog({ out: process.stdout, level: loglevel });
 
-	cc_amqp = new mod_caamqp.caAmqp({
-		broker: broker,
-		exchange: mod_ca.ca_amqp_exchange,
-		exchange_opts: mod_ca.ca_amqp_exchange_opts,
-		basename: mod_ca.ca_amqp_key_base_tool,
-		hostname: hostname,
-		bindings: [],
-		log: log
-	});
-	cc_amqp.on('amqp-error', function (err) {
-		die('amqp: %s', err.message);
-	});
-	cc_amqp.on('amqp-fatal', function (err) {
-		die('amqp: %s', err.message);
-	});
+	capconf = {
+	    log: log,
+	    queue: queuename,
+	    sysinfo: sysinfo,
+	    retry_limit: 0
+	};
 
-	cc_cap = new mod_cap.capAmqpCap({
-	    log: log, amqp: cc_amqp, sysinfo: sysinfo
-	});
+	if (cc_debug)
+		capconf['dbglog'] = log;
+
+	cc_cap = new mod_cap.capAmqpCap(capconf);
 	cc_cap.on('msg-ack-abort', ccAckAbort);
 	cc_cap.on('msg-ack-ping', ccAckPing);
 	cc_cap.on('msg-ack-status', ccAckStatus);
-
-	cc_amqp.start(ccRunCmd);
+	cc_cap.on('connected', ccRunCmd);
+	cc_cap.start();
 }
 
 function usage(msg)
@@ -90,7 +98,7 @@ function die()
 
 function shutdown()
 {
-	cc_amqp.stop();
+	cc_cap.stop();
 }
 
 function ccTimeout()
@@ -101,13 +109,13 @@ function ccTimeout()
 
 function ccRunCmd()
 {
-	var destkey = process.argv[2];
-	var msg;
+	var destkey, msg;
 
-	cc_cmd = process.argv[3];
+	destkey = cc_argv[cc_optind++];
+	cc_cmd = cc_argv[cc_optind++];
 
-	cc_verbose = process.argv.length > 4 &&
-	    process.argv[4] == '-v';
+	cc_verbose = cc_argv.length >= cc_optind &&
+	    cc_argv[cc_optind++] == '-v';
 
 	if (!(cc_cmd in cc_cmdswitch))
 		usage('unrecognized command: ' + cc_cmd);

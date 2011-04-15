@@ -4,7 +4,6 @@
 
 var mod_ca = require('../lib/ca/ca-common');
 var mod_caagg = require('../lib/ca/ca-agg.js');
-var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_caerr = require('../lib/ca/ca-error');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
@@ -26,11 +25,9 @@ var agg_profile = false;
 var agg_insts = {};		/* active instrumentations by id */
 var agg_start;			/* start time (in ms) */
 var agg_http;			/* http server */
-var agg_amqp;			/* AMQP handle */
 var agg_cap;			/* cap wrapper */
 var agg_log;			/* log handle */
 var agg_sysinfo;		/* system info config */
-var agg_broker;			/* AMQP broker config */
 
 var agg_transforms = {};	/* available transformations by name */
 
@@ -47,7 +44,7 @@ var agg_future_warn_interval = 60 * 60 * 1000;	/* warning frequency (1/hour) */
 
 function main()
 {
-	var dbg_log;
+	var dbg_log, queue;
 
 	agg_start = new Date().getTime();
 
@@ -67,8 +64,6 @@ function main()
 
 	agg_sysinfo = mod_ca.caSysinfo(agg_name, agg_vers);
 	caDbg.set('agg_sysinfo', agg_sysinfo);
-	agg_broker = mod_ca.caBroker();
-	caDbg.set('agg_broker', agg_broker);
 
 	agg_log = new mod_log.caLog({ out: process.stderr });
 	caDbg.set('agg_log', agg_log);
@@ -81,37 +76,28 @@ function main()
 		caDbg.set('amqp_debug_log', dbg_log);
 	}
 
-	agg_amqp = new mod_caamqp.caAmqp({
-	    broker: agg_broker,
-	    exchange: mod_ca.ca_amqp_exchange,
-	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
-	    basename: mod_ca.ca_amqp_key_base_aggregator,
-	    hostname: agg_sysinfo.ca_hostname,
-	    bindings: [ mod_ca.ca_amqp_key_all ],
-	    log: agg_log
-	});
-	caDbg.set('agg_amqp', agg_amqp);
-	agg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError);
-	agg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError);
-
+	queue = mod_cap.ca_amqp_key_base_aggregator + agg_sysinfo.ca_hostname;
 	agg_cap = new mod_cap.capAmqpCap({
 	    dbglog: dbg_log,
-	    amqp: agg_amqp,
 	    log: agg_log,
+	    queue: queue,
 	    sysinfo: agg_sysinfo
 	});
+
 	caDbg.set('agg_cap', agg_cap);
-	agg_cap.on('msg-cmd-abort', mod_cap.caAbortRemote(agg_cap));
-	agg_cap.on('msg-cmd-ping', mod_cap.caPingRemote(agg_cap));
+	agg_cap.bind(mod_cap.ca_amqp_key_all);
+
 	agg_cap.on('msg-cmd-status', aggCmdStatus);
 	agg_cap.on('msg-cmd-enable_aggregation', aggCmdEnableAggregation);
 	agg_cap.on('msg-data', aggData);
 	agg_cap.on('msg-notify-configsvc_online', aggNotifyConfigRestarted);
+	agg_cap.on('msg-notify-config_reset', aggNotifyConfigReset);
 
 	agg_log.info('Aggregator starting up (%s/%s)', agg_name, agg_vers);
 	agg_log.info('%-12s %s', 'Hostname:', agg_sysinfo.ca_hostname);
-	agg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(agg_broker));
-	agg_log.info('%-12s %s', 'Routing key:', agg_amqp.routekey());
+	agg_log.info('%-12s %s', 'AMQP broker:',
+	    JSON.stringify(agg_cap.broker()));
+	agg_log.info('%-12s %s', 'Routing key:', queue);
 
 	aggInitBackends();
 
@@ -123,25 +109,25 @@ function main()
 	caDbg.set('agg_http', agg_http);
 
 	agg_http.start(function () {
-	    agg_http_port = agg_http.port();
-	    caDbg.set('agg_http_port', agg_http_port_base);
-	    agg_log.info('%-12s Port %d (started)',
-		'HTTP server:', agg_http_port);
-	    agg_amqp.start(aggStarted);
-	    setTimeout(aggTick, 1000);
+		agg_http_port = agg_http.port();
+		caDbg.set('agg_http_port', agg_http_port_base);
+		agg_log.info('%-12s Port %d (started)',
+		    'HTTP server:', agg_http_port);
+		agg_cap.on('connected', aggStarted);
+		agg_cap.start();
+		setTimeout(aggTick, 1000);
 	});
 }
 
 function aggNotifyConfig()
 {
-	agg_cap.sendNotifyAggOnline(mod_ca.ca_amqp_key_config, agg_http_port,
+	agg_cap.sendNotifyAggOnline(mod_cap.ca_amqp_key_config, agg_http_port,
 	    agg_transforms);
 }
 
 function aggStarted()
 {
 	agg_log.info('AMQP broker connected.');
-	/* XXX should we send this periodically too?  every 5 min or whatever */
 	aggNotifyConfig();
 }
 
@@ -294,15 +280,20 @@ function aggDataFutureCheck(hostname, datatime, now)
 	return (false);
 }
 
+function aggNotifyConfigRestarted()
+{
+	agg_log.info('config service restarted');
+	aggNotifyConfig();
+}
+
 /*
  * Invoked when the configuration service restarts.  Because instrumentations
  * are not yet persistent, we drop all the data we have and start again.
  */
-function aggNotifyConfigRestarted()
+function aggNotifyConfigReset()
 {
+	agg_log.info('config reset');
 	agg_insts = {};
-	agg_log.info('config service restarted');
-	aggNotifyConfig();
 }
 
 function aggHttpRouter(server)
@@ -331,11 +322,9 @@ function aggAdminStatus()
 	start = new Date().getTime();
 
 	ret = {};
-	ret['amqp_broker'] = agg_broker;
-	ret['amqp_routekey'] = agg_amqp.routekey();
 	ret['heap'] = process.memoryUsage();
 	ret['http'] = agg_http.info();
-	ret['amqp'] = agg_amqp.info();
+	ret['amqp_cap'] = agg_cap.info();
 	ret['sysinfo'] = agg_sysinfo;
 	ret['started'] = agg_start;
 	ret['uptime'] = start - agg_start;

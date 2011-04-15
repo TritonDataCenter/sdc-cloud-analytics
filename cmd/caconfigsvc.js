@@ -10,7 +10,6 @@ var mod_sys = require('sys');
 var ASSERT = require('assert');
 
 var mod_ca = require('../lib/ca/ca-common');
-var mod_caamqp = require('../lib/ca/ca-amqp');
 var mod_cainst = require('../lib/ca/ca-inst');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
 var mod_cahttp = require('../lib/ca/ca-http');
@@ -23,17 +22,16 @@ var mod_metric = require('../lib/ca/ca-metric');
 var HTTP = require('../lib/ca/http-constants');
 
 var cfg_http;			/* http server */
-var cfg_amqp;			/* AMQP handle */
 var cfg_cap;			/* camqp CAP wrapper */
 var cfg_log;			/* log handle */
 var cfg_factory;		/* instrumentation factory */
 var cfg_mapi;			/* mapi config */
-var cfg_broker;			/* AMQP broker config */
 var cfg_sysinfo;		/* system config */
 var cfg_mdmgr;			/* metadata manager */
 var cfg_profiles;		/* profile manager */
 var cfg_profile_customer;	/* customer profile */
 var cfg_profile_operator;	/* operator profile */
+var cfg_started;		/* configsvc has started */
 
 var cfg_name = 'configsvc';			/* component name */
 var cfg_vers = '0.0';				/* component version */
@@ -75,7 +73,7 @@ var cfg_global_insts = {};	/* global (non-customer) insts */
 
 function main()
 {
-	var mapi, request_log, dbg_log;
+	var mapi, request_log, dbg_log, queue;
 
 	cfg_start = new Date().getTime();
 
@@ -98,8 +96,6 @@ function main()
 	caDbg.set('cfg_sysinfo', cfg_sysinfo);
 	cfg_log = new mod_log.caLog({ out: process.stderr });
 	caDbg.set('cfg_log', cfg_log);
-	cfg_broker = mod_ca.caBroker();
-	caDbg.set('cfg_broker', cfg_broker);
 	cfg_mapi = mod_ca.caMapiConfig();
 	caDbg.set('cfg_mapi', cfg_mapi);
 	cfg_metrics = new mod_metric.caMetricSet();
@@ -122,31 +118,23 @@ function main()
 		caDbg.set('http_request_log', request_log);
 	}
 
-	cfg_amqp = new mod_caamqp.caAmqp({
-	    broker: cfg_broker,
-	    exchange: mod_ca.ca_amqp_exchange,
-	    exchange_opts: mod_ca.ca_amqp_exchange_opts,
-	    basename: mod_ca.ca_amqp_key_base_config,
-	    hostname: cfg_sysinfo.ca_hostname,
-	    bindings: [ mod_ca.ca_amqp_key_config, mod_ca.ca_amqp_key_all ],
-	    log: cfg_log
-	});
-	caDbg.set('cfg_amqp', cfg_amqp);
-	cfg_amqp.on('amqp-error', mod_caamqp.caAmqpLogError(cfg_log));
-	cfg_amqp.on('amqp-fatal', mod_caamqp.caAmqpFatalError(cfg_log));
+	queue = mod_cap.ca_amqp_key_base_config + cfg_sysinfo.ca_hostname;
 
 	cfg_cap = new mod_cap.capAmqpCap({
 	    dbglog: dbg_log,
-	    amqp: cfg_amqp,
 	    log: cfg_log,
+	    queue: queue,
 	    sysinfo: cfg_sysinfo
 	});
+
 	caDbg.set('cfg_cap', cfg_cap);
-	cfg_cap.on('msg-cmd-abort', mod_cap.caAbortRemote(cfg_cap));
-	cfg_cap.on('msg-cmd-ping', mod_cap.caPingRemote(cfg_cap));
+	cfg_cap.bind(mod_cap.ca_amqp_key_config);
+	cfg_cap.bind(mod_cap.ca_amqp_key_all);
+
 	cfg_cap.on('msg-cmd-status', cfgCmdStatus);
 	cfg_cap.on('msg-notify-aggregator_online', cfgNotifyAggregatorOnline);
 	cfg_cap.on('msg-notify-configsvc_online', mod_ca.caNoop);
+	cfg_cap.on('msg-notify-config_reset', mod_ca.caNoop);
 	cfg_cap.on('msg-notify-instrumenter_online',
 	    cfgNotifyInstrumenterOnline);
 	cfg_cap.on('msg-notify-log', cfgNotifyLog);
@@ -162,8 +150,9 @@ function main()
 
 	cfg_log.info('Config service starting up (%s/%s)', cfg_name, cfg_vers);
 	cfg_log.info('%-12s %s', 'Hostname:', cfg_sysinfo.ca_hostname);
-	cfg_log.info('%-12s %s', 'AMQP broker:', JSON.stringify(cfg_broker));
-	cfg_log.info('%-12s %s', 'Routing key:', cfg_amqp.routekey());
+	cfg_log.info('%-12s %s', 'AMQP broker:',
+	    JSON.stringify(cfg_cap.broker()));
+	cfg_log.info('%-12s %s', 'Routing key:', queue);
 	cfg_log.info('%-12s Port %d', 'HTTP server:', cfg_http_port);
 
 	if (cfg_mapi) {
@@ -187,16 +176,15 @@ function main()
 	    uri_base: cfg_http_baseuri,
 	    mapi: mapi
 	});
+
 	caDbg.set('cfg_factory', cfg_factory);
 
 	cfgProfileInit(function () {
-		cfg_amqp.start(function () {
-			cfg_log.info('AMQP broker connected.');
+		cfg_http.start(function () {
+			cfg_log.info('HTTP server started.');
 
-			cfg_http.start(function () {
-				cfg_log.info('HTTP server started.');
-				cfgStarted();
-			});
+			cfg_cap.on('connected', cfgStarted);
+			cfg_cap.start();
 		});
 	});
 }
@@ -204,7 +192,7 @@ function main()
 /*
  * Loads profiles.  We first load metadata, then load profiles from that.
  */
-function cfgProfileInit()
+function cfgProfileInit(callback)
 {
 	cfg_mdmgr = new mod_md.caMetadataManager(cfg_log, './metadata');
 	caDbg.set('cfg_mdmgr', cfg_mdmgr);
@@ -231,14 +219,7 @@ function cfgProfileInit()
 			throw (new Error('operator profile not found'));
 		}
 
-		cfg_amqp.start(function () {
-			cfg_log.info('AMQP broker connected.');
-
-			cfg_http.start(function () {
-				cfg_log.info('HTTP server started.');
-				cfgStarted();
-			});
-		});
+		callback();
 	});
 }
 
@@ -255,8 +236,14 @@ function cfgRequestProfileSet(request)
 
 function cfgStarted()
 {
-	cfg_cap.sendNotifyCfgOnline(mod_ca.ca_amqp_key_all);
-	setTimeout(cfgReaper, cfg_reaper_interval);
+	cfg_log.info('AMQP broker connected.');
+	cfg_cap.sendNotifyCfgOnline(mod_cap.ca_amqp_key_all);
+
+	if (!cfg_started) {
+		cfg_started = true;
+		cfg_cap.sendNotifyCfgReset(mod_cap.ca_amqp_key_all);
+		setTimeout(cfgReaper, cfg_reaper_interval);
+	}
 }
 
 /*
@@ -397,11 +384,9 @@ function cfgAdminStatus(callback, recurse, timeout)
 
 	nrequests = 1;
 	ret = {};
-	ret['amqp_broker'] = cfg_broker;
-	ret['amqp_routekey'] = cfg_amqp.routekey();
 	ret['heap'] = process.memoryUsage();
 	ret['http'] = cfg_http.info();
-	ret['amqp'] = cfg_amqp.info();
+	ret['amqp_cap'] = cfg_cap.info();
 	ret['sysinfo'] = cfg_sysinfo;
 	ret['started'] = cfg_start;
 	ret['uptime'] = start - cfg_start;

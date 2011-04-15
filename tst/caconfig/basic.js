@@ -7,6 +7,7 @@ var mod_querystring = require('querystring');
 var ASSERT = require('assert');
 
 var mod_ca = require('../../lib/ca/ca-common');
+var mod_cap = require('../../lib/ca/ca-amqp-cap');
 var mod_tl = require('../../lib/tst/ca-test');
 var HTTP = require('../../lib/ca/http-constants');
 
@@ -222,7 +223,7 @@ function setup()
 	http = new mod_tl.ctHttpRequester(http_port);
 	instrumenter = new mod_tl.ctDummyInstrumenter();
 	aggregator = new mod_tl.ctDummyAggregator();
-	mod_tl.ctWaitForAmqpService(mod_ca.ca_amqp_key_config, function () {
+	mod_tl.ctWaitForAmqpService(mod_cap.ca_amqp_key_config, function () {
 		instrumenter.start(function () {
 			aggregator.start(mod_tl.advance);
 		});

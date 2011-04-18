@@ -57,6 +57,7 @@ function main()
 
 	ins_cap = new mod_cap.capAmqpCap({
 	    dbglog: dbg_log,
+	    keepalive: true,
 	    log: ins_log,
 	    queue: queue,
 	    sysinfo: sysinfo

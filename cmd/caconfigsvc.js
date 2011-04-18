@@ -122,6 +122,7 @@ function main()
 
 	cfg_cap = new mod_cap.capAmqpCap({
 	    dbglog: dbg_log,
+	    keepalive: true,
 	    log: cfg_log,
 	    queue: queue,
 	    sysinfo: cfg_sysinfo

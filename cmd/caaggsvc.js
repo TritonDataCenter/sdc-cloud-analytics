@@ -79,6 +79,7 @@ function main()
 	queue = mod_cap.ca_amqp_key_base_aggregator + agg_sysinfo.ca_hostname;
 	agg_cap = new mod_cap.capAmqpCap({
 	    dbglog: dbg_log,
+	    keepalive: true,
 	    log: agg_log,
 	    queue: queue,
 	    sysinfo: agg_sysinfo

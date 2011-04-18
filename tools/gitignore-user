@@ -4,7 +4,12 @@
 # it.  These patterns can't just be put in the repository's gitignore file
 # because git won't check that for our submodules' directories.
 #
+*.pyc
+*.o
 *.node
 .*.swp
-.lock-wscript
+cscope.*
 build
+deps/node-install
+.lock-wscript
+lib/ca/errno.js

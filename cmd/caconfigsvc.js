@@ -512,7 +512,7 @@ function cfgHttpAdminStatus(request, response)
 		if (!(ex instanceof caValidationError))
 			throw (ex);
 
-		response.send(HTTP.EBADREQUEST, ex);
+		response.sendError(ex);
 		return;
 	}
 
@@ -661,24 +661,20 @@ function cfgHttpInstCreate(request, response)
 		if (ninstns == cfg_instn_max_peruser) {
 			cfg_log.warn('user %s attempted to exceed max # of ' +
 			    'instrumentations allowed', custid);
-			response.send(HTTP.EBADREQUEST, {
-			    error: caSprintf('only %d instrumentations allowed',
-			    cfg_instn_max_peruser)
-			});
+			response.sendError(new caValidationError(
+			    caSprintf('only %d instrumentations allowed',
+			    cfg_instn_max_peruser)));
 			return;
 		}
 	}
 
 	pset = cfgRequestProfileSet(request).intersection(cfg_metrics);
 	cfg_factory.create(custid, props, pset, function (err, resp) {
-		var headers, code, inst;
+		var headers, inst;
 
 		if (err) {
 			cfg_log.error('failed to create instn: %r', err);
-			code = err instanceof caError &&
-			    err.code() == ECA_INVAL ? HTTP.EBADREQUEST :
-			    HTTP.ESERVER;
-			response.send(code, { error: err.message });
+			response.sendError(err);
 			return;
 		}
 
@@ -764,8 +760,8 @@ function cfgHttpInstSetProperties(request, response)
 	inst.last = new Date();
 	cfg_factory.setProperties(inst.inst, props, function (err) {
 		if (err)
-			return (response.send(
-			    HTTP.EBADREQUEST, { error: err.message }));
+			return (response.sendError(err));
+
 		return (response.send(HTTP.OK, inst.inst.properties()));
 	});
 }

@@ -430,7 +430,7 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 		if (!(ex instanceof caValidationError))
 			throw (ex);
 
-		response.send(HTTP.EBADREQUEST, { error: ex.message });
+		response.sendError(ex);
 		return;
 	}
 
@@ -754,7 +754,7 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 		if (!(ex instanceof caValidationError))
 			throw (ex);
 
-		response.send(HTTP.EBADREQUEST, { error: ex.message });
+		response.sendError(ex);
 		return;
 	}
 
@@ -865,7 +865,7 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 		if (!(ex instanceof caValidationError))
 			throw (ex);
 
-		response.send(HTTP.EBADREQUEST, { error: ex.message });
+		response.sendError(ex);
 		return;
 	}
 

@@ -25,6 +25,8 @@ function assertError(obj)
 {
 	ASSERT.ok(obj.constructor == Object);
 	ASSERT.ok('error' in obj);
+	ASSERT.ok('code' in obj['error']);
+	ASSERT.ok('message' in obj['error']);
 }
 
 /*
@@ -101,43 +103,43 @@ function check_instrumentation(test, code, response, rv)
 var http_test_cases = [ {
 	name: 'missing required "stat" field',
 	input: { module: 'test_module' },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'missing required "module" field',
 	input: { stat: 'test_module' },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'invalid module name',
 	input: { module: 'test_module_wrong', stat: 'ops1' },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'invalid stat name',
 	input: { module: 'test_module', stat: 'ops2' },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'invalid module type',
 	input: { module: {}, stat: 'ops1' },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'invalid stat type',
 	input: { module: 'test_module', stat: {} },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'illegal predicate: invalid key',
 	input: { module: 'test_module', stat: 'ops1', predicate: { junk: [] } },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'illegal predicate: too few args to "eq"',
 	input: { module: 'test_module', stat: 'ops1', predicate: { eq: [] } },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'illegal predicate: wrong type',
 	input: { module: 'test_module', stat: 'ops1', predicate: 'blah' },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'illegal decomposition: illegal field',
 	input: { module: 'test_module', stat: 'ops1', decomposition: ['junk'] },
-	error: HTTP.EBADREQUEST
+	error: HTTP.ECONFLICT
 }, {
 	name: 'create with simple metric',
 	input: { module: 'test_module', stat: 'ops1' },
@@ -240,7 +242,6 @@ function check_global_uris()
 	/* /junk should not exist. */
 	http.sendEmpty('GET', '/junk', true, function (err, response, rv) {
 		ASSERT.ok(response.statusCode == HTTP.ENOTFOUND);
-		assertError(rv);
 		check_stage_done();
 	});
 
@@ -298,7 +299,7 @@ function check_global_uris()
 
 	/* Cannot POST with no data */
 	http.sendEmpty('POST', url_create, true, function (err, response, rv) {
-		ASSERT.equal(response.statusCode, HTTP.EBADREQUEST);
+		ASSERT.equal(response.statusCode, HTTP.ECONFLICT);
 		assertError(rv);
 		check_stage_done();
 	});
@@ -306,7 +307,6 @@ function check_global_uris()
 	/* Cannot PUT to create */
 	http.sendEmpty('PUT', url_create, true, function (err, response, rv) {
 		ASSERT.equal(response.statusCode, HTTP.ENOTFOUND);
-		assertError(rv);
 		check_stage_done();
 	});
 }

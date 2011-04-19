@@ -19,6 +19,7 @@ var agg_vers = '0.0';			/* component version */
 var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
 var agg_http_baseuri = '/ca/';
 var agg_http_port_base = mod_ca.ca_http_port_agg_base;
+var agg_http_ipaddr = '127.0.0.1';	/* HTTP server address */
 var agg_http_port;			/* actual http port */
 var agg_profile = false;
 
@@ -122,8 +123,8 @@ function main()
 
 function aggNotifyConfig()
 {
-	agg_cap.sendNotifyAggOnline(mod_cap.ca_amqp_key_config, agg_http_port,
-	    agg_transforms);
+	agg_cap.sendNotifyAggOnline(mod_cap.ca_amqp_key_config,
+	    agg_http_ipaddr, agg_http_port, agg_transforms);
 }
 
 function aggStarted()

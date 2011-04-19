@@ -794,7 +794,7 @@ function cfgHttpInstValue(request, response)
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst, port;
+	var inst, aggr, ipaddr, port;
 
 	if (!(fqid in cfg_insts)) {
 		response.send(HTTP.ENOTFOUND);
@@ -803,9 +803,13 @@ function cfgHttpInstValue(request, response)
 
 	inst = cfg_insts[fqid];
 	inst.last = new Date();
-	port = inst.inst.aggregator().cag_http_port;
+
+	aggr = inst.inst.aggregator();
+	ipaddr = aggr.cag_http_ipaddr;
+	port = aggr.cag_http_port;
 	ASSERT.ok(port);
-	mod_cahttp.caHttpForward(request, response, '127.0.0.1', port, cfg_log);
+
+	mod_cahttp.caHttpForward(request, response, ipaddr, port, cfg_log);
 }
 
 /*
@@ -848,7 +852,7 @@ function cfgCmdStatus(msg)
  */
 function cfgNotifyAggregatorOnline(msg)
 {
-	var id, agg, action, trans;
+	var id, agg, action, trans, ipaddr;
 
 	if (!('ag_http_port' in msg)) {
 		cfg_log.warn('ignoring aggonline msg with no port: %j', msg);
@@ -871,6 +875,8 @@ function cfgNotifyAggregatorOnline(msg)
 		agg.cag_insts = {};
 	}
 
+	ipaddr = ('ag_http_ipaddr' in msg) ? msg.ag_http_ipaddr : '127.0.0.1';
+
 	agg.cag_hostname = msg.ca_hostname;
 	agg.cag_routekey = msg.ca_source;
 	agg.cag_agent_name = msg.ca_agent_name;
@@ -878,6 +884,7 @@ function cfgNotifyAggregatorOnline(msg)
 	agg.cag_os_name = msg.ca_os_name;
 	agg.cag_os_release = msg.ca_os_release;
 	agg.cag_os_revision = msg.ca_os_revision;
+	agg.cag_http_ipaddr = ipaddr;
 	agg.cag_http_port = msg.ag_http_port;
 	agg.cag_transformations = msg.ag_transformations;
 

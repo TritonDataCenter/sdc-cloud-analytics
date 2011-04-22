@@ -58,18 +58,19 @@ TST_DIR_NAME="tst"
 CURRENT_FAILURES=0
 
 #
-#Tests that passed
+# Tests that passed
 #
 CURRENT_PASSES=0
 
 #
-#Tests that could not run for some reason
-#
-CURRENT_ERRORS=0
-#
 # Total number of tests run
 #
 TESTS_RUN=0
+
+#
+# Number of tests skipped
+#
+TESTS_SKIPPED=0
 
 #
 # node relative path
@@ -177,16 +178,9 @@ function get-all-tests
 	[[ -d $tst_root ]] || fail "Cannot find test directory"
 	pushd $tst_root >/dev/null
 	tst_root=$(pwd)
-	TESTS=$(find . -name 'tst.*.*')
-	[[ "TESTS" != "" ]] || fail "Found no tests to run"
 	popd >/dev/null
-
-	tmp=""
-	# Convert to absolute paths
-	for t in $TESTS; do
-		tmp="$tst_root/$t $tmp"
-	done;
-	TESTS=$tmp
+	TESTS=$(find $tst_root -name 'tst*.js' -o -name 'tst*.sh')
+	[[ "TESTS" != "" ]] || fail "Found no tests to run"
 }
 
 function welcome
@@ -222,62 +216,52 @@ function execute-test
 	[[ $# -eq 1 ]] || fail "Missing test to execute"
 	test_path=$1
 	test_name=$(basename $1)
+	test_label=$(echo $test_path | sed -e s#^$SRC/##)
 	test_dir=$(dirname $1)
 	test_odir="$OUTPUT_DIR/test.$TESTS_RUN"
-	ext=$(echo $test_name | cut -d. -f 3)
+	ext=${test_name##*.}
+	reason=
 	EXEC=""
 
-	echo "Executing test $(echo $1 | sed -e s#^$SRC/tst/.#tst#) ... \c"
+	case "$ext" in
+	"sh") 	EXEC=$BASH_EXEC	;;
+	"js") 	EXEC=$NODE_EXEC ;;
+	*) 	echo "Skipping test $test_label (unknown type)"
+		((TESTS_SKIPPED++))
+		return 0
+		;;
+	esac
+
+	echo "Executing test $test_label ... \c"
 
 	mkdir "$test_odir" >/dev/null || fail "Can't make directory"
-
 	pushd "$test_dir" >/dev/null
-	case "$ext" in
-	"sh")
-		EXEC=$BASH_EXEC	
-		;;
-	"js")
-		EXEC=$NODE_EXEC
-		;;
-	*)
-		;;
-	esac
-	
-	if [ "$EXEC" == "" ]; then
-		printf ">>>Unsupported test type: %s\n\n" $ext
-		result=2
-	elif $EXEC $test_name >$test_odir/stdout 2>$test_odir/stderr; then
-		result=0
-	else
-		result=1
-	fi
-
+	$EXEC $test_name >$test_odir/$$.out 2>$test_odir/$$.err
+	execres=$?
 	popd > /dev/null
 
-	case "$result" in
-	0) 
-		echo "success."
-		mv $test_odir "$OUTPUT_DIR/success.$CURRENT_PASSES"
-		((CURRENT_PASSES++))
-		;;
-	1)
-		echo "FAILED."
-		printf ">>>Failure: details in failure.%d\n\n" $CURRENT_FAILURES
-		cp "$test_path" "$test_odir/$test_name"
-		mv "$test_odir" "$OUTPUT_DIR/failure.$CURRENT_FAILURES"
-		((CURRENT_FAILURES++))
-		;;
-	2)
-		echo "FAILED."
-		mv $test_odir "$OUTPUT_DIR/error.$CURRENT_ERRORS"
-		((CURRENT_ERRORS++))
-		;;
-	*)
-		 fail "Got unkown return value from execute-test"
-		;;
-	esac
+	if [[ $execres != 0 ]]; then
+		reason="test returned $execres instead of 0"
+	elif [[ -f $test_path.out ]] && \
+	    ! diff $test_path.out $test_odir/$$.out > /dev/null ; then
+		cp $test_path.out $test_odir/$test_name.out
+		reason="stdout mismatch"
+	fi
 
-	return $result
+	if [[ -z $reason ]]; then
+		echo "success."
+		mv "$test_odir" "$OUTPUT_DIR/success.$CURRENT_PASSES"
+		((CURRENT_PASSES++))
+		return;
+	fi
+
+	echo "FAILED."
+	echo "$test_path failed: $reason" > "$test_odir/README"
+	printf ">>> failure details in %s/failure.%d\n\n" \
+	    $OUTPUT_DIR $CURRENT_FAILURES
+	cp "$test_path" "$test_odir/$test_name"
+	mv "$test_odir" "$OUTPUT_DIR/failure.$CURRENT_FAILURES"
+	((CURRENT_FAILURES++))
 }
 
 #
@@ -289,7 +273,7 @@ function results
 	printf "Results:\n"
 	printf "\tTests passed:\t%2d/%2d\n" $CURRENT_PASSES $TESTS_RUN
 	printf "\tTests failed:\t%2d/%2d\n" $CURRENT_FAILURES $TESTS_RUN
-	printf "\tTests errored:\t%2d/%2d\n" $CURRENT_ERRORS $TESTS_RUN
+	printf "\tTests skipped:\t%2d/%2d\n" $TESTS_SKIPPED $TESTS_RUN
 	printf "\n===================================================\n"
 }
 
@@ -331,7 +315,7 @@ done
 shift $((OPTIND-1))
 
 if [ "$OPT_OUTPUT_DIR" == "" ]; then
-	usage "output-dir not specified"
+	OPT_OUTPUT_DIR="/var/tmp"
 fi
 
 if [ $# -eq 0 -a $OPT_RUN_ALL -eq 0 ]; then

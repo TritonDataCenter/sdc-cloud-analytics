@@ -11,7 +11,8 @@ var mod_tl = require('../../lib/tst/ca-test');
 var dataset = mod_caagg.caDatasetForInstrumentation({
 	'value-arity': mod_ca.ca_arity_scalar,
 	'value-dimension': 1,
-	'nsources': 2
+	'nsources': 2,
+	'granularity': 1
     });
 
 var source1 = 'source1';
@@ -157,3 +158,41 @@ mod_assert.equal(dataset.dataForTime(time2 + 1), 0);
 dataset.update(source1, time1, undefined);
 mod_assert.equal(dataset.nreporting(time1, 1), 1);
 mod_assert.equal(dataset.dataForTime(time1), 0);
+
+/* test granularity > 1 */
+dataset = mod_caagg.caDatasetForInstrumentation({
+	'value-arity': mod_ca.ca_arity_scalar,
+	'value-dimension': 1,
+	'nsources': 2,
+	'granularity': 10
+});
+
+/* initial state */
+mod_assert.equal(0, dataset.dataForTime(123450));
+
+/* data properly aligned */
+dataset.update(source1, 123450, 5);
+mod_assert.equal(0, dataset.dataForTime(123440));
+mod_assert.equal(5, dataset.dataForTime(123450));
+mod_assert.equal(0, dataset.dataForTime(123460));
+
+/* data not aligned */
+dataset.update(source1, 123449, 4);
+mod_assert.equal(4, dataset.dataForTime(123440));
+mod_assert.equal(5, dataset.dataForTime(123450));
+mod_assert.equal(0, dataset.dataForTime(123460));
+
+dataset.update(source1, 123451, 3);
+mod_assert.equal(4, dataset.dataForTime(123440));
+mod_assert.equal(8, dataset.dataForTime(123450));
+mod_assert.equal(0, dataset.dataForTime(123460));
+
+dataset.update(source1, 123459, 2);
+mod_assert.equal(4, dataset.dataForTime(123440));
+mod_assert.equal(10, dataset.dataForTime(123450));
+mod_assert.equal(0, dataset.dataForTime(123460));
+
+dataset.update(source1, 123460, 1);
+mod_assert.equal(4, dataset.dataForTime(123440));
+mod_assert.equal(10, dataset.dataForTime(123450));
+mod_assert.equal(1, dataset.dataForTime(123460));

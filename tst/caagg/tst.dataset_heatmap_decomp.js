@@ -9,7 +9,8 @@ var mod_tl = require('../../lib/tst/ca-test');
 
 var dataset = mod_caagg.caDatasetForInstrumentation({
 	'value-arity': mod_ca.ca_arity_numeric,
-	'value-dimension': 3
+	'value-dimension': 3,
+	'granularity': 1
     });
 
 var source1 = 'source1';
@@ -293,3 +294,41 @@ mod_assert.deepEqual(dataset.total(), total);
 dataset.update(source1, time1, undefined);
 mod_assert.equal(dataset.nreporting(time1, 1), 1);
 mod_assert.deepEqual(dataset.dataForTime(time1), {});
+
+
+/* granularity > 0 */
+dataset = mod_caagg.caDatasetForInstrumentation({
+    'value-arity': mod_ca.ca_arity_numeric,
+    'value-dimension': 3,
+    'granularity': 10
+});
+
+/* initial state */
+mod_assert.deepEqual({}, dataset.dataForTime(123450));
+
+/* data properly aligned */
+dataset.update(source1, 123450, { abe: [[[10, 20], 5 ]] });
+mod_assert.deepEqual({}, dataset.dataForTime(123440));
+mod_assert.deepEqual({ abe: [[[10, 20], 5 ]] }, dataset.dataForTime(123450));
+mod_assert.deepEqual({}, dataset.dataForTime(123460));
+
+/* data not aligned */
+dataset.update(source1, 123449, { abe: [[[10, 20], 4 ]] });
+mod_assert.deepEqual({ abe: [[[10, 20], 4 ]] }, dataset.dataForTime(123440));
+mod_assert.deepEqual({ abe: [[[10, 20], 5 ]] }, dataset.dataForTime(123450));
+mod_assert.deepEqual({}, dataset.dataForTime(123460));
+
+dataset.update(source1, 123451, { abe: [[[10, 20], 3 ]] });
+mod_assert.deepEqual({ abe: [[[10, 20], 4 ]] }, dataset.dataForTime(123440));
+mod_assert.deepEqual({ abe: [[[10, 20], 8 ]] }, dataset.dataForTime(123450));
+mod_assert.deepEqual({}, dataset.dataForTime(123460));
+
+dataset.update(source1, 123459, { abe: [[[10, 20], 2 ]] });
+mod_assert.deepEqual({ abe: [[[10, 20], 4 ]] }, dataset.dataForTime(123440));
+mod_assert.deepEqual({ abe: [[[10, 20], 10 ]] }, dataset.dataForTime(123450));
+mod_assert.deepEqual({}, dataset.dataForTime(123460));
+
+dataset.update(source1, 123460, { abe: [[[10, 20], 1 ]] });
+mod_assert.deepEqual({ abe: [[[10, 20], 4 ]] }, dataset.dataForTime(123440));
+mod_assert.deepEqual({ abe: [[[10, 20], 10 ]] }, dataset.dataForTime(123450));
+mod_assert.deepEqual({ abe: [[[10, 20], 1 ]] }, dataset.dataForTime(123460));

@@ -118,6 +118,29 @@ insDTraceMetric.prototype.deinstrument = function (callback)
 		callback();
 };
 
+insDTraceMetric.prototype.tick = function ()
+{
+	if (!this.cad_dtr)
+		return;
+
+	/*
+	 * We consume data at least once per second to check for errors as well
+	 * as to let DTrace know we're still alive.
+	 */
+	this.cad_dtr.consume(this.error.bind(this));
+};
+
+insDTraceMetric.prototype.error = function (probe, record)
+{
+	if (!record['data'])
+		return;
+
+	if (probe['module'] != 'dtrace' || probe['name'] != 'ERROR')
+		return;
+
+	insd_log.dbg('DTRACE ERROR: %j', record['data']);
+};
+
 insDTraceMetric.prototype.value = function ()
 {
 	var agg = {};

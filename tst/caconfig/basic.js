@@ -65,6 +65,7 @@ function check_instrumentation(test, code, response, rv)
 		decomp = [ decomp ];
 	pred = inp.predicate || {};
 	trans = inp.transformations || {};
+	exp = test.expect || {};
 
 	ASSERT.equal(response.statusCode, code);
 	assertNoError(rv);
@@ -72,7 +73,10 @@ function check_instrumentation(test, code, response, rv)
 	ASSERT.equal(rv['stat'], inp['stat']);
 	ASSERT.deepEqual(rv['decomposition'], decomp);
 	ASSERT.deepEqual(rv['predicate'], pred);
-	ASSERT.equal(rv['retention-time'], 600);
+	if (!('granularity' in exp))
+		ASSERT.equal(rv['granularity'], 1);
+	if (!('retention-time' in exp))
+		ASSERT.equal(rv['retention-time'], 600);
 	ASSERT.equal(rv['idle-max'], 3600);
 	ASSERT.equal(rv['enabled'], true);
 	ASSERT.deepEqual(rv['transformations'], trans);
@@ -83,10 +87,9 @@ function check_instrumentation(test, code, response, rv)
 	}).length == 1);
 	ASSERT.ok(rv['nsources'] === 1);
 
-	exp = test.expect || {};
 	for (key in test.expect) {
-		ASSERT.equal(rv[key], exp[key],
-		    'key ' + key + ' didn\'t match.');
+		ASSERT.equal(rv[key], exp[key], caSprintf(
+		    'error on key "%s": %j != %j', key, rv[key], exp[key]));
 	}
 }
 
@@ -141,9 +144,36 @@ var http_test_cases = [ {
 	input: { module: 'test_module', stat: 'ops1', decomposition: ['junk'] },
 	error: HTTP.ECONFLICT
 }, {
+	name: 'illegal granularity: not a number',
+	input: { module: 'test_module', stat: 'ops1', granularity: 'foo' },
+	error: HTTP.ECONFLICT
+}, {
+	name: 'illegal granularity: zero',
+	input: { module: 'test_module', stat: 'ops1', granularity: '0' },
+	error: HTTP.ECONFLICT
+}, {
+	name: 'illegal granularity: not a multiple of 5',
+	input: { module: 'test_module', stat: 'ops1', granularity: '11' },
+	error: HTTP.ECONFLICT
+}, {
+	name: 'illegal granularity: too long a retention-time',
+	input: { module: 'test_module', stat: 'ops1', granularity: '1',
+	    'retention-time': 3601 },
+	error: HTTP.ECONFLICT
+}, {
+	name: 'granularity: truncated to an integer',
+	input: { module: 'test_module', stat: 'ops1', granularity: '10.5' },
+	expect: { 'granularity': 10 }
+}, {
+	name: 'large granularity and long retention time',
+	input: { module: 'test_module', stat: 'ops1', granularity: '10',
+	    'retention-time': 3601 },
+	expect: { 'granularity': 10, 'retention-time': 3601 }
+}, {
 	name: 'create with simple metric',
 	input: { module: 'test_module', stat: 'ops1' },
-	expect: { 'value-dimension': 1, 'value-arity': 'scalar' }
+	expect: { 'value-dimension': 1, 'value-arity': 'scalar',
+	    'granularity': 1 }
 }, {
 	name: 'create with single discrete decomposition',
 	input: { module: 'test_module', stat: 'ops1',

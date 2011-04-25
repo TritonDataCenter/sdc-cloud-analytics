@@ -14,6 +14,7 @@ var mod_metric = require('../lib/ca/ca-metric');
 
 var ins_name = 'instsvc';	/* component name */
 var ins_vers = '0.0';		/* component version */
+var ins_granularity_max = mod_ca.ca_granularity_min;
 
 var ins_iid;			/* interval timer id */
 var ins_insts = {};		/* active instrumentations by id */
@@ -156,7 +157,20 @@ insBackendInterface.prototype.metadata = function ()
  *				specified metric.  Invoke the specified callback
  *				when deinstrumentation is complete.
  *
- *	value():		Retrieve the current value of the metric.
+ *	value():		Retrieve the current value of the metric.  The
+ *				returned data describes the events since the
+ *				last value was reported.  This method will be
+ *				invoked at a frequency determined by the
+ *				granularity of the instrumentation.  If
+ *				granularity is 1 second, this method will be
+ *				invoked once per second.  If granularity is 60
+ *				seconds, this will only be invoked once per
+ *				minute.
+ *
+ *	tick():			If specified, tick() is invoked once per
+ *	[optional]		second.  This is useful for backends that must
+ *				consume data once per second, even when the
+ *				granularity is less frequent than that.
  */
 insBackendInterface.prototype.registerMetric = function (args)
 {
@@ -294,24 +308,45 @@ var ins_last;
 
 function insTick()
 {
-	var id, when, value;
+	var id, when, whenms, instn, value;
 
-	when = new Date().getTime();
+	whenms = new Date().getTime();
+	when = Math.floor(whenms / 1000);
 
 	/*
 	 * If for some reason we get invoked multiple times within the same
 	 * second, we ignore the subsequent invocations to avoid confusing the
 	 * aggregator.
 	 */
-	if (ins_last &&
-	    Math.floor(when / 1000) == Math.floor(ins_last / 1000))
+	if (ins_last && ins_last == when)
 		return;
 
 	for (id in ins_insts) {
-		value = ins_insts[id].is_impl.value();
+		instn = ins_insts[id];
+
+		if (instn.is_impl.tick)
+			instn.is_impl.tick();
+
+		/*
+		 * For granularity > 1, we only want to report data on the exact
+		 * second that we're supposed to, so we just check that the
+		 * granularity divides the current time.  It's possible that for
+		 * whatever reason we fail to run at that second (perhaps
+		 * because the system is handling higher priority work for that
+		 * full second), in which case we'd miss reporting the data
+		 * point.  That's why we cap granularity at some small number of
+		 * seconds: so the impact of a single missed data point is
+		 * small.
+		 */
+		if (when % instn.is_granularity !== 0)
+			continue;
+
+		value = instn.is_impl.value();
+
 		if (value === undefined)
 			ins_log.warn('undefined value from inst %s', id);
-		ins_cap.sendData(ins_insts[id].is_inst_key, id, value, when);
+
+		ins_cap.sendData(ins_insts[id].is_inst_key, id, value, whenms);
 	}
 
 	ins_last = when;
@@ -375,7 +410,7 @@ function insImplSupportsFields(impl, fields)
 function insCmdEnable(msg)
 {
 	var destkey = msg.ca_source;
-	var id, basemetric, impl, impls, inst, ii;
+	var id, basemetric, impl, impls, inst, ii, granularity;
 
 	if (!('is_inst_id' in msg) || !('is_module' in msg) ||
 	    !('is_stat' in msg) || !('is_predicate' in msg) ||
@@ -421,7 +456,36 @@ function insCmdEnable(msg)
 
 	impl = impls[ii];
 
+	granularity = 'is_granularity' in msg ? msg.is_granularity : 1;
+	if (typeof (granularity) != typeof (0) ||
+	    Math.floor(granularity) != granularity ||
+	    granularity < 1) {
+		ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
+		    'unsupported value for "is_granularity"', id);
+		return;
+	}
+
+	/*
+	 * We never want to accumulate more than N seconds worth of state
+	 * inside the instrumenter itself, so we cap the granularity at N
+	 * seconds so that we report data at least that often even if the
+	 * aggregator will only be aggregating up.  We require that
+	 * granularities greater than this be evenly divided by this so that the
+	 * aggregator can easily aggregate these values over time.
+	 */
+	if (granularity > ins_granularity_max) {
+		if (granularity % ins_granularity_max != 0) {
+			ins_cap.sendCmdAckEnableInstFail(destkey, msg.ca_id,
+			    'granularity must be a multiple of ' +
+			    ins_granularity_max, id);
+			return;
+		}
+
+		granularity = ins_granularity_max;
+	}
+
 	inst = {};
+	inst.is_granularity = granularity;
 	inst.is_module = msg.is_module;
 	inst.is_stat = msg.is_stat;
 	inst.is_predicate = mod_ca.caDeepCopy(msg.is_predicate);

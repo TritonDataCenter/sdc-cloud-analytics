@@ -32,11 +32,13 @@ function stack4()
  * that they appear in the stacktrace.
  */
 setTimeout(function () {
-	var exn;
+	var exn, re;
+
+	re = new RegExp(process.env['SRC'], 'g');
 
 	exn = stack1(stack2);
-	console.log(caSprintf('%r', exn));
+	console.log(caSprintf('%r', exn).replace(re, '...'));
 
 	exn = stack1(stack4);
-	console.log(caSprintf('%r', exn));
+	console.log(caSprintf('%r', exn).replace(re, '...'));
 }, 0);

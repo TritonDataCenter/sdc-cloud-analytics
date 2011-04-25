@@ -706,7 +706,7 @@ function cfgHttpInstReadProps(request)
 
 	props = {};
 	fields = [ 'module', 'stat', 'predicate', 'decomposition', 'enabled',
-	    'retention-time', 'idle-max' ];
+	    'retention-time', 'idle-max', 'granularity' ];
 
 	for (ii = 0; ii < fields.length; ii++) {
 		if (fields[ii] in actuals)

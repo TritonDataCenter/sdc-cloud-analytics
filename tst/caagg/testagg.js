@@ -24,7 +24,7 @@ var mod_tl = require('../../lib/tst/ca-test');
 /*
  * Timeout if we don't succeed.
  */
-mod_tl.ctSetTimeout(100*500);
+mod_tl.ctSetTimeout(50 * 1000);
 
 
 /*
@@ -523,6 +523,7 @@ var enableAgg = function (source)
 	    'enabled': true,
 	    'retention-time': 600,
 	    'nsources': nsources,
+	    'granularity': 1,
 	    transformations: []
 	};
 	mod_tl.ctStdout.info('Sending enable agg message: %j', inst);

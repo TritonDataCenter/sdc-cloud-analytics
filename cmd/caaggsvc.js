@@ -205,7 +205,7 @@ function aggCmdStatus(msg)
 function aggData(msg)
 {
 	var id, time, hostname, value, now;
-	var inst, dataset, rq, ii;
+	var inst, dataset, interval, rq, ii;
 
 	id = msg.d_inst_id;
 	time = msg.d_time;
@@ -238,7 +238,8 @@ function aggData(msg)
 	if (inst.agi_last < time)
 		inst.agi_last = time;
 
-	inst.agi_dataset.update(hostname, time, value);
+	dataset = inst.agi_dataset;
+	dataset.update(hostname, time, value);
 
 	/*
 	 * If we have all the data we're expecting for this time index, wake up
@@ -249,7 +250,8 @@ function aggData(msg)
 	 * data from all instrumenters for this time, we won't some time later
 	 * get data from any of them for some previous time index.
 	 */
-	dataset = inst.agi_dataset;
+	interval = dataset.normalizeInterval(time, time);
+	time = interval['start_time'];
 	ASSERT.ok(dataset.nreporting(time) <= dataset.nsources(),
 	    caSprintf('nreporting: %d, nsources: %d', dataset.nreporting(time),
 	    dataset.nsources()));
@@ -261,8 +263,8 @@ function aggData(msg)
 
 		if (rq.datatime + rq.duration <= time) {
 			inst.agi_requests.splice(ii--, 1);
-			rq.callback(id, rq.datatime, rq.request, rq.response,
-			    now - rq.rqtime);
+			rq.callback(id, rq.datatime, rq.duration,
+			    rq.request, rq.response, now - rq.rqtime);
 		}
 	}
 }
@@ -395,7 +397,7 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 	var custid = request.params['custid'];
 	var instid = request.params['instid'];
 	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst, dataset, now, start, duration, since;
+	var inst, dataset, interval, now, start, duration, since;
 
 	if (!(fqid in agg_insts)) {
 		response.send(HTTP.ENOTFOUND);
@@ -405,6 +407,7 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 	inst = agg_insts[fqid];
 	now = new Date().getTime();
 	since = inst.agi_since.getTime();
+	dataset = inst.agi_dataset;
 
 	try {
 		start = mod_ca.caHttpParam(aggValueParams, request.ca_params,
@@ -421,7 +424,8 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 			duration = default_duration;
 
 		if (start === undefined)
-			start = parseInt(now / 1000, 10) - duration - 1;
+			start = parseInt(now / 1000, 10) - duration -
+			    inst.agi_instrumentation['granularity'];
 		else if ((start + duration) * 1000 > now + agg_http_req_timeout)
 			throw (new caValidationError(
 			    'start_time + duration is in the future'));
@@ -435,11 +439,14 @@ function aggHttpValueCommon(request, response, callback, default_duration,
 		return;
 	}
 
-	dataset = inst.agi_dataset;
+	interval = dataset.normalizeInterval(start, duration);
+	start = interval['start_time'];
+	duration = interval['duration'];
+
 	if ((start + duration) * 1000 < since ||
-	    dataset.nreporting(start + duration - 1) >=
-	    aggExpected(dataset, start + duration - 1)) {
-		callback(fqid, start, request, response, 0);
+	    dataset.nreporting(start + duration) >=
+	    aggExpected(dataset, start + duration)) {
+		callback(fqid, start, duration, request, response, 0);
 		return;
 	}
 
@@ -488,18 +495,21 @@ function aggHttpValueRaw(request, response)
 	aggHttpValueCommon(request, response, aggHttpValueRawDone, 1, true);
 }
 
-function aggHttpValueRawDone(id, when, request, response, delay)
+function aggHttpValueRawDone(id, start, duration, request, response, delay)
 {
 	var inst = agg_insts[id];
 	var dataset = inst.agi_dataset;
 	var ret, keys, transform;
 
+	ASSERT.ok(duration ==
+	    dataset.normalizeInterval(start, 1)['duration']);
+
 	ret = {};
-	ret.duration = 1;
-	ret.start_time = when;
+	ret.duration = duration;
+	ret.start_time = start;
 	ret.nsources = dataset.nsources();
-	ret.value = dataset.dataForTime(when);
-	ret.minreporting = dataset.nreporting(when);
+	ret.value = dataset.dataForTime(start);
+	ret.minreporting = dataset.nreporting(start);
 
 	keys = (typeof (ret.value) == 'object' &&
 	    ret.value.constructor == Object) ?  Object.keys(ret.value) : [];
@@ -716,9 +726,10 @@ function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 	return (conf);
 }
 
-function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
+function aggHttpValueHeatmapImageDone(id, start, duration, request, response,
+    delay)
 {
-	var conf, duration, selected, isolate, exclude, rainbow;
+	var conf, selected, isolate, exclude, rainbow;
 	var inst, dataset, datasets, count;
 	var ii, ret, transforms, buffer, png;
 	var param = function (formals, key) {
@@ -731,7 +742,6 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 	dataset = inst.agi_dataset;
 
 	try {
-		duration = param(aggValueParams, 'duration') || 60;
 		selected = param(aggValueHeatmapParams, 'selected');
 		isolate = param(aggValueHeatmapParams, 'isolate');
 		exclude = param(aggValueHeatmapParams, 'exclude');
@@ -834,9 +844,10 @@ function aggHttpValueHeatmapImageDone(id, start, request, response, delay)
 		agg_log.dbg('%s', tk);
 }
 
-function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
+function aggHttpValueHeatmapDetailsDone(id, start, duration, request, response,
+    delay)
 {
-	var inst, conf, detconf, duration, xx, yy;
+	var inst, conf, detconf, xx, yy;
 	var dataset, range, present, ii, ret, value;
 	var param = function (formals, key) {
 		return (mod_ca.caHttpParam(formals, request.ca_params, key));
@@ -846,7 +857,6 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
 	dataset = inst.agi_dataset;
 
 	try {
-		duration = param(aggValueParams, 'duration') || 60;
 		conf = aggHttpHeatmapConf(request, start, duration, false, 0);
 		xx = param(aggValueHeatmapParams, 'x');
 		yy = param(aggValueHeatmapParams, 'y');
@@ -958,8 +968,14 @@ function aggHttpValueHeatmapDetailsDone(id, start, request, response, delay)
  */
 function aggExpected(dataset, time)
 {
-	return (dataset.maxreporting(time - agg_http_req_timeout / 1000 -
-	    agg_recent_interval / 1000, agg_recent_interval / 1000));
+	var start, duration, interval;
+
+	start = time - agg_http_req_timeout / 1000 - agg_recent_interval / 1000;
+	duration = agg_recent_interval / 1000;
+	interval = dataset.normalizeInterval(start, duration);
+
+	return (dataset.maxreporting(
+	    interval['start_time'], interval['duration']));
 }
 
 /*
@@ -980,8 +996,8 @@ function aggTick()
 
 			if (now - rq.rqtime >= agg_http_req_timeout) {
 				inst.agi_requests.splice(ii--, 1);
-				rq.callback(id, rq.datatime, rq.request,
-				    rq.response, now - rq.rqtime);
+				rq.callback(id, rq.datatime, rq.duration,
+				    rq.request, rq.response, now - rq.rqtime);
 			}
 		}
 

@@ -34,6 +34,7 @@ JSSTYLE		 = $(TOOLSDIR)/jsstyle
 CAPROF		 = node $(TOOLSDIR)/caprof.js
 CAMCHK		 = node $(TOOLSDIR)/camchk.js > /dev/null
 CAMD		 = node $(TOOLSDIR)/camd.js
+JSONCHK		 = node $(TOOLSDIR)/jsonchk.js
 XMLLINT		 = xmllint --noout
 TAR		 = tar
 RMTREE		 = rm -rf
@@ -60,6 +61,7 @@ TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
 METADATA_FILES		:= $(shell find metadata -name '*.json')
 METAD_FILES		:= $(shell find $(METAD_DIR) -name '*.js')
 SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
+JSON_FILES		:= $(shell find pkg -name '*.json')
 
 SMF_MANIFESTS = \
 	smf/manifest/caconfigsvc.xml			\
@@ -264,7 +266,13 @@ check-jsl-web: $(WEBJS_FILES)
 check-jsstyle: $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
 
-check: check-metadata check-metad check-shell check-manifests check-jsstyle check-jsl
+check-json: $(JSON_FILES:%=%.check)
+
+%.json.check: %.json
+	$(JSONCHK) $<
+
+check: check-metadata check-metad check-shell check-manifests check-jsstyle \
+    check-jsl check-json
 	@echo check okay
 
 #

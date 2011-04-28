@@ -10,7 +10,7 @@ tr_tmpdir=/var/tmp/$(basename $0).$$
 
 function runtest
 {
-	local func arg rv
+	local func arg
 	func=$1
 	arg=$2
 

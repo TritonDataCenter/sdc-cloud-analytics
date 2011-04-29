@@ -34,26 +34,27 @@ function check_and_fill(err)
 {
 	var metadata;
 
+	ASSERT(!err, caSprintf('unexpected error: %j', err));
 	metadata = stash.bucketMetadata('janey');
 	ASSERT(!metadata);
 
-	stash.bucketContents('janey', function (err, result) {
-		ASSERT(err);
-		ASSERT(err.code() == ECA_NOENT);
+	stash.bucketContents('janey', function (err2, result) {
+		ASSERT(err2);
+		ASSERT(err2.code() == ECA_NOENT);
 
-		expected = { friend: 'bart', likes: 'milhouse' }
+		expected = { friend: 'bart', likes: 'milhouse' };
 		stash.bucketFill('janey', expected, 'somecontentsomg',
 		    mod_tl.advance);
 	});
 }
 
-function filled(err, result)
+function filled(err)
 {
 	ASSERT(!err, caSprintf('unexpected error: %j', err));
 	mod_assert.deepEqual(expected, stash.bucketMetadata('janey'));
 
-	stash.bucketContents('janey', function (err, result) {
-		ASSERT(!err, caSprintf('unexpected error: %j', err));
+	stash.bucketContents('janey', function (err2, result) {
+		ASSERT(!err2, caSprintf('unexpected error: %j', err2));
 		log.dbg('got back bucket: %j', result);
 		mod_assert.deepEqual(expected, result['metadata']);
 		mod_assert.equal('somecontentsomg', result['data']);
@@ -67,13 +68,13 @@ function fill_again()
 	stash.bucketFill('janey', expected, 'morestuff', mod_tl.advance);
 }
 
-function check_again(err, result)
+function check_again(err)
 {
 	ASSERT(!err, caSprintf('unexpected error: %j', err));
 	mod_assert.deepEqual(expected, stash.bucketMetadata('janey'));
 
-	stash.bucketContents('janey', function (err, result) {
-		ASSERT(!err, caSprintf('unexpected error: %j', err));
+	stash.bucketContents('janey', function (err2, result) {
+		ASSERT(!err2, caSprintf('unexpected error: %j', err2));
 		log.dbg('got back bucket: %j', result);
 		mod_assert.deepEqual(expected, result['metadata']);
 		mod_assert.equal('morestuff', result['data']);
@@ -99,8 +100,8 @@ function newstash_check(err)
 	ASSERT(created <= middle);
 
 	mod_assert.deepEqual(expected, stash.bucketMetadata('janey'));
-	stash.bucketContents('janey', function (err, result) {
-		ASSERT(!err, caSprintf('unexpected error: %j', err));
+	stash.bucketContents('janey', function (err2, result) {
+		ASSERT(!err2, caSprintf('unexpected error: %j', err2));
 		log.dbg('got back bucket: %j', result);
 		mod_assert.deepEqual(expected, result['metadata']);
 		mod_assert.equal('morestuff', result['data']);

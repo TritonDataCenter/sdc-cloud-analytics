@@ -66,7 +66,8 @@ JSON_FILES		:= $(shell find pkg -name '*.json')
 SMF_MANIFESTS = \
 	smf/manifest/caconfigsvc.xml			\
 	smf/manifest/caaggsvc.xml			\
-	smf/manifest/cainstsvc.xml
+	smf/manifest/cainstsvc.xml			\
+	smf/manifest/castashsvc.xml
 
 SH_SCRIPTS = \
 	pkg/pkg-postactivate.sh		\
@@ -83,7 +84,7 @@ SVC_SCRIPTS = \
 	pkg/pkg-svc-postactivate.sh	\
 	pkg/pkg-svc-postdeactivate.sh
 
-PKGS		 = cabase caconfigsvc caaggsvc cainstsvc
+PKGS		 = cabase caconfigsvc caaggsvc cainstsvc castashsvc
 PKG_TARBALLS	 = $(PKGS:%=$(PKGROOT)/%.tar.gz)
 
 PKGDIRS_cabase := \
@@ -153,12 +154,20 @@ PKGFILES_cainstsvc = \
 	$(SVC_SCRIPTS:%=$(PKGROOT)/cainstsvc/%)		\
 	$(PKGROOT)/cainstsvc/package.json
 
+PKGDIRS_castashsvc := \
+	$(PKGROOT)/castashsvc/pkg
+
+PKGFILES_castashsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/castashsvc/%)	\
+	$(PKGROOT)/castashsvc/package.json
+
 PKG_DIRS := \
 	$(PKGROOT)		\
 	$(PKGDIRS_cabase)	\
 	$(PKGDIRS_caconfigsvc)	\
 	$(PKGDIRS_caaggsvc)	\
-	$(PKGDIRS_cainstsvc)
+	$(PKGDIRS_cainstsvc)	\
+	$(PKGDIRS_castashsvc)
 
 ROOT_DIRS = \
 	$(ROOT_CA)						\
@@ -314,6 +323,9 @@ $(PKGROOT)/caaggsvc.tar.gz: install-caaggsvc
 $(PKGROOT)/cainstsvc.tar.gz: install-cainstsvc
 	cd $(PKGROOT) && $(TAR) cf - cainstsvc | gzip > cainstsvc.tar.gz
 
+$(PKGROOT)/castashsvc.tar.gz: install-castashsvc
+	cd $(PKGROOT) && $(TAR) cf - castashsvc | gzip > castashsvc.tar.gz
+
 #
 # "install" target install files into the proto ("root") area
 #
@@ -324,7 +336,8 @@ install-rootdirs: $(ROOT_DIRS)
 
 install-pkgdirs: $(PKG_DIRS)
 
-install-pkgs: install-cabase install-caconfigsvc install-caaggsvc install-cainstsvc
+install-pkgs: install-cabase install-caconfigsvc install-caaggsvc \
+    install-cainstsvc install-castashsvc
 
 install-cabase: all install-pkgdirs $(PKGFILES_cabase) $(PKGDEPS_cabase)
 
@@ -333,6 +346,8 @@ install-caconfigsvc: install-cabase $(PKGFILES_caconfigsvc) $(PKGDEPS_caconfigsv
 install-caaggsvc: install-cabase $(PKGFILES_caaggsvc) $(PKGDEPS_caaggsvc)
 
 install-cainstsvc: install-cabase $(PKGFILES_cainstsvc) $(PKGDEPS_cainstsvc)
+
+install-castashsvc: install-cabase $(PKGFILES_castashsvc) $(PKGDEPS_castashsvc)
 
 $(PKGROOT)/cabase/node_modules/%: deps/%
 	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/$^
@@ -359,6 +374,9 @@ $(PKGROOT)/caaggsvc/%: %
 	cp $^ $@
 
 $(PKGROOT)/cainstsvc/%: %
+	cp $^ $@
+
+$(PKGROOT)/castashsvc/%: %
 	cp $^ $@
 
 $(PKGROOT)/%/package.json: pkg/%-package.json FORCE

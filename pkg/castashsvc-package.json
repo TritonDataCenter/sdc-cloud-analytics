@@ -1,0 +1,17 @@
+{
+	"name":		"castashsvc",
+	"description":	"Joyent Cloud Analytics Stash Service",
+	"version":	"0.0.1v@@CA_VERSION@@",
+	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
+	"author":	"Joyent (joyent.com)",
+	"scripts": {
+		"postactivate":		"pkg/pkg-svc-postactivate.sh",
+		"postdeactivate":	"pkg/pkg-svc-postdeactivate.sh"
+	},
+	"engines": {
+		"node":	"*"
+	},
+	"dependencies": {
+		"cabase": 	">1.0.1"
+	}
+}

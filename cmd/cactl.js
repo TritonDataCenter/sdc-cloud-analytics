@@ -18,20 +18,25 @@ var cc_cap;				/* cap wrapper */
 var cc_toid;				/* timeout handle */
 var cc_cmd;				/* command sent */
 var cc_start;				/* time cmd was sent */
+var cc_list;				/* command was "stash list" */
 var cc_arg0 = process.argv[1];
 var cc_help = [
-    'usage: cactl [-d] <hostname> <command>',
+    'usage: cactl [-d] <hostname> <command> [...]',
     'Poke a cloud analytics instance via AMQP.',
     '    <hostname> is a routing key identifying a single system',
     '    	hint: try "ca.config" for the config server\n',
     '    <command> is one of:',
-    '        abort		panic remote service (use with caution)',
-    '        ping		check connectivity',
-    '        status [-v]	get detailed status info',
-    '                   	with -v, print additional unstructured info',
-    '        log <msg>		report log message\n',
+    '        abort              panic remote service (use with caution)',
+    '        ping               check connectivity',
+    '        status [-v]        get detailed status info',
+    '                           with -v, print additional unstructured info',
+    '        log <msg>          report log message',
+    '        stash list         show list of stash buckets',
+    '        stash get <bucket> retrieve contents of stash bucket "bucket"',
+    '        stash put <bucket> <contents> [<metadata>]',
+    '                           save contents into stash bucket "bucket"\n',
     '    Global Options:',
-    '        -d		print AMQP debug messages'
+    '        -d	print AMQP debug messages'
 ].join('\n');
 
 function printf()
@@ -77,6 +82,8 @@ function main()
 	cc_cap.on('msg-ack-abort', ccAckAbort);
 	cc_cap.on('msg-ack-ping', ccAckPing);
 	cc_cap.on('msg-ack-status', ccAckStatus);
+	cc_cap.on('msg-ack-data_get', ccAckDataGet);
+	cc_cap.on('msg-ack-data_put', ccAckDataPut);
 	cc_cap.on('connected', ccRunCmd);
 	cc_cap.start();
 }
@@ -114,8 +121,13 @@ function ccRunCmd()
 	destkey = cc_argv[cc_optind++];
 	cc_cmd = cc_argv[cc_optind++];
 
-	cc_verbose = cc_argv.length >= cc_optind &&
-	    cc_argv[cc_optind++] == '-v';
+	if (cc_argv.length > cc_optind &&
+	    cc_argv[cc_optind] == '-v') {
+		cc_verbose = true;
+		cc_optind++;
+	} else {
+		cc_verbose = false;
+	}
 
 	if (!(cc_cmd in cc_cmdswitch))
 		usage('unrecognized command: ' + cc_cmd);
@@ -149,17 +161,76 @@ function ccRunLogCmd()
 {
 	var msg = {};
 
-	if (process.argv.length < 5)
+	if (cc_argv.length <= cc_optind)
 		usage('missing log message');
 
 	msg.ca_type = 'notify';
 	msg.ca_subtype = 'log';
-	msg.l_message = process.argv[4];
+	msg.l_message = cc_argv[cc_optind++];
 
 	return (msg);
 }
 
 cc_cmdswitch['log'] = ccRunLogCmd;
+
+function ccRunStashCmd()
+{
+	var msg, subcmd, bucket;
+
+	if (cc_argv.length <= cc_optind)
+		usage('missing stash subcommand');
+
+	subcmd = cc_argv[cc_optind++];
+	msg = {};
+	msg.ca_id = 1;
+	msg.ca_type = 'cmd';
+
+	switch (subcmd) {
+	case 'list':
+		cc_list = true;
+		/*jsl:fallthru*/
+	case 'get':
+		msg.ca_subtype = 'data_get';
+		break;
+
+	case 'put':
+		msg.ca_subtype = 'data_put';
+		break;
+
+	default:
+		usage('invalid stash subcommand');
+		break;
+	}
+
+	if (subcmd == 'list') {
+		bucket = '.contents';
+	} else if (cc_argv.length > cc_optind) {
+		bucket = cc_argv[cc_optind++];
+	} else {
+		usage('missing stash bucket');
+	}
+
+	cc_cmd = msg.ca_subtype;
+
+	if (subcmd == 'get' || subcmd == 'list') {
+		msg.p_requests = [ { bucket: bucket } ];
+		return (msg);
+	}
+
+	if (cc_argv.length <= cc_optind)
+		usage('missing stash contents');
+
+	msg.p_requests = [ {
+	    bucket: bucket,
+	    data: cc_argv[cc_optind++],
+	    metadata: cc_argv.length > cc_optind ?
+	        JSON.parse(cc_argv[cc_optind++]) : {}
+	} ];
+
+	return (msg);
+}
+
+cc_cmdswitch['stash'] = ccRunStashCmd;
 
 function ccCheckMsg(msg)
 {
@@ -276,6 +347,9 @@ function ccAckStatus(msg)
 
 		break;
 
+	case 'stash':
+		break;
+
 	default:
 		printf('unknown component type\n');
 		break;
@@ -285,6 +359,71 @@ function ccAckStatus(msg)
 		printf('additional unstructured status information:\n');
 		printf('%j\n', msg.s_status);
 	}
+
+	shutdown();
+}
+
+function ccAckDataPut(msg)
+{
+	var result;
+
+	ccCheckMsg(msg);
+
+	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
+	printf('%-12s %s\n', 'Route key:', msg.ca_source);
+	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
+	    msg.ca_agent_version);
+	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
+	    msg.ca_os_release, msg.ca_os_revision);
+
+	result = msg.p_results[0];
+
+	if ('error' in result) {
+		printf('ERROR saving data: %s\n',
+		    result['error']['message']);
+		process.exit(1);
+	}
+
+	printf('saved data\n');
+	shutdown();
+}
+
+function ccAckDataGet(msg)
+{
+	var result, metadata, buckets, ii;
+
+	ccCheckMsg(msg);
+	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
+	printf('%-12s %s\n', 'Route key:', msg.ca_source);
+	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
+	    msg.ca_agent_version);
+	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
+	    msg.ca_os_release, msg.ca_os_revision);
+
+	result = msg.p_results[0];
+
+	if ('error' in result) {
+		printf('ERROR retrieving data: %s\n',
+		    result['error']['message']);
+		process.exit(1);
+	}
+
+	result = result['result'];
+
+	if (!cc_list) {
+		printf('metadata: %j\n', result['metadata']);
+		printf('%s\n', result['data']);
+		shutdown();
+		return;
+	}
+
+	metadata = JSON.parse(result['data']);
+	buckets = Object.keys(metadata).sort();
+
+	printf('Buckets:\n');
+	for (ii = 0; ii < buckets.length; ii++)
+		printf('%-20s  %j\n', buckets[ii], metadata[buckets[ii]]);
+	printf('%d buckets.\n', buckets.length);
 
 	shutdown();
 }

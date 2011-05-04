@@ -255,7 +255,8 @@ function setup()
 	http = new mod_tl.ctHttpRequester(http_port);
 	instrumenter = new mod_tl.ctDummyInstrumenter();
 	aggregator = new mod_tl.ctDummyAggregator();
-	mod_tl.ctWaitForAmqpService(mod_cap.ca_amqp_key_config, function () {
+	mod_tl.ctInitConfigService(function (err) {
+		ASSERT.ok(!err);
 		instrumenter.start(function () {
 			aggregator.start(mod_tl.advance);
 		});

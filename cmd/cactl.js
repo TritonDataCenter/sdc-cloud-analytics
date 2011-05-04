@@ -232,7 +232,7 @@ function ccRunStashCmd()
 
 cc_cmdswitch['stash'] = ccRunStashCmd;
 
-function ccCheckMsg(msg)
+function ccCheckMsg(msg, hidelatency)
 {
 	var end = new Date();
 	var millis = end.getTime() - cc_start.getTime();
@@ -243,7 +243,8 @@ function ccCheckMsg(msg)
 	if (msg.ca_id !== 1)
 		die('response message had wrong id: %s', msg.ca_id);
 
-	printf('%-12s %d ms\n', 'Latency:', millis);
+	if (!hidelatency)
+		printf('%-12s %d ms\n', 'Latency:', millis);
 	clearTimeout(cc_toid);
 }
 
@@ -392,13 +393,16 @@ function ccAckDataGet(msg)
 {
 	var result, metadata, buckets, ii;
 
-	ccCheckMsg(msg);
-	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
-	printf('%-12s %s\n', 'Route key:', msg.ca_source);
-	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
-	    msg.ca_agent_version);
-	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
-	    msg.ca_os_release, msg.ca_os_revision);
+	ccCheckMsg(msg, !cc_list);
+
+	if (cc_list) {
+		printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
+		printf('%-12s %s\n', 'Route key:', msg.ca_source);
+		printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
+		    msg.ca_agent_version);
+		printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
+		    msg.ca_os_release, msg.ca_os_revision);
+	}
 
 	result = msg.p_results[0];
 
@@ -411,7 +415,6 @@ function ccAckDataGet(msg)
 	result = result['result'];
 
 	if (!cc_list) {
-		printf('metadata: %j\n', result['metadata']);
 		printf('%s\n', result['data']);
 		shutdown();
 		return;

@@ -12,9 +12,17 @@ var cc_svc;
 
 function main()
 {
+	var args;
+
 	mod_dbg.caEnablePanicOnCrash();
-	cc_svc = new mod_cainst.caConfigService(process.argv.slice(2));
+
+	args = process.argv.slice(2);
+	args.unshift('./metadata');
+
+	cc_svc = new mod_cainst.caConfigService(args);
+
 	caDbg.set('service', cc_svc);
+
 	cc_svc.start(function (err) {
 		if (err)
 			caPanic('failed to start service', err);

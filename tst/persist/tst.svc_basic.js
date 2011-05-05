@@ -5,7 +5,7 @@
 var mod_assert = require('assert');
 var ASSERT = mod_assert.ok;
 
-var mod_casvc = require('../../lib/ca/ca-svc-persist');
+var mod_casvc = require('../../lib/ca/ca-svc-stash');
 var mod_tl = require('../../lib/tst/ca-test');
 mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
 
@@ -14,7 +14,7 @@ var tmpdir, svc, svckey, cap, connected;
 function setup_svc()
 {
 	tmpdir = mod_tl.ctTmpdir();
-	svc = new mod_casvc.caPersistenceService([ tmpdir ]);
+	svc = new mod_casvc.caStashService([ tmpdir ]);
 	svckey = svc.routekey();
 	svc.start(mod_tl.advance);
 }

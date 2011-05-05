@@ -180,7 +180,7 @@ function check_amqp_down()
 	});
 
 	stages.push(function (unused, next) {
-		cap.cmdPing(mod_cap.ca_amqp_key_persist, 1000, function (err) {
+		cap.cmdPing(mod_cap.ca_amqp_key_stash, 1000, function (err) {
 			ASSERT(err);
 			ASSERT(err.code() == ECA_TIMEDOUT);
 			mod_tl.ctStdout.info('failed to ping stash (good)');

@@ -7,7 +7,6 @@ var ASSERT = mod_assert.ok;
 
 var mod_ca = require('../../lib/ca/ca-common');
 var mod_cap = require('../../lib/ca/ca-amqp-cap');
-var mod_persist = require('../../lib/ca/ca-svc-persist');
 var mod_tl = require('../../lib/tst/ca-test');
 var mod_metric = require('../../lib/ca/ca-metric');
 var HTTP = require('../../lib/ca/http-constants');

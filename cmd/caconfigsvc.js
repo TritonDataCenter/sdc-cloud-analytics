@@ -5,7 +5,7 @@
  * analytics service, including instrumenters and aggregators.
  */
 
-var mod_cainst = require('../lib/ca/ca-inst');
+var mod_svc = require('../lib/ca/ca-svc-config');
 var mod_dbg = require('../lib/ca/ca-dbg');
 
 var cc_svc;
@@ -19,7 +19,7 @@ function main()
 	args = process.argv.slice(2);
 	args.unshift('./metadata');
 
-	cc_svc = new mod_cainst.caConfigService(args);
+	cc_svc = new mod_svc.caConfigService(args);
 
 	caDbg.set('service', cc_svc);
 

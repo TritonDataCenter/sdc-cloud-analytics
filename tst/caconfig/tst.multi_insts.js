@@ -98,8 +98,7 @@ function setup()
 	instr2 = new mod_tl.ctDummyInstrumenter(metrics2);
 	aggregator = new mod_tl.ctDummyAggregator();
 
-	mod_tl.ctInitConfigService(function (err) {
-	    ASSERT(!err);
+	mod_tl.ctInitConfigServices(function () {
 	    caRunParallel([
 		function (callback) { instr1.start(callback); },
 		function (callback) { instr2.start(callback); },

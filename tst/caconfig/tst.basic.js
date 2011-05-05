@@ -14,7 +14,7 @@ var HTTP = require('../../lib/ca/http-constants');
 var log = mod_tl.ctStdout;
 var http_port = mod_ca.ca_http_port_config;
 var url_create = '/ca/instrumentations?profile=none';
-var instrumenter, aggregator, http;
+var instrumenter, aggregator, http, svcs;
 
 mod_tl.ctSetTimeout(10 * 1000);
 
@@ -255,8 +255,8 @@ function setup()
 	http = new mod_tl.ctHttpRequester(http_port);
 	instrumenter = new mod_tl.ctDummyInstrumenter();
 	aggregator = new mod_tl.ctDummyAggregator();
-	mod_tl.ctInitConfigService(function (err) {
-		ASSERT.ok(!err);
+	mod_tl.ctInitConfigServices(function (rsvcs) {
+		svcs = rsvcs;
 		instrumenter.start(function () {
 			aggregator.start(mod_tl.advance);
 		});
@@ -527,5 +527,14 @@ function final_check()
 }
 
 mod_tl.ctPushFunc(final_check);
+
+function teardown()
+{
+	svcs['stash'].stop(function () {
+		svcs['config'].stop(mod_tl.advance);
+	});
+}
+
+mod_tl.ctPushFunc(teardown);
 mod_tl.ctPushFunc(mod_tl.ctDoExitSuccess);
 mod_tl.advance();

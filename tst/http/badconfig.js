@@ -1,5 +1,5 @@
 /*
- * In this test we throw lots of bad HTTP requets/parameters to the Config
+ * In this test we throw lots of bad HTTP requests/parameters to the Config
  * service and expect to get back failures.
  */
 var mod_assert = require('assert');
@@ -44,7 +44,7 @@ function runRequest(obj, errno)
 var nrequests = 0;
 
 mod_tl.ctSetTimeout(15 * 1000);
-mod_tl.ctInitConfigService(runtests);
+mod_tl.ctInitStashService(runtests);
 
 function runtests()
 {

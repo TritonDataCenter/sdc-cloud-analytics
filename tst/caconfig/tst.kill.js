@@ -13,11 +13,15 @@
  *
  *    o instn setprops are persisted across a bounce
  *
+ *    o these operations fail with 503 while the stash is down
+ *
  * We do this using the primitives defined above, described here for reference:
  *
  *    setup_initial		Used to set up and tear down the config and
  *    setup_again		stash services.
+ *    setup_stash
  *    teardown
+ *    teardown_stash
  *    check_modules
  *    check_http_down
  *    check_amqp_down
@@ -40,6 +44,7 @@
 
 var mod_assert = require('assert');
 var ASSERT = mod_assert.ok;
+var mod_stash = require('../../lib/ca/ca-svc-stash');
 var mod_ca = require('../../lib/ca/ca-common');
 var mod_calog = require('../../lib/ca/ca-log');
 var mod_cap = require('../../lib/ca/ca-amqp-cap');
@@ -52,11 +57,12 @@ var url_create = '/ca/instrumentations?profile=none&module=test_module&' +
     'stat=ops1';
 
 var svcs, aggr, instr, requester;
+var stash = true;
 var capcount = 0;
 var lastnum = 0;
 var instns = [];
 
-mod_tl.ctSetTimeout(45 * 1000);
+mod_tl.ctSetTimeout(90 * 1000);
 
 /*
  * Initial setup: launch dummy aggregator and instrumenter in addition to the
@@ -131,6 +137,26 @@ function teardown()
 }
 
 /*
+ * Bring down only the stash service.
+ */
+function teardown_stash()
+{
+	stash = false;
+	svcs['stash'].stop(mod_tl.advance);
+}
+
+/*
+ * Bring back up only the stash.
+ */
+function setup_stash()
+{
+	stash = true;
+	svcs['stash'] = new mod_stash.caStashService(
+	    [ mod_tl.ctTmpdir() ], mod_calog.caLog.INFO);
+	svcs['stash'].start(mod_tl.advance);
+}
+
+/*
  * Verify that the configsvc is not responding on HTTP (as part of a bounce).
  */
 function check_http_down()
@@ -200,11 +226,19 @@ function create_one()
 	    function (err, response, rv) {
 		var suffix, num;
 
+		if (!stash) {
+			mod_assert.equal(response.statusCode, HTTP.ESRVUNAVAIL);
+			mod_tl.ctStdout.info(
+			    'failed to create instn as expected');
+			mod_tl.advance();
+			return;
+		}
+
 		mod_assert.equal(response.statusCode, HTTP.CREATED);
 
 		suffix = rv['uri'].substring(rv['uri'].lastIndexOf('/') + 1);
 		num = parseInt(suffix, 10);
-		mod_assert.equal(num, lastnum + 1);
+		mod_assert.ok(num > lastnum);
 		lastnum = num;
 
 		instns.push(rv['uri']);
@@ -218,15 +252,22 @@ function create_one()
  */
 function modify_one()
 {
-	var instn = instns[0];
+	var instn = instns[instns.length - 1];
 
 	requester.sendAsForm('PUT', instn, { 'idle-max': 1000 },
 	    true, function (err, response, data) {
+		if (!stash) {
+			mod_assert.equal(response.statusCode, HTTP.ESRVUNAVAIL);
+			mod_tl.ctStdout.info(
+			    'failed to modify instn as expected');
+			mod_tl.advance();
+			return;
+		}
+
 		mod_assert.equal(response.statusCode, HTTP.OK);
 		mod_assert.equal(data['idle-max'], 1000);
 		mod_tl.advance();
 	});
-
 }
 
 /*
@@ -234,7 +275,7 @@ function modify_one()
  */
 function check_props_orig()
 {
-	var instn = instns[0];
+	var instn = instns[instns.length - 1];
 
 	requester.sendEmpty('GET', instn, true, function (err, response, data) {
 		mod_assert.equal(response.statusCode, HTTP.OK);
@@ -249,7 +290,7 @@ function check_props_orig()
  */
 function check_props_modified()
 {
-	var instn = instns[0];
+	var instn = instns[instns.length - 1];
 
 	requester.sendEmpty('GET', instn, true, function (err, response, data) {
 		mod_assert.equal(response.statusCode, HTTP.OK);
@@ -264,10 +305,19 @@ function check_props_modified()
  */
 function destroy_one()
 {
-	var instn = instns.pop();
+	var instn = instns[instns.length - 1];
 
 	mod_tl.ctStdout.info('destroying instn "%s"', instn);
 	requester.sendEmpty('DELETE', instn, true, function (err, response) {
+		if (!stash) {
+			mod_assert.equal(response.statusCode, HTTP.ESRVUNAVAIL);
+			mod_tl.ctStdout.info(
+			    'failed to destroy instn as expected');
+			mod_tl.advance();
+			return;
+		}
+
+		instns.pop();
 		mod_assert.equal(response.statusCode, HTTP.NOCONTENT);
 		mod_tl.advance();
 	});
@@ -293,8 +343,9 @@ function check_list()
 			}
 
 			if (jj == instns.length)
-				throw (new Error('found unexpected uri: ' +
-				    rv[ii]['uri']));
+				throw (new Error(caSprintf(
+				    'found unexpected "%s" (%j, %j)',
+				    rv[ii]['uri'], rv, instns)));
 		}
 
 		mod_tl.ctStdout.info('current state matches (%d instns)',
@@ -338,7 +389,7 @@ function check_postbringup()
 function check_final()
 {
 	mod_assert.equal(instns.length, 0);
-	mod_assert.equal(4, lastnum);
+	mod_assert.equal(9, lastnum);
 	mod_tl.advance();
 }
 
@@ -395,9 +446,36 @@ mod_tl.ctPushFunc(setup_again);
 mod_tl.ctPushFunc(check_modules);
 mod_tl.ctPushFunc(check_list);		/* verify */
 mod_tl.ctPushFunc(check_props_modified);
-
 mod_tl.ctPushFunc(destroy_one);
 mod_tl.ctPushFunc(check_list);
+
+mod_tl.ctPushFunc(create_one);		/* check modification with stash down */
+mod_tl.ctPushFunc(create_one);
+mod_tl.ctPushFunc(teardown_stash);
+
+mod_tl.ctPushFunc(create_one);
+mod_tl.ctPushFunc(check_list);
+mod_tl.ctPushFunc(destroy_one);
+mod_tl.ctPushFunc(check_list);
+mod_tl.ctPushFunc(check_props_orig);
+mod_tl.ctPushFunc(modify_one);
+// mod_tl.ctPushFunc(check_props_orig);	// XXX should work
+
+mod_tl.ctPushFunc(setup_stash);
+mod_tl.ctPushFunc(check_list);
+mod_tl.ctPushFunc(create_one);
+mod_tl.ctPushFunc(check_list);
+mod_tl.ctPushFunc(destroy_one);
+mod_tl.ctPushFunc(check_list);
+mod_tl.ctPushFunc(create_one);
+mod_tl.ctPushFunc(check_props_orig);
+mod_tl.ctPushFunc(modify_one);
+mod_tl.ctPushFunc(check_props_modified);
+
+mod_tl.ctPushFunc(destroy_one);		/* cleanup */
+mod_tl.ctPushFunc(destroy_one);
+mod_tl.ctPushFunc(destroy_one);
+
 mod_tl.ctPushFunc(check_final);		/* final checks */
 mod_tl.ctPushFunc(mod_tl.ctDoExitSuccess);
 mod_tl.advance();

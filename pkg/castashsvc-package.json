@@ -12,6 +12,6 @@
 		"node":	"*"
 	},
 	"dependencies": {
-		"cabase": 	">1.0.1"
+		"cabase": 	">1.0.2"
 	}
 }

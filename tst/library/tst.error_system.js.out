@@ -1,6 +1,6 @@
 TEST: EEXIST error
 EXCEPTION: caError: ca stat failed: ENOENT, No such file or directory '/betternotexist'
-    at caError.caSystemError (/home/dap/ca-work/lib/ca/ca-error.js:205:10)
+    at caError.caSystemError (/home/dap/ca-work/lib/ca/ca-error.js:206:10)
     at Object.<anonymous> (/home/dap/ca-work/tst/library/tst.error_system.js:15:8)
     at Module._compile (module.js:404:26)
     at Object..js (module.js:410:10)
@@ -10,7 +10,7 @@ EXCEPTION: caError: ca stat failed: ENOENT, No such file or directory '/betterno
     at EventEmitter._tickCallback (node.js:126:26)
 TEST: ENOENT error
 EXCEPTION: caError: ca mkdir failed: EEXIST, File exists '/'
-    at caError.caSystemError (/home/dap/ca-work/lib/ca/ca-error.js:205:10)
+    at caError.caSystemError (/home/dap/ca-work/lib/ca/ca-error.js:206:10)
     at Object.<anonymous> (/home/dap/ca-work/tst/library/tst.error_system.js:28:8)
     at Module._compile (module.js:404:26)
     at Object..js (module.js:410:10)

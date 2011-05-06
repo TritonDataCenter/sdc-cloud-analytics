@@ -1,0 +1,4 @@
+{
+	"description": "This is a JSON file used by the tests."
+	"problems": [ "cable problem", 1 ]
+}

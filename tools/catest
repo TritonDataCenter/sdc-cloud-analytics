@@ -94,6 +94,12 @@ BASH_EXEC="/usr/bin/bash"
 OUTPUT_BASE_DIR=""
 
 #
+# Temporary directory for tests to use
+#
+CATMPDIR="/var/tmp/catest.$$_tmpfiles"
+export CATMPDIR
+
+#
 # Populated via setup-output, is an absolute path
 #
 OUTPUT_DIR=""
@@ -189,6 +195,7 @@ function welcome
 	printf "Welcome to catest\n"
 	printf "Configuration:\n"
 	printf "\tOutput Directory: $OUTPUT_BASE_DIR/$OUTPUT_DIR_NAME\n"
+	printf "\tTemp Directory: $CATMPDIR\n"
 	printf "\tNode executable: $NODE_EXEC\n"
 	printf "\tKeep non-failure output: $OPT_KEEP_SUCCESS\n"
 	printf "\tFound %d test(s) to run\n" $NUM_TESTS
@@ -206,6 +213,8 @@ function setup-output
 	cd $OUTPUT_DIR_NAME
 	OUTPUT_DIR=$(pwd)
 	popd >/dev/null
+
+	mkdir -p $CATMPDIR || fail "Can't make temp directory"
 }
 
 #

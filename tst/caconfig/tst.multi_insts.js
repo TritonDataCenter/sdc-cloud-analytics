@@ -98,7 +98,7 @@ function setup()
 	instr2 = new mod_tl.ctDummyInstrumenter(metrics2);
 	aggregator = new mod_tl.ctDummyAggregator();
 
-	mod_tl.ctWaitForAmqpService(mod_cap.ca_amqp_key_config, function () {
+	mod_tl.ctInitConfigServices(function () {
 	    caRunParallel([
 		function (callback) { instr1.start(callback); },
 		function (callback) { instr2.start(callback); },
@@ -186,7 +186,7 @@ function enable_metric(metric, callback)
 	http.sendAsJson('POST', url_create, metric, true,
 	    function (err, response, rv) {
 		ASSERT(!err);
-		ASSERT(response.statusCode == HTTP.CREATED);
+		mod_assert.equal(response.statusCode, HTTP.CREATED);
 		if (instr1.nenabled() > enabled1)
 			ret.push('instr1');
 		if (instr2.nenabled() > enabled2)

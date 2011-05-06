@@ -85,6 +85,12 @@ function load_dtracepath
 	echo "DTRACE_LIBPATH=$DTRACE_LIBPATH"
 }
 
+function load_logfiles
+{
+	ns_dbglogfile="$ns_logbase/$ns_name/amqp-$(date +%F.%T).$$"
+	ns_rqlogfile="$ns_logbase/$ns_name/requests-$(date +%F.%T).$$"
+}
+
 function run_realtime
 {
 	local pid=$1
@@ -101,23 +107,42 @@ ns_node="$(getprop caconfig/path-node)"
 ns_logbase="$(getprop caconfig/path-logs)"
 ns_rt=$(getprop caconfig/run-rt)
 ns_name=
+ns_args=
 
 #
 # Figure out which service to start.
 #
 case $SMF_FMRI in
 	*caconfigsvc*)	ns_name=caconfigsvc
+			load_logfiles
 			load_mapi
+			ns_args="$ns_dbglogfile $ns_rqlogfile"
 			;;
 	*caaggsvc*)	export HOST=$(uname -n)-${SMF_FMRI/*:}
 			ns_name=caaggsvc
+			load_logfiles
 			load_geoip
+			ns_args="$ns_dbglogfile"
 			;;
 	*cainstsvc*)	ns_name=cainstsvc
+			load_logfiles
 			load_dtracepath
+			ns_args="$ns_dbglogfile"
+			;;
+	*castashsvc*)	ns_name=castashsvc
+			load_logfiles
+			stash=$(getprop caconfig/stash-rootdir)
+			[[ -n $stash ]] || fail "no stash configured"
+			echo "using stash '$stash'"
+			ns_args="$stash $ns_dbglogfile"
 			;;
 	*) 		fail "don't know how to start $SMF_FMRI" ;;
 esac
+
+#
+# Set up log files and directories
+#
+mkdir -p "$ns_logbase/$ns_name" || fail "failed to create log directory"
 
 cd "$ns_root" || fail "failed to cd"
 ns_root=$(pwd)
@@ -132,11 +157,8 @@ env | sort | egrep '^(AMQP_|MAPI_|NODE_PATH)' | grep -v PASSWORD
 #
 # Launch the daemon.
 #
-mkdir -p "$ns_logbase/$ns_name" || fail "failed to create log directory"
-ns_dbglogfile="$ns_logbase/$ns_name/amqp-$(date +%F.%T).$$"
-ns_rqlogfile="$ns_logbase/$ns_name/requests-$(date +%F.%T).$$"
 smf_clear_env
-$ns_node $ns_exec $ns_dbglogfile $ns_rqlogfile &
+$ns_node $ns_exec $ns_args &
 ns_pid=$!
 [[ $ns_rt == "true" ]] && run_realtime $ns_pid
 exit $SMF_EXIT_OK

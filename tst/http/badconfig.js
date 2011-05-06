@@ -1,5 +1,5 @@
 /*
- * In this test we throw lots of bad HTTP requets/parameters to the Config
+ * In this test we throw lots of bad HTTP requests/parameters to the Config
  * service and expect to get back failures.
  */
 var mod_assert = require('assert');
@@ -18,29 +18,38 @@ var httpFail = function (errno, path)
 		    mod_ca.caSprintf('Tried to access path: %s.\nExpected ' +
 			'return code %d, got %d.',
 			path, errno, response.statusCode));
+
+		checkdone();
 	});
 };
+
+function checkdone()
+{
+	if (--nrequests === 0) {
+		mod_tl.ctStdout.info('test completed successfully');
+		process.exit(0);
+	}
+}
 
 function runRequest(obj, errno)
 {
 	var func = httpFail(errno, obj.path);
+	mod_tl.ctStdout.info('testing path "%s"', obj.path);
 	mod_tl.ctHttpRequest(obj, func);
 }
 
 /*
  * Wait for the server to come up.
  */
-mod_tl.ctTimedCheck(function (callback) {
-	mod_tl.ctHttpRequest({
-	    method: 'GET',
-	    path: '/',
-	    port: CFGSVC_PORT
-	}, callback);
-}, runtests, 5, 1000);
+var nrequests = 0;
+
+mod_tl.ctSetTimeout(15 * 1000);
+mod_tl.ctInitStashService(runtests);
 
 function runtests()
 {
 	/* Bad Paths */
+	++nrequests;
 
 	runRequest({
 	    method: 'GET',
@@ -240,4 +249,6 @@ function runtests()
 	    path: '/ca/customers/brendan/instrumentations/42',
 	    port: CFGSVC_PORT
 	}, 404);
+
+	checkdone();
 }

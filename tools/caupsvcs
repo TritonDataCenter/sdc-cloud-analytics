@@ -44,7 +44,7 @@ function svc_iter_instances
 #
 # Process arguments.  See usage message above for details.
 #
-cus_pkgs="cabase caaggsvc caconfigsvc"
+cus_pkgs="cabase caaggsvc castashsvc caconfigsvc"
 cus_arg0=$(basename $0)
 opt_f=false
 opt_k=false
@@ -89,7 +89,7 @@ cd $cus_tmpdir || fail
 echo "Verifying update image ... \c"
 [[ -d root/pkg ]] || fail "invalid image (expected 'root/pkg' directory)"
 cd root/pkg
-for pkg in cabase caaggsvc caconfigsvc; do
+for pkg in $cus_pkgs; do
 	[[ -f $pkg.tar.gz ]] || fail "invalid image (missing $pkg.tar.gz)"
 done
 echo "done."

@@ -21,7 +21,7 @@
 		<propval name="mapi-port" type="astring" value="" />
 		<propval name="mapi-user" type="astring" value="" />
 		<propval name="mapi-password" type="astring" value="" />
-		<propval name="path-logs" type="astring" value="@@BASE_DIR@@/ca/log" />
+		<propval name="path-logs" type="astring" value="/var/smartdc/ca/log" />
 		<propval name="path-node" type="astring" value="@@CABASE_DIR@@/cmd/node" />
 		<propval name="path-dist" type="astring" value="@@CABASE_DIR@@" />
 		<propval name="run-rt" type="astring" value="false" />

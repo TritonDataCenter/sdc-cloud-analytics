@@ -3,6 +3,7 @@
 	"cpu":		{ "label": "CPU"			},
 	"disk":		{ "label": "Disk"			},
 	"fs":		{ "label": "Filesystem"			},
+	"memory":	{ "label": "Memory"			},
 	"nic":		{ "label": "Network interface"		},
 	"node":		{ "label": "Node.js 0.4.x"		},
 	"syscall":	{ "label": "System calls"		},
@@ -139,6 +140,36 @@
 	"label":	"logical read/write operations",
 	"unit":		"operations",
 	"fields":	[ "hostname", "zonename", "optype" ]
+    }, {
+	"module":	"memory",
+	"stat":		"rss",
+	"label":	"resident set size",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename" ]
+    }, {
+	"module":	"memory",
+	"stat":		"rss_limit",
+	"label":	"maximum resident set size",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename" ]
+    }, {
+	"module":	"memory",
+	"stat":		"swap",
+	"label":	"anonymous memory used",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename" ]
+    }, {
+	"module":	"memory",
+	"stat":		"swap_limit",
+	"label":	"maximum anonymous memory used",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename" ]
+    }, {
+	"module":	"memory",
+	"stat":		"reclaimed_bytes",
+	"label":	"excess memory reclaimed",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"nic",
 	"stat":		"nics",

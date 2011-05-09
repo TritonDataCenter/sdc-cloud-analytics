@@ -469,6 +469,77 @@ var inskMetrics = [ {
 			values: function () { return ([ 'read', 'write' ]); }
 		}
 	}
+}, {
+	module: 'memory',
+	stat: 'rss',
+	kstat: { module: 'memory_cap' },
+	extract: function (fields, kstat, kprev) {
+		return (kstat['data']['rss']);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
+}, {
+	module: 'memory',
+	stat: 'rss_limit',
+	kstat: { module: 'memory_cap' },
+	extract: function (fields, kstat, kprev) {
+		return (inskMemLimit(kstat['data']['physcap']));
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
+}, {
+	module: 'memory',
+	stat: 'swap',
+	kstat: { module: 'memory_cap' },
+	extract: function (fields, kstat, kprev) {
+		return (kstat['data']['swap']);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
+}, {
+	module: 'memory',
+	stat: 'swap_limit',
+	kstat: { module: 'memory_cap' },
+	extract: function (fields, kstat, kprev) {
+		return (inskMemLimit(kstat['data']['swapcap']));
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
+}, {
+	module: 'memory',
+	stat: 'reclaimed_bytes',
+	kstat: { module: 'memory_cap' },
+	extract: function (fields, kstat, kprev) {
+		return (kstat['data']['pagedout'] -
+		    kprev['data']['pagedout']);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
 } ];
 
 function inskNicFilter(kstat)
@@ -560,6 +631,14 @@ function inskTcpErrtypeValues(kstat, kprev)
 	return (Object.keys(inskTcpErrors).map(function (elt) {
 		return (inskTcpErrors[elt]);
 	}));
+}
+
+function inskMemLimit(value)
+{
+	if (value === Math.pow(2, 64) || value === 0)
+		return (undefined);
+
+	return (value);
 }
 
 /*
@@ -845,18 +924,21 @@ insKstatAutoMetric.prototype.addDecompositions = function (datapts, decomps, ii)
  */
 insKstatAutoMetric.prototype.kstatDataPoints = function (kstat, klast, interval)
 {
-	var rv, fields, ii;
+	var raw, rv, fields, ii, value;
 
-	rv = [];
+	raw = [];
 	fields = Object.keys(this.iam_fields);
 	ASSERT(fields.length > 0); /* everything supports hostname */
-	this.kstatDataPointsFrom(rv, kstat, klast, interval, fields, 0);
+	this.kstatDataPointsFrom(raw, kstat, klast, interval, fields, 0);
 
-	for (ii = 0; ii < rv.length; ii++) {
-		rv[ii] = {
-		    fields: rv[ii],
-		    value: this.iam_extract(rv[ii], kstat, klast, interval)
-		};
+	rv = [];
+	for (ii = 0; ii < raw.length; ii++) {
+		value = this.iam_extract(raw[ii], kstat, klast, interval);
+
+		if (value === undefined)
+			continue;
+
+		rv.push({ fields: raw[ii], value: value });
 	}
 
 	return (rv);

@@ -12,6 +12,26 @@
 		    "ppid", "pexecname", "ppsargs", "leavereason", "runtime"
 		]
 	}, {
+		"module": "memory",
+		"stat": "rss",
+		"fields": [ "hostname", "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "rss_limit",
+		"fields": [ "hostname", "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "swap",
+		"fields": [ "hostname", "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "swap_limit",
+		"fields": [ "hostname", "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "reclaimed_bytes",
+		"fields": [ "hostname", "zonename" ]
+	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [

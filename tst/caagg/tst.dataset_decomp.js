@@ -7,11 +7,14 @@ var mod_ca = require('../../lib/ca/ca-common');
 var mod_caagg = require('../../lib/ca/ca-agg');
 var mod_tl = require('../../lib/tst/ca-test');
 
-var dataset = mod_caagg.caDatasetForInstrumentation({
-	'value-arity': mod_ca.ca_arity_discrete,
-	'value-dimension': 2,
-	'granularity': 1
-    });
+var spec = {
+    'value-arity': mod_ca.ca_arity_discrete,
+    'value-dimension': 2,
+    'granularity': 1
+};
+
+var dataset = mod_caagg.caDatasetForInstrumentation(spec);
+var stashed, restored;
 
 var source1 = 'source1';
 var source2 = 'source2';
@@ -82,6 +85,27 @@ mod_assert.deepEqual(dataset.dataForTime(time1), {
 	molloy: 72
 });
 mod_assert.deepEqual(dataset.dataForTime(time2), { burns: 57 });
+
+/* stash / unstash */
+stashed = dataset.stash();
+restored = mod_caagg.caDatasetForInstrumentation(spec);
+mod_assert.deepEqual(restored.dataForTime(time1), {});
+mod_assert.deepEqual(restored.dataForTime(time2), {});
+restored.unstash(stashed['metadata'], stashed['data']);
+mod_assert.deepEqual(dataset.dataForTime(time1), {
+	abe: 82,
+	burns: 12,
+	jasper: 82,
+	molloy: 72
+});
+mod_assert.deepEqual(restored.dataForTime(time1), {
+	abe: 82,
+	burns: 12,
+	jasper: 82,
+	molloy: 72
+});
+mod_assert.deepEqual(dataset.dataForTime(time2), { burns: 57 });
+mod_assert.deepEqual(restored.dataForTime(time2), { burns: 57 });
 
 /* expire old data */
 dataset.expireBefore(time1 + 1);

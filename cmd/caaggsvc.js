@@ -32,6 +32,11 @@ var agg_sysinfo;		/* system info config */
 
 var agg_transforms = {};	/* available transformations by name */
 
+var agg_stash_min_interval = 60 * 1000;		/* min freq for stash updates */
+var agg_stash_timeout = 10 * 1000;		/* timeout for stash ops */
+var agg_stash_load_retry = 60 * 1000;		/* time between load retries */
+var agg_stash_saved;				/* last global save */
+
 var agg_recent_interval = 2 * agg_http_req_timeout;	/* see aggExpected() */
 
 /*
@@ -153,23 +158,16 @@ function aggCmdEnableAggregation(msg)
 	 * instrumentation then we're already done.
 	 */
 	if (id in agg_insts) {
-		/* XXX check against key */
-		agg_insts[id].agi_instrumentation = msg.ag_instrumentation;
+		agg_insts[id].update(msg.ca_instrumentation);
 		agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 		return;
 	}
 
+	agg_log.info('aggregating instrumentation %s', id);
 	agg_cap.bind(datakey, function () {
-	    var inst = msg.ag_instrumentation;
-	    agg_log.info('aggregating instrumentation %s', id);
-	    agg_insts[id] = {
-		agi_since: new Date(),
-		agi_dataset: mod_caagg.caDatasetForInstrumentation(inst),
-		agi_last: 0,
-		agi_requests: [],
-		agi_instrumentation: inst
-	    };
-	    agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
+		agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
+		agg_insts[id] = new aggInstn(id, msg.ag_instrumentation,
+		    datakey);
 	});
 }
 
@@ -242,13 +240,14 @@ function aggData(msg)
 	dataset.update(hostname, time, value);
 
 	/*
-	 * If we have all the data we're expecting for this time index, wake up
-	 * HTTP requests which may now be satisfied.  We examine all of the
-	 * requests waiting on data for this instrumentation and we wake up
-	 * those that were waiting for data for this time index as well as those
-	 * waiting for data from earlier times, on the assumption that if we got
-	 * data from all instrumenters for this time, we won't some time later
-	 * get data from any of them for some previous time index.
+	 * If we have all the data we're expecting for this time index, save it
+	 * to the stash and then wake up HTTP requests which may now be
+	 * satisfied.  We examine all of the requests waiting on data for this
+	 * instrumentation and we wake up those that were waiting for data for
+	 * this time index as well as those waiting for data from earlier times,
+	 * on the assumption that if we got data from all instrumenters for this
+	 * time, we won't some time later get data from any of them for some
+	 * previous time index.
 	 */
 	interval = dataset.normalizeInterval(time, time);
 	time = interval['start_time'];
@@ -258,6 +257,7 @@ function aggData(msg)
 	if (dataset.nreporting(time) < aggExpected(dataset, time))
 		return;
 
+	inst.save();
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
 		rq = inst.agi_requests[ii];
 
@@ -1001,6 +1001,16 @@ function aggTick()
 			}
 		}
 
+		if (inst.agi_load == 'waiting' &&
+		    now - inst.agi_load_last > agg_stash_load_retry) {
+			inst.agi_load = 'idle';
+			inst.load();
+		} else if (!agg_stash_saved ||
+		    agg_stash_saved - now > agg_stash_min_interval)  {
+			agg_stash_saved = now;
+			inst.save();
+		}
+
 		if (!inst.agi_instrumentation['retention-time'])
 			continue;
 
@@ -1109,7 +1119,7 @@ function aggHttpVerifyTransformations(id, request)
 	    }
 	}, request.ca_params, 'transformations');
 
-	validtrans = agg_insts[id]['agi_instrumentation']['transformations'];
+	validtrans = agg_insts[id].agi_instrumentation['transformations'];
 
 	for (ii = 0; ii < trans.length; ii++) {
 		if (!(trans[ii] in agg_transforms))
@@ -1185,5 +1195,207 @@ function aggHttpValueTransform(id, request, raw)
 
 	return (ret);
 }
+
+/*
+ * This class is not very well encapsulated.  It's primarily used as a data
+ * structure for keeping track of various state associated with this
+ * instrumentation, and most of the properties are exposed directly to the rest
+ * of the aggregator.  The class exists (rather than using a simple Object) to
+ * encapsulate the load state, which is non-trivial.
+ *
+ * Note that both loading and saving data is best-effort, and nothing actually
+ * waits for it directly.  That's why the load() and save() entry points don't
+ * consume callbacks and don't provide notification for completion or failure.
+ */
+function aggInstn(id, instn, datakey)
+{
+	this.agi_id = id;
+	this.agi_since = new Date();
+	this.agi_dataset = mod_caagg.caDatasetForInstrumentation(instn);
+	this.agi_last = 0;
+	this.agi_requests = [];
+	this.agi_instrumentation = instn;
+	this.agi_datakey = datakey;
+	this.agi_bucket = 'ca.instn.data.' + this.agi_id;
+
+	if (!instn['persist-data']) {
+		this.agi_load = 'non-persistent';
+		return;
+	}
+
+	this.agi_load = 'idle';
+	this.load();
+}
+
+/*
+ * Fetch and load saved data from the stash.  The load state must be 'idle',
+ * which indicates that we've either never tried to load before or a previous
+ * load failed (i.e. there's no load currently going on).
+ */
+aggInstn.prototype.load = function ()
+{
+	var instn, log;
+
+	instn = this;
+	log = agg_log;
+
+	ASSERT.equal(this.agi_load, 'idle');
+	this.agi_load = 'pending';
+
+	agg_log.info('instn %s: loading from stash', this.agi_id);
+
+	agg_cap.cmdDataGet(mod_cap.ca_amqp_key_stash, agg_stash_timeout,
+	    [ { bucket: this.agi_bucket } ], function (err, results) {
+		if (err) {
+			/*
+			 * We failed to complete the "get" command at all.
+			 * We'll try again in a little while.
+			 */
+			instn.agi_load = 'waiting';
+			instn.agi_load_last = new Date().getTime();
+			log.error('instn %s stash load failed: %r',
+			    instn.agi_id, err);
+			return;
+		}
+
+		/*
+		 * If we fail after this point, it's because the data is
+		 * garbage.  We treat this as a successful load for the purposes
+		 * of saving future data, meaning that we'll clobber whatever
+		 * data is currently there.
+		 */
+		instn.agi_load = 'loaded';
+		ASSERT.equal(results.length, 1);
+
+		if ('error' in results[0]) {
+			if (results[0]['error']['code'] == ECA_NOENT)
+				agg_log.warn('instn %s stash load: no data',
+				    instn.agi_id);
+			else
+				agg_log.warn('instn %s stash load: failed: %s',
+				    results[0]['error']['message']);
+
+			return;
+		}
+
+		instn.unstash(results[0]['result']);
+	    });
+};
+
+/*
+ * Given data saved in the stash, load it into this instrumentation's dataset.
+ */
+aggInstn.prototype.unstash = function (result)
+{
+	var metadata, contents, data;
+
+	metadata = result['metadata'];
+	contents = result['data'];
+
+	try {
+		data = JSON.parse(contents);
+		agg_log.info('instn %s stash load: found results from %j',
+		    this.agi_id, metadata.ca_creator);
+		this.agi_dataset.unstash(metadata, data);
+	} catch (ex) {
+		agg_log.warn('instn %s stash load: failed to parse results: %r',
+		    this.agi_id, ex);
+	}
+};
+
+/*
+ * Save the current state to the stash, but only if it hasn't been saved too
+ * recently and we're not currently trying to save it.
+ */
+aggInstn.prototype.save = function ()
+{
+	var instn, now, rq;
+
+	/*
+	 * Non-persistent instrumentations don't get saved.
+	 */
+	if (this.agi_load == 'non-persistent')
+		return;
+
+	/*
+	 * If we're already saving, don't try to save again.
+	 */
+	if (this.agi_saving)
+		return;
+
+	/*
+	 * If we haven't loaded anything from the persistence service, don't
+	 * save what we've got.  Otherwise, we might clobber what's there just
+	 * because we didn't load it yet (perhaps because the stash was
+	 * experiencing problems when we started up).
+	 */
+	if (this.agi_load != 'loaded')
+		return;
+
+	now = new Date().getTime();
+
+	if (this.agi_last_saved) {
+		if (now - this.agi_last_saved < agg_stash_min_interval)
+			return;
+
+		if (now - this.agi_last_saved <
+		    this.agi_instrumentation['granularity'] * 1000)
+			return;
+	}
+
+	instn = this;
+	rq = this.agi_dataset.stash();
+	rq['bucket'] = this.agi_bucket;
+	rq['data'] = JSON.stringify(rq['data']);
+	rq['metadata'].ca_creator = agg_sysinfo;
+
+	agg_log.dbg('instn %s: saving to stash', instn.agi_id);
+
+	this.agi_saving = true;
+	agg_cap.cmdDataPut(mod_cap.ca_amqp_key_stash, agg_stash_timeout,
+	    [ rq ], function (err, results) {
+		instn.agi_saving = false;
+
+		if (err) {
+			agg_log.error('instn %s stash save failed: %r',
+			    instn.agi_id, err);
+			return;
+		}
+
+		if ('error' in results[0]) {
+			agg_log.error('instn %s stash save failed remotely: %s',
+			    instn.agi_id, results[0]['error']['message']);
+			return;
+		}
+
+		instn.agi_last_saved = now;
+	    });
+};
+
+aggInstn.prototype.update = function (newinst, datakey)
+{
+	if (datakey != this.agi_datakey) {
+		agg_log.error('asked to re-aggregate instn "%s" with ' +
+		    'different datakey (was "%s", now "%s")', this.agi_id,
+		    this.agi_datakey, datakey);
+	}
+
+	this.agi_instrumentation = newinst;
+	if (newinst['persist-data'] && this.agi_load == 'non-persistent') {
+		this.agi_load = 'idle';
+		this.load();
+		return;
+	}
+
+	if (!newinst['persist-data'] && this.agi_load != 'non-persistent') {
+		this.agi_load = 'non-persistent';
+		this.deleteData();
+	}
+};
+
+aggInstn.prototype.deleteData = function ()
+{
+	/* XXX */
+};
 
 main();

@@ -109,6 +109,24 @@ function newstash_check(err)
 	});
 }
 
+function remove()
+{
+	stash.bucketDelete('janey', function (err) {
+		ASSERT(!err, caSprintf('unexpected error: %j', err));
+		log.dbg('removed bucket');
+		mod_tl.advance();
+	});
+}
+
+function check_removed()
+{
+	stash.bucketContents('janey', function (err) {
+		ASSERT(err);
+		ASSERT(err.code() == ECA_NOENT);
+		mod_tl.advance();
+	});
+}
+
 function cleanup()
 {
 	log.info('removing "%s"', tmpdir);
@@ -122,6 +140,10 @@ mod_tl.ctPushFunc(fill_again);
 mod_tl.ctPushFunc(check_again);
 mod_tl.ctPushFunc(newstash);
 mod_tl.ctPushFunc(newstash_check);
+mod_tl.ctPushFunc(remove);
+mod_tl.ctPushFunc(check_removed);
+mod_tl.ctPushFunc(newstash);
+mod_tl.ctPushFunc(check_removed);
 mod_tl.ctPushFunc(cleanup);
 mod_tl.ctPushFunc(mod_tl.ctDoExitSuccess);
 mod_tl.advance();

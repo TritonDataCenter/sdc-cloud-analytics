@@ -159,7 +159,7 @@ function aggCmdEnableAggregation(msg)
 	 * instrumentation then we're already done.
 	 */
 	if (id in agg_insts) {
-		agg_insts[id].update(msg.ca_instrumentation);
+		agg_insts[id].update(msg.ag_instrumentation, datakey);
 		agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 		return;
 	}

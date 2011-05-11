@@ -35,7 +35,7 @@ var agg_transforms = {};	/* available transformations by name */
 var agg_stash_min_interval = 60 * 1000;		/* min freq for stash updates */
 var agg_stash_timeout = 10 * 1000;		/* timeout for stash ops */
 var agg_stash_load_retry = 60 * 1000;		/* time between load retries */
-var agg_stash_saved;				/* last global save */
+var agg_stash_saved = 0;				/* last global save */
 
 var agg_recent_interval = 2 * agg_http_req_timeout;	/* see aggExpected() */
 
@@ -1008,8 +1008,15 @@ function aggExpected(dataset, time)
  */
 function aggTick()
 {
-	var id, inst, ii, rq;
+	var id, inst, ii, rq, globalsave;
 	var now = new Date().getTime();
+
+	if (agg_stash_saved - now > agg_stash_min_interval) {
+		globalsave = true;
+		agg_stash_saved = now;
+	} else {
+		globalsave = false;
+	}
 
 	for (id in agg_insts) {
 		inst = agg_insts[id];
@@ -1030,9 +1037,7 @@ function aggTick()
 		    now - inst.agi_load_last > agg_stash_load_retry) {
 			inst.agi_load = 'idle';
 			inst.load();
-		} else if (!agg_stash_saved ||
-		    agg_stash_saved - now > agg_stash_min_interval)  {
-			agg_stash_saved = now;
+		} else if (globalsave) {
 			inst.save();
 		}
 

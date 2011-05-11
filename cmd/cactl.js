@@ -32,6 +32,7 @@ var cc_help = [
     '                           with -v, print additional unstructured info',
     '        log <msg>          report log message',
     '        stash list         show list of stash buckets',
+    '        stash del <bucket> delete stash bucket "bucket"',
     '        stash get <bucket> retrieve contents of stash bucket "bucket"',
     '        stash put <bucket> <contents> [<metadata>]',
     '                           save contents into stash bucket "bucket"\n',
@@ -84,6 +85,7 @@ function main()
 	cc_cap.on('msg-ack-status', ccAckStatus);
 	cc_cap.on('msg-ack-data_get', ccAckDataGet);
 	cc_cap.on('msg-ack-data_put', ccAckDataPut);
+	cc_cap.on('msg-ack-data_delete', ccAckDataDel);
 	cc_cap.on('connected', ccRunCmd);
 	cc_cap.start();
 }
@@ -197,6 +199,11 @@ function ccRunStashCmd()
 		msg.ca_subtype = 'data_put';
 		break;
 
+	case 'del':
+	case 'delete':
+		msg.ca_subtype = 'data_delete';
+		break;
+
 	default:
 		usage('invalid stash subcommand');
 		break;
@@ -212,7 +219,7 @@ function ccRunStashCmd()
 
 	cc_cmd = msg.ca_subtype;
 
-	if (subcmd == 'get' || subcmd == 'list') {
+	if (subcmd != 'put') {
 		msg.p_requests = [ { bucket: bucket } ];
 		return (msg);
 	}
@@ -386,6 +393,31 @@ function ccAckDataPut(msg)
 	}
 
 	printf('saved data\n');
+	shutdown();
+}
+
+function ccAckDataDel(msg)
+{
+	var result;
+
+	ccCheckMsg(msg);
+
+	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
+	printf('%-12s %s\n', 'Route key:', msg.ca_source);
+	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
+	    msg.ca_agent_version);
+	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
+	    msg.ca_os_release, msg.ca_os_revision);
+
+	result = msg.p_results[0];
+
+	if ('error' in result) {
+		printf('ERROR deleting bucket: %s\n',
+		    result['error']['message']);
+		process.exit(1);
+	}
+
+	printf('deleted bucket\n');
 	shutdown();
 }
 

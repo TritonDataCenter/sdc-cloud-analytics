@@ -7,11 +7,14 @@ var mod_ca = require('../../lib/ca/ca-common');
 var mod_caagg = require('../../lib/ca/ca-agg');
 var mod_tl = require('../../lib/tst/ca-test');
 
-var dataset = mod_caagg.caDatasetForInstrumentation({
-	'value-arity': mod_ca.ca_arity_numeric,
-	'value-dimension': 3,
-	'granularity': 1
-    });
+var spec = {
+    'value-arity': mod_ca.ca_arity_numeric,
+    'value-dimension': 3,
+    'granularity': 1
+};
+
+var dataset = mod_caagg.caDatasetForInstrumentation(spec);
+var stashed, restored;
 
 var source1 = 'source1';
 var source2 = 'source2';
@@ -248,6 +251,81 @@ total[time2] = [
     [[10, 20], 15]
 ];
 mod_assert.deepEqual(dataset.total(), total);
+
+/* stash / unstash */
+stashed = dataset.stash();
+restored = mod_caagg.caDatasetForInstrumentation(spec);
+mod_assert.deepEqual(restored.total(), {});
+mod_assert.deepEqual(restored.keysForTime(time1, 1), []);
+mod_assert.deepEqual(restored.dataForTime(time1), {});
+mod_assert.deepEqual(restored.dataForKey('abe'), {});
+restored.unstash(stashed['metadata'], stashed['data']);
+
+mod_assert.deepEqual(dataset.dataForTime(time1), {
+	abe: [
+	    [[10, 20], 10],
+	    [[20, 30],  9],
+	    [[40, 50], 44],
+	    [[60, 70], 15]
+	],
+	jasper: [
+	    [[20, 30], 15],
+	    [[40, 50], 17]
+	],
+ 	molloy: [
+	    [[ 0, 10], 18],
+	    [[10, 20], 15],
+	    [[30, 40],  7],
+	    [[40, 50],  3]
+	]
+});
+mod_assert.deepEqual(dataset.keysForTime(time1, 1).sort(),
+    [ 'abe', 'jasper', 'molloy' ]);
+mod_assert.deepEqual(dataset.keysForTime(time1, time2 + 1 - time1).sort(),
+    [ 'abe', 'glick', 'jasper', 'molloy' ]);
+mod_assert.deepEqual(dataset.dataForTime(time2), {
+    abe: [[[0, 10], 12]],
+    glick: [[[10, 20], 15]]
+});
+mod_assert.deepEqual(dataset.keysForTime(time2, 1).sort(), [ 'abe', 'glick' ]);
+mod_assert.deepEqual(dataset.dataForKey('abe'), abe);
+mod_assert.deepEqual(dataset.dataForKey('glick'), glick);
+mod_assert.deepEqual(dataset.dataForKey('jasper'), jasper);
+mod_assert.deepEqual(dataset.dataForKey('molloy'), molloy);
+mod_assert.deepEqual(dataset.total(), total);
+
+mod_assert.deepEqual(restored.dataForTime(time1), {
+	abe: [
+	    [[10, 20], 10],
+	    [[20, 30],  9],
+	    [[40, 50], 44],
+	    [[60, 70], 15]
+	],
+	jasper: [
+	    [[20, 30], 15],
+	    [[40, 50], 17]
+	],
+ 	molloy: [
+	    [[ 0, 10], 18],
+	    [[10, 20], 15],
+	    [[30, 40],  7],
+	    [[40, 50],  3]
+	]
+});
+mod_assert.deepEqual(restored.keysForTime(time1, 1).sort(),
+    [ 'abe', 'jasper', 'molloy' ]);
+mod_assert.deepEqual(restored.keysForTime(time1, time2 + 1 - time1).sort(),
+    [ 'abe', 'glick', 'jasper', 'molloy' ]);
+mod_assert.deepEqual(restored.dataForTime(time2), {
+    abe: [[[0, 10], 12]],
+    glick: [[[10, 20], 15]]
+});
+mod_assert.deepEqual(restored.keysForTime(time2, 1).sort(), [ 'abe', 'glick' ]);
+mod_assert.deepEqual(restored.dataForKey('abe'), abe);
+mod_assert.deepEqual(restored.dataForKey('glick'), glick);
+mod_assert.deepEqual(restored.dataForKey('jasper'), jasper);
+mod_assert.deepEqual(restored.dataForKey('molloy'), molloy);
+mod_assert.deepEqual(restored.total(), total);
 
 
 /* don't expire old data */

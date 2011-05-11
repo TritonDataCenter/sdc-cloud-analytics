@@ -54,6 +54,7 @@ var gMaxSeries;
  * Global state
  */
 var gGraphs = {};		/* currently active graphs */
+var gPersistCheckbox;
 
 /*
  * Fix that Firefox < 4 doesn't have Object.keys(); -- Code from
@@ -73,6 +74,8 @@ if (!Object.keys)
 
 window.onload = function ()
 {
+	gPersistCheckbox = document.getElementById('gStatPersistent');
+
 	gInitColors();
 	gInitConfig();
 	setTimeout(gTick, 0);
@@ -610,6 +613,9 @@ gGraph.prototype.initDetails = function ()
 
 	label = gMetricBase(this.g_metric);
 	this.g_body = 'module=' + metric.module + '&stat=' + metric.stat;
+
+	if (gPersistCheckbox.checked)
+		this.g_body += '&persist-data=true';
 
 	if (decomps.length === 0) {
 		this.g_type = 'scalar';

@@ -161,6 +161,10 @@ var http_test_cases = [ {
 	    'retention-time': 3601 },
 	error: HTTP.ECONFLICT
 }, {
+	name: 'illegal value for persist-data',
+	input: { module: 'test_module', stat: 'ops1', 'persist-data': 'junk' },
+	error: HTTP.ECONFLICT
+}, {
 	name: 'granularity: truncated to an integer',
 	input: { module: 'test_module', stat: 'ops1', granularity: '10.5' },
 	expect: { 'granularity': 10 }
@@ -173,7 +177,12 @@ var http_test_cases = [ {
 	name: 'create with simple metric',
 	input: { module: 'test_module', stat: 'ops1' },
 	expect: { 'value-dimension': 1, 'value-arity': 'scalar',
-	    'granularity': 1 }
+	    'granularity': 1, 'persist-data': false }
+}, {
+	name: 'create with simple metric and persistence',
+	input: { module: 'test_module', stat: 'ops1', 'persist-data': 'true' },
+	expect: { 'value-dimension': 1, 'value-arity': 'scalar',
+	    'granularity': 1, 'persist-data': true }
 }, {
 	name: 'create with single discrete decomposition',
 	input: { module: 'test_module', stat: 'ops1',

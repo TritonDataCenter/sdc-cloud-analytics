@@ -173,6 +173,18 @@ function fill_bad_bucketname()
 	});
 }
 
+function delete_bad_bucketname()
+{
+	cap.cmdDataPut(svckey, 1000, [ { bucket: { 'bucket': '.contents' } } ],
+	    function (err, results) {
+		ASSERT(!err);
+		mod_assert.equal(results.length, 1);
+		ASSERT('error' in results[0]);
+		mod_assert.equal(results[0]['error']['code'], ECA_INVAL);
+		mod_tl.advance();
+	});
+}
+
 function fill_bad_metadata()
 {
 	cap.cmdDataPut(svckey, 1000, [ {
@@ -214,7 +226,6 @@ function teardown()
 {
 	svc.stop(function () {
 		ASSERT(connected);
-		connected = false;
 		mod_tl.advance();
 	});
 }
@@ -227,6 +238,49 @@ function check_down()
 		ASSERT(err.code() == ECA_TIMEDOUT);
 		mod_tl.advance();
 	    });
+}
+
+function delete_nonexistent()
+{
+	cap.cmdDataDelete(svckey, 1000, [ { bucket: 'foobar' } ],
+	    function (err, results) {
+		ASSERT(!err);
+		ASSERT('result' in results[0]);
+		mod_tl.advance();
+	    });
+}
+
+function delete_bucket()
+{
+	cap.cmdDataDelete(svckey, 1000, [ { bucket: 'bucket1' } ],
+	    function (err, results) {
+		ASSERT(!err);
+		ASSERT('result' in results[0]);
+		mod_tl.advance();
+	    });
+}
+
+function check_deleted()
+{
+	cap.cmdDataGet(svckey, 1000, [
+	    { bucket: 'bucket1' }, { bucket: 'bucket2' }, { bucket: 'bucket3' }
+	], function (err, results) {
+		mod_assert.equal(results.length, 3);
+
+		ASSERT('error' in results[0]);
+		mod_assert.equal(results[1]['error']['code'], ECA_NOENT);
+
+		ASSERT('error' in results[1]);
+		mod_assert.equal(results[1]['error']['code'], ECA_NOENT);
+
+		ASSERT(!('error' in results[2]));
+		mod_assert.deepEqual(results[2]['result'], {
+			bucket: 'bucket3',
+			metadata: {},
+			data: 'dont let the name fool you'
+		});
+		mod_tl.advance();
+	});
 }
 
 /* setup */
@@ -250,6 +304,7 @@ mod_tl.ctPushFunc(fill_bad_bucketname);
 mod_tl.ctPushFunc(fill_bad_metadata);
 mod_tl.ctPushFunc(fill_missing_bucketname);
 mod_tl.ctPushFunc(fill_missing_metadata);
+mod_tl.ctPushFunc(delete_bad_bucketname);
 
 /* teardown and read data again (durability) */
 mod_tl.ctPushFunc(teardown);
@@ -258,6 +313,16 @@ mod_tl.ctPushFunc(check_down);
 mod_tl.ctPushFunc(setup_svc);
 mod_tl.ctPushFunc(check_noerr);
 mod_tl.ctPushFunc(check_buckets);
+
+/* bucket delete */
+mod_tl.ctPushFunc(delete_nonexistent);
+mod_tl.ctPushFunc(delete_bucket);
+mod_tl.ctPushFunc(check_deleted);
+mod_tl.ctPushFunc(teardown);
+mod_tl.ctPushFunc(check_down);
+mod_tl.ctPushFunc(setup_svc);
+mod_tl.ctPushFunc(check_noerr);
+mod_tl.ctPushFunc(check_deleted);
 
 mod_tl.ctPushFunc(mod_tl.ctDoExitSuccess);
 mod_tl.advance();

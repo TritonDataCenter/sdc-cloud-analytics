@@ -7,11 +7,14 @@ var mod_ca = require('../../lib/ca/ca-common');
 var mod_caagg = require('../../lib/ca/ca-agg');
 var mod_tl = require('../../lib/tst/ca-test');
 
-var dataset = mod_caagg.caDatasetForInstrumentation({
-	'value-arity': mod_ca.ca_arity_numeric,
-	'value-dimension': 2,
-	'granularity': 1
-    });
+var spec = {
+    'value-arity': mod_ca.ca_arity_numeric,
+    'value-dimension': 2,
+    'granularity': 1
+};
+
+var dataset = mod_caagg.caDatasetForInstrumentation(spec);
+var stashed, restored;
 
 var source1 = 'source1';
 var source2 = 'source2';
@@ -92,6 +95,40 @@ mod_assert.deepEqual(dataset.total(), total);
 mod_assert.deepEqual(dataset.keysForTime(time1, 1), []);
 mod_assert.deepEqual(dataset.keysForTime(time1, 10), []);
 mod_assert.deepEqual(dataset.dataForKey('foo'), {});
+
+/* stash / unstash */
+stashed = dataset.stash();
+restored = mod_caagg.caDatasetForInstrumentation(spec);
+mod_assert.deepEqual(restored.total(), {});
+mod_assert.deepEqual(restored.keysForTime(time1, 1), []);
+mod_assert.deepEqual(restored.dataForTime(time1), {});
+restored.unstash(stashed['metadata'], stashed['data']);
+
+mod_assert.deepEqual(dataset.dataForTime(time1), [
+	[[ 0, 10], 15],
+	[[10, 20], 25],
+	[[30, 40],  7],
+	[[40, 50], 30],
+	[[60, 70],  7]
+]);
+mod_assert.deepEqual(dataset.dataForTime(time2), [[5, 15], 12]);
+mod_assert.deepEqual(dataset.total(), total);
+mod_assert.deepEqual(dataset.keysForTime(time1, 1), []);
+mod_assert.deepEqual(dataset.keysForTime(time1, 10), []);
+mod_assert.deepEqual(dataset.dataForKey('foo'), {});
+
+mod_assert.deepEqual(restored.dataForTime(time1), [
+	[[ 0, 10], 15],
+	[[10, 20], 25],
+	[[30, 40],  7],
+	[[40, 50], 30],
+	[[60, 70],  7]
+]);
+mod_assert.deepEqual(restored.dataForTime(time2), [[5, 15], 12]);
+mod_assert.deepEqual(restored.total(), total);
+mod_assert.deepEqual(restored.keysForTime(time1, 1), []);
+mod_assert.deepEqual(restored.keysForTime(time1, 10), []);
+mod_assert.deepEqual(restored.dataForKey('foo'), {});
 
 /* don't expire old data */
 dataset.expireBefore(time1);

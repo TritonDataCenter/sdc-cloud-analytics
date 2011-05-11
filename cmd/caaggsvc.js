@@ -96,6 +96,7 @@ function main()
 
 	agg_cap.on('msg-cmd-status', aggCmdStatus);
 	agg_cap.on('msg-cmd-enable_aggregation', aggCmdEnableAggregation);
+	agg_cap.on('msg-cmd-disable_aggregation', aggCmdDisableAggregation);
 	agg_cap.on('msg-data', aggData);
 	agg_cap.on('msg-notify-configsvc_online', aggNotifyConfigRestarted);
 	agg_cap.on('msg-notify-config_reset', aggNotifyConfigReset);
@@ -163,12 +164,36 @@ function aggCmdEnableAggregation(msg)
 		return;
 	}
 
-	agg_log.info('aggregating instrumentation %s', id);
+	agg_log.info('aggregating instn %s', id);
 	agg_cap.bind(datakey, function () {
 		agg_cap.sendCmdAckEnableAggSuc(destkey, msg.ca_id, id);
 		agg_insts[id] = new aggInstn(id, msg.ag_instrumentation,
 		    datakey);
 	});
+}
+
+function aggCmdDisableAggregation(msg)
+{
+	var fqid, destkey, instn;
+
+	destkey = msg.ca_source;
+
+	if (!('ag_inst_id' in msg)) {
+		agg_cap.sendCmdAckDisableAggFail(destkey, msg.ca_id,
+		    'missing field');
+		return;
+	}
+
+	fqid = msg.ag_inst_id;
+	agg_cap.sendCmdAckDisableAggSuc(destkey, msg.ca_id, fqid);
+
+	if (!(fqid in agg_insts))
+		return;
+
+	agg_log.info('disabling aggregation for instn %s', fqid);
+	instn = agg_insts[fqid];
+	delete (agg_insts[fqid]);
+	instn.deleteData();
 }
 
 /*
@@ -1395,7 +1420,25 @@ aggInstn.prototype.update = function (newinst, datakey)
 
 aggInstn.prototype.deleteData = function ()
 {
-	/* XXX */
+	var instn = this;
+
+	agg_cap.cmdDataDelete(mod_cap.ca_amqp_key_stash, agg_stash_timeout,
+	    [ { bucket: this.agi_bucket } ], function (err, results) {
+		if (err) {
+			agg_log.error('instn %s stash delete failed: %r',
+			    instn.agi_id, err);
+			return;
+		}
+
+		if ('error' in results[0]) {
+			agg_log.error('instn %s stash delete failed ' +
+			    'remotely: %s', instn.agi_id,
+			    results[0]['error']['message']);
+			return;
+		}
+
+		agg_log.info('instn %s data deleted', instn.agi_id);
+	    });
 };
 
 main();

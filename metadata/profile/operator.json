@@ -32,6 +32,10 @@
 		"stat": "reclaimed_bytes",
 		"fields": [ "hostname", "zonename" ]
 	}, {
+		"module": "memory",
+		"stat": "pageins",
+		"fields": [ "hostname", "zonename" ]
+	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [

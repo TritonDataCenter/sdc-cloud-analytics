@@ -171,6 +171,12 @@
 	"type":		"size",
 	"fields":	[ "hostname", "zonename" ]
     }, {
+	"module":	"memory",
+	"stat":		"pageins",
+	"label":	"pages paged in",
+	"unit":		"pages",
+	"fields":	[ "hostname", "zonename" ]
+    }, {
 	"module":	"nic",
 	"stat":		"nics",
 	"label":	"NICs",

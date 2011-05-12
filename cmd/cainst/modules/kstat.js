@@ -540,6 +540,20 @@ var inskMetrics = [ {
 			}
 		}
 	}
+}, {
+	module: 'memory',
+	stat: 'pageins',
+	kstat: { module: 'memory_cap' },
+	extract: function (fields, kstat, kprev) {
+		return (kstat['data']['pgpgin'] - kprev['data']['pgpgin']);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
 } ];
 
 function inskNicFilter(kstat)

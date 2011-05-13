@@ -6,6 +6,7 @@
 	"author":	"Joyent (joyent.com)",
 	"bin":		{
 		"cactl":	"cmd/cactl.js",
+		"cagcore":	"cmd/cagcore.js",
 		"caprof":	"tools/caprof.js"
 	},
 	"scripts": {

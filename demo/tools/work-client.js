@@ -4,9 +4,9 @@
 
 var mod_http = require('http');
 var uris = [
-	{ uri: '/fast', concurrency: 10 },
-	{ uri: '/slow', concurrency: 10 },
-	{ uri: '/search?q=ca', concurrency: 10 }
+	{ uri: '/cached', concurrency: 10 },
+	{ uri: '/favicon', concurrency: 10 },
+	{ uri: '/search?q=slow&garbage', concurrency: 10 }
 ];
 
 function main()
@@ -37,10 +37,17 @@ function main()
 
 function start_load(hostname, port, uri)
 {
+	/*
+	 * We skip the agent to avoid node issue #877, where the agent
+	 * inadvertently throttles connections.  We could also specify the
+	 * connection: keep-alive header, but we prefer to emulate the behavior
+	 * of many different clients.
+	 */
 	mod_http.get({
 		host: hostname,
 		port: port,
-		path: uri
+		path: uri,
+		agent: false
 	}, function (response) {
 		return (start_load(hostname, port, uri));
 	});

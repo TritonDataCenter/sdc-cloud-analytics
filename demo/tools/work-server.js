@@ -10,7 +10,7 @@ console.log('Server running at http://127.0.0.1:%s/', port);
 
 function handle(request, response)
 {
-	if (request.url.indexOf('/slow') == 0) {
+	if (request.url.indexOf('slow') != -1) {
 		setTimeout(finish(request, response), 50);
 		return;
 	}
@@ -21,7 +21,8 @@ function handle(request, response)
 function finish(request, response)
 {
 	return (function () {
-		make_garbage();
+		if (request.url.indexOf('garbage') != -1)
+			make_garbage();
 		response.writeHead(200, {'Content-Type': 'text/plain'});
 		response.end();
 	});

@@ -80,7 +80,8 @@ function check_instrumentation(test, code, response, rv)
 	ASSERT.equal(rv['idle-max'], 3600);
 	ASSERT.equal(rv['enabled'], true);
 	ASSERT.deepEqual(rv['transformations'], trans);
-	ASSERT.ok(rv['uri'].lastIndexOf('/ca/instrumentations/') === 0);
+	ASSERT.equal(rv['uri'], '/ca/instrumentations/' + rv['id']);
+	ASSERT.ok(rv['id'].length > 0);
 	ASSERT.ok(rv['uris'].length > 0);
 	ASSERT.ok(rv['uris'].filter(function (elt) {
 		return (elt['name'] == 'value_raw');

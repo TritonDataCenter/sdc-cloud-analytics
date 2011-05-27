@@ -535,6 +535,7 @@ function aggHttpValueRawDone(id, start, duration, request, response, delay)
 	ret.nsources = dataset.nsources();
 	ret.value = dataset.dataForTime(start);
 	ret.minreporting = dataset.nreporting(start);
+	aggHttpValueFill(ret, request);
 
 	keys = (typeof (ret.value) == 'object' &&
 	    ret.value.constructor == Object) ?  Object.keys(ret.value) : [];
@@ -751,6 +752,29 @@ function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
 	return (conf);
 }
 
+function aggHttpValueFill(ret, request, hmconf)
+{
+	var rqstart, rqduration;
+
+	rqstart = mod_ca.caHttpParam(aggValueParams, request.ca_params,
+	    'start_time');
+	rqduration = mod_ca.caHttpParam(aggValueParams, request.ca_params,
+	    'duration');
+
+	if (rqstart !== undefined)
+		ret.requested_start_time = rqstart;
+
+	if (rqduration !== undefined)
+		ret.requested_duration = rqduration;
+
+	if (hmconf === undefined)
+		return;
+
+	ret.nbuckets = hmconf['nbuckets'];
+	ret.width = hmconf['width'];
+	ret.height = hmconf['height'];
+}
+
 function aggHttpValueHeatmapImageDone(id, start, duration, request, response,
     delay)
 {
@@ -800,6 +824,7 @@ function aggHttpValueHeatmapImageDone(id, start, duration, request, response,
 	ret.nsources = dataset.nsources();
 	ret.minreporting = dataset.nreporting(start, duration);
 	ret.present = dataset.keysForTime(start, duration);
+	aggHttpValueFill(ret, request, conf);
 
 	if (rainbow)
 		selected = ret.present.sort();
@@ -906,6 +931,7 @@ function aggHttpValueHeatmapDetailsDone(id, start, duration, request, response,
 	}
 
 	range = mod_heatmap.samplerange(xx, yy, conf);
+	range[0] = dataset.normalizeInterval(range[0], duration)['start_time'];
 
 	ret = {};
 	ret.bucket_time = range[0];
@@ -915,6 +941,7 @@ function aggHttpValueHeatmapDetailsDone(id, start, duration, request, response,
 	ret.duration = duration;
 	ret.nsources = dataset.nsources();
 	ret.minreporting = dataset.nreporting(range[0]);
+	aggHttpValueFill(ret, request, conf);
 
 	if (delay > 0)
 		ret.delayed = delay;

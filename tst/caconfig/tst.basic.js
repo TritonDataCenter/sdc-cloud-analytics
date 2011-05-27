@@ -15,6 +15,7 @@ var log = mod_tl.ctStdout;
 var http_port = mod_ca.ca_http_port_config;
 var url_create = '/ca/instrumentations?profile=none';
 var instrumenter, aggregator, http, svcs;
+var start = new Date().getTime();
 
 mod_tl.ctSetTimeout(10 * 1000);
 
@@ -87,6 +88,9 @@ function check_instrumentation(test, code, response, rv)
 		return (elt['name'] == 'value_raw');
 	}).length == 1);
 	ASSERT.ok(rv['nsources'] === 1);
+
+	ASSERT.ok(rv['crtime'] >= start);
+	ASSERT.ok(rv['crtime'] <= new Date().getTime());
 
 	for (key in test.expect) {
 		ASSERT.equal(rv[key], exp[key], caSprintf(

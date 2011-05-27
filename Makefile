@@ -7,6 +7,8 @@
 #
 CA_VERSION	:= $(shell git symbolic-ref HEAD | \
 	nawk -F / '{print $$3}')-$(shell git describe --dirty)
+SRC		:= $(shell pwd)
+NODEENV		:= $(shell tools/npath)
 
 #
 # Directories
@@ -14,54 +16,56 @@ CA_VERSION	:= $(shell git symbolic-ref HEAD | \
 BUILD		 = build
 DIST		 = $(BUILD)/dist
 PKGROOT		 = $(BUILD)/pkg
-ROOT		 = $(BUILD)/root
-ROOT_CA		 = $(ROOT)/opt/smartdc/ca
-TOOLSDIR	 = tools
-JS_SUBDIRS	 = cmd lib tools
-TST_SUBDIRS	 = tst
-SRC		:= $(shell pwd)
-NODEDIR		:= $(SRC)/deps/node-install/bin
-WEBREV		 = $(TOOLSDIR)/webrev_support
+
+DEMO_DIRS	:= $(shell find demo -type d)
 METAD_DIR	 = $(SRC)/cmd/cainst/modules/dtrace/
+NODEDIR		:= $(SRC)/deps/node-install/bin
+JS_SUBDIRS	 = cmd lib tools
+TOOLSDIR	 = tools
+TST_SUBDIRS	 = tst
+WEBREV		 = $(TOOLSDIR)/webrev_support
 
 #
 # Tools
 #
 BASH		 = bash
+CC		 = gcc
+CAPROF		 = $(NODEENV) $(NODE) $(TOOLSDIR)/caprof.js
+CAMCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/camchk.js > /dev/null
+CAMD		 = $(NODEENV) $(NODE) $(TOOLSDIR)/camd.js
 CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
-CAPROF		 = node $(TOOLSDIR)/caprof.js
-CAMCHK		 = node $(TOOLSDIR)/camchk.js > /dev/null
-CAMD		 = node $(TOOLSDIR)/camd.js
-JSONCHK		 = node $(TOOLSDIR)/jsonchk.js
-XMLLINT		 = xmllint --noout
-TAR		 = tar
-RMTREE		 = rm -rf
+JSONCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/jsonchk.js
+MKERRNO		 = $(TOOLSDIR)/mkerrno
+NODE		:= $(NODEDIR)/node
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= PATH=$(NODEDIR):$$PATH npm
-MKERRNO		 = $(TOOLSDIR)/mkerrno
-CC		 = gcc
+RMTREE		 = rm -rf
+TAR		 = tar
+XMLLINT		 = xmllint --noout
 
 #
 # Files
 #
 JSL_CONF_MAIN		 = $(TOOLSDIR)/jsl_support/jsl.conf
 JSL_CONF_WEB		 = $(TOOLSDIR)/jsl_support/jsl.web.conf
+
+DEMO_FILES		:= $(shell find demo -type f)
 DEMO_JSFILES		 = demo/basicvis/cademo.js
 DEMO_WEBJSFILES		 = demo/basicvis/caflot.js	\
 	demo/basicvis/caadmin.js			\
 	demo/basicvis/camon.js
 JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
 JS_FILES		+= lib/ca/errno.js
-DEMO_FILES		:= $(shell find demo -type f)
-DEMO_DIRS		:= $(shell find demo -type d)
-WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
-TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
-METADATA_FILES		:= $(shell find metadata -name '*.json')
-METAD_FILES		:= $(shell find $(METAD_DIR) -name '*.js')
-SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 JSON_FILES		:= $(shell find pkg -name '*.json')
+METAD_FILES		:= $(shell find $(METAD_DIR) -name '*.js')
+METADATA_FILES		:= $(shell find metadata -name '*.json')
+RELEASE_TARBALL  	 = $(DIST)/ca-pkg-$(CA_VERSION).tar.bz2
+TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
+WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
+
+SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
 
 SMF_MANIFESTS = \
 	smf/manifest/caconfigsvc.xml			\
@@ -69,10 +73,15 @@ SMF_MANIFESTS = \
 	smf/manifest/cainstsvc.xml			\
 	smf/manifest/castashsvc.xml
 
+SVC_SCRIPTS = \
+	pkg/pkg-svc-postactivate.sh	\
+	pkg/pkg-svc-postdeactivate.sh
+
 SH_SCRIPTS = \
 	pkg/pkg-postactivate.sh		\
 	pkg/pkg-postdeactivate.sh	\
 	smf/method/canodesvc		\
+	tools/cabranch			\
 	tools/cadeploy			\
 	tools/cadepsvcs			\
 	tools/caupagent			\
@@ -80,10 +89,9 @@ SH_SCRIPTS = \
 	tools/catest			\
 	tools/ca-headnode-setup
 
-SVC_SCRIPTS = \
-	pkg/pkg-svc-postactivate.sh	\
-	pkg/pkg-svc-postdeactivate.sh
-
+#
+# Package definitions
+#
 PKGS		 = cabase caconfigsvc caaggsvc cainstsvc castashsvc
 PKG_TARBALLS	 = $(PKGS:%=$(PKGROOT)/%.tar.gz)
 
@@ -118,7 +126,7 @@ PKGFILES_cabase = \
 	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
 	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
-	$(PKGROOT)/cabase/lib/ca			\
+	$(PKGROOT)/cabase/lib/ca/errno.js		\
 	$(PKGROOT)/cabase/lib/node.d
 
 DEPS_cabase = \
@@ -169,56 +177,6 @@ PKG_DIRS := \
 	$(PKGDIRS_cainstsvc)	\
 	$(PKGDIRS_castashsvc)
 
-ROOT_DIRS = \
-	$(ROOT_CA)						\
-	$(ROOT_CA)/cmd						\
-	$(ROOT_CA)/cmd/caagg					\
-	$(ROOT_CA)/cmd/caagg/transforms				\
-	$(ROOT_CA)/cmd/cainst					\
-	$(ROOT_CA)/cmd/cainst/modules				\
-	$(ROOT_CA)/cmd/cainst/modules/dtrace			\
-	$(ROOT_CA)/deps						\
-	$(ROOT_CA)/deps/connect					\
-	$(ROOT_CA)/deps/connect/connect				\
-	$(ROOT_CA)/deps/connect/connect/middleware		\
-	$(ROOT_CA)/deps/connect/connect/middleware/session	\
-	$(ROOT_CA)/deps/node					\
-	$(ROOT_CA)/deps/node-amqp				\
-	$(ROOT_CA)/deps/node-heatmap				\
-	$(ROOT_CA)/deps/node-libdtrace				\
-	$(ROOT_CA)/deps/node-kstat				\
-	$(ROOT_CA)/deps/node-png				\
-	$(ROOT_CA)/deps/node-uname				\
-	$(ROOT_CA)/deps/node-libGeoIP				\
-	$(ROOT_CA)/lib						\
-	$(ROOT_CA)/lib/ca					\
-	$(ROOT_CA)/lib/tst					\
-	$(ROOT_CA)/pkg						\
-	$(ROOT_CA)/smf						\
-	$(ROOT_CA)/smf/method					\
-	$(ROOT_CA)/smf/manifest					\
-	$(ROOT_CA)/tools					\
-
-ROOT_FILES = \
-	$(JS_FILES:%=$(ROOT_CA)/%)	\
-	$(SH_SCRIPTS:%=$(ROOT_CA)/%)	\
-	$(SMF_MANIFESTS:%=$(ROOT_CA)/%)
-
-ROOT_DEPFILES := \
-	$(ROOT_CA)/deps/node/node				\
-	$(ROOT_CA)/deps/node-amqp/amqp.js			\
-	$(ROOT_CA)/deps/node-amqp/amqp-definitions-0-8.js	\
-	$(ROOT_CA)/deps/node-amqp/promise.js			\
-	$(ROOT_CA)/deps/node-heatmap/heatmap.js			\
-	$(ROOT_CA)/deps/node-kstat/kstat.node			\
-	$(ROOT_CA)/deps/node-libdtrace/libdtrace.node		\
-	$(ROOT_CA)/deps/node-png/png.node			\
-	$(ROOT_CA)/deps/node-uname/uname.node			\
-	$(ROOT_CA)/deps/node-libGeoIP/libGeoIP.node
-
-CONNECT_FILES := $(shell cd deps/connect/lib && find connect -name '*.js')
-ROOT_DEPFILES += $(CONNECT_FILES:%=$(ROOT_CA)/deps/connect/%)
-
 NATIVE_DEPS = \
 	deps/node/build/default/node				\
 	deps/node-kstat/build/default/kstat.node		\
@@ -230,133 +188,84 @@ NATIVE_DEPS = \
 #
 # Targets
 #
-all: $(WEBREV)/bin/codereview $(SRC)/deps/node-install $(NATIVE_DEPS) lib/ca/errno.js
+all: tools release
 
-$(SRC)/deps/node-install:
-	mkdir -p $(SRC)/deps/node-install
-
-deps/node/build/default/node:
-	(cd deps/node && ./configure --with-dtrace --prefix=$(SRC)/deps/node-install && make install)
-
-%.node: $(NODE_WAF)
-	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
-
-lib/ca/errno.js: /usr/include/sys/errno.h
-	$(MKERRNO) $^ > $@
-
-#
-# "check" targets check syntax for files
-#
-check-metadata: $(METADATA_FILES:%=%.check)
-
-check-metad:
-	$(CAMD) $(METAD_FILES)
-
-metadata/profile/%.json.check: metadata/profile/%.json
-	$(CAPROF) $^
-
-metadata/metric/%.json.check: metadata/metric/%.json
-	$(CAMCHK) $^
-
-check-manifests: $(SMF_MANIFESTS)
-	$(XMLLINT) --dtdvalid $(SMF_DTD) $(SMF_MANIFESTS)
-
-check-shell: $(SH_SCRIPTS)
-	$(BASH) -n $(SH_SCRIPTS)
-
-check-jsl: check-jsl-main check-jsl-web
-
-check-jsl-main: $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
-	$(JSL) --conf=$(JSL_CONF_MAIN) $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
-
-check-jsl-web: $(WEBJS_FILES)
-	$(JSL) --conf=$(JSL_CONF_WEB) $(WEBJS_FILES)
-
-check-jsstyle: $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
-	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
-
-check-json: $(JSON_FILES:%=%.check)
-
-%.json.check: %.json
-	$(JSONCHK) $<
-
-check: check-metadata check-metad check-shell check-manifests check-jsstyle \
-    check-jsl check-json
-	@echo check okay
-
-#
-# "xref" target builds the cscope cross-reference
-#
-
-cscope.files:
-	find deps $(JS_SUBDIRS) $(DEMO_JSFILES) $(DEMO_WEBJSFILES) \
-	    -type f -name '*.js' -o -name '*.c' -o \
-	    -name '*.cpp' -o -name '*.cc' -o -name '*.h' > cscope.files
-
-xref: cscope.files
-	$(CSCOPE) -bqR
-
-.PHONY: cscope.files
-
-#
-# Bulids necessary binary components for tools
-#
+# XXX don't think we need codereview at all
+tools: $(WEBREV)/bin/codereview $(NODEDIR)/node $(NATIVE_DEPS)
+.PHONY: tools
 
 $(WEBREV)/bin/codereview:
 	$(CC) $(WEBREV)/src/lwlp.c -o $(WEBREV)/bin/codereview
-	
+
+$(NODEDIR)/node: deps/node/build/default/node
+
+deps/node/build/default/node: | deps/node/.git deps/node-install
+	(cd deps/node && ./configure --with-dtrace \
+	    --prefix=$(SRC)/deps/node-install && make install)
+
+deps/node-install:
+	mkdir -p deps/node-install
 
 #
-# "pkg" target builds package tarball
+# The "release" target creates a ca-pkg.tar.bz2 suitable for release to the
+# head-node. To formally release this, it should be copied to assets.joyent.us
+# and placed into the /data/assets/templates/liveimg directory.  (Access
+# assets.joyent.us via the user "jill", for which access is exclusively via
+# authorized ssh key.)  That is, to formally release it, from build/dist:
+#
+#     scp ca-pkg*bz2 jill@assets.joyent.us:/data/assets/templates/liveimg
+#
+# Subsequent head-node builds will then pick up the new release.
+#
+release: $(RELEASE_TARBALL)
+
+$(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
+	mkdir -p $(BUILD)/root
+	[[ -e $(BUILD)/root/pkg ]] || ln -s $(SRC)/$(BUILD)/pkg $(BUILD)/root/pkg
+	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz) | bzip2 > $@
+
+$(DIST):
+	mkdir -p $@
+
+#
+# The "pkg" target builds tarballs for each of the npm packages.
 #
 pkg: $(PKG_TARBALLS)
 
-$(PKGROOT)/cabase.tar.gz: install-cabase
-	cd $(PKGROOT) && $(TAR) cf - cabase | gzip > cabase.tar.gz
-
-$(PKGROOT)/caconfigsvc.tar.gz: install-caconfigsvc
-	cd $(PKGROOT) && $(TAR) cf - caconfigsvc | gzip > caconfigsvc.tar.gz
-
-$(PKGROOT)/caaggsvc.tar.gz: install-caaggsvc
-	cd $(PKGROOT) && $(TAR) cf - caaggsvc | gzip > caaggsvc.tar.gz
-
-$(PKGROOT)/cainstsvc.tar.gz: install-cainstsvc
-	cd $(PKGROOT) && $(TAR) cf - cainstsvc | gzip > cainstsvc.tar.gz
-
-$(PKGROOT)/castashsvc.tar.gz: install-castashsvc
-	cd $(PKGROOT) && $(TAR) cf - castashsvc | gzip > castashsvc.tar.gz
-
 #
-# "install" target install files into the proto ("root") area
+# We have to depend on NATIVE_DEPS here because otherwise "npm bundle install"
+# will happily install a dependency package (like node-uname) even though its
+# binary hasn't actually been built.  We have to trigger the building of the
+# binary.
 #
-install: all install-rootdirs install-rootfiles install-deps \
-    install-pkgs
+$(PKGROOT)/cabase.tar.gz: $(NATIVE_DEPS) $(PKGFILES_cabase) | $(PKGDEPS_cabase) $(PKG_DIRS)
+	(cd $(PKGROOT) && $(TAR) cf - cabase) | gzip > $@
 
-install-rootdirs: $(ROOT_DIRS)
+$(PKGROOT)/caconfigsvc.tar.gz: $(PKGFILES_caconfigsvc) | $(PKG_DIRS)
+	(cd $(PKGROOT) && $(TAR) cf - caconfigsvc) | gzip > $@
 
-install-pkgdirs: $(PKG_DIRS)
+$(PKGROOT)/caaggsvc.tar.gz: $(PKGFILES_caaggsvc) | $(PKG_DIRS)
+	(cd $(PKGROOT) && $(TAR) cf - caaggsvc) | gzip > $@
 
-install-pkgs: install-cabase install-caconfigsvc install-caaggsvc \
-    install-cainstsvc install-castashsvc
+$(PKGROOT)/cainstsvc.tar.gz: $(PKGFILES_cainstsvc) | $(PKG_DIRS)
+	(cd $(PKGROOT) && $(TAR) cf - cainstsvc) | gzip > $@
 
-install-cabase: all install-pkgdirs $(PKGFILES_cabase) $(PKGDEPS_cabase)
+$(PKGROOT)/castashsvc.tar.gz: $(PKGFILES_castashsvc) | $(PKG_DIRS)
+	(cd $(PKGROOT) && $(TAR) cf - castashsvc) | gzip > $@
 
-install-caconfigsvc: install-cabase $(PKGFILES_caconfigsvc) $(PKGDEPS_caconfigsvc)
-
-install-caaggsvc: install-cabase $(PKGFILES_caaggsvc) $(PKGDEPS_caaggsvc)
-
-install-cainstsvc: install-cabase $(PKGFILES_cainstsvc) $(PKGDEPS_cainstsvc)
-
-install-castashsvc: install-cabase $(PKGFILES_castashsvc) $(PKGDEPS_castashsvc)
-
-$(PKGROOT)/cabase/node_modules/%: deps/%
-	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/$^
-
-$(PKGROOT)/cabase/node_modules/%: deps/node-%
-	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/$^
+$(PKGFILES_cabase) $(PKGFILES_caconfigsvc) $(PKGFILES_caaggsvc) $(PKGFILES_cainstsvc) $(PKGFILES_castashsvc): | $(PKG_DIRS)
 
 $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)
+
+$(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/%/.git
+	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/deps/$*
+
+$(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/node-%/.git
+	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/deps/node-$*
+
+deps/%/.git: | deps/%
+	git submodule update --init
 
 $(PKGROOT)/cabase/cmd/node: deps/node/node
 	cp $^ $@
@@ -382,78 +291,83 @@ $(PKGROOT)/castashsvc/%: %
 $(PKGROOT)/%/package.json: pkg/%-package.json FORCE
 	sed -e 's#@@CA_VERSION@@#$(CA_VERSION)#g' $< > $@
 
-FORCE:
-
-.PHONY: FORCE
-
 $(PKGROOT)/%/.npmignore: pkg/npm-ignore
 	grep -v ^# $^ > $@
 
-$(ROOT_DIRS):
-	mkdir -p $(ROOT_DIRS)
+.SECONDEXPANSION:
+%.node: | deps/node-$$(*F)/.git
+	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
 
-install-rootfiles: $(ROOT_FILES)
-
-$(ROOT_CA)/%: %
-	cp $^ $@
-
-install-deps: $(ROOT_DEPFILES)
-
-$(ROOT_CA)/deps/%.js: deps/%.js
-	cp $^ $@
-
-$(ROOT_CA)/deps/%.js: deps/connect/lib/%.js
-	cp $^ $@
-
-$(ROOT_CA)/deps/connect/%.js: deps/connect/lib/%.js
-	cp $^ $@
-
-$(ROOT_CA)/deps/node-heatmap/heatmap.js: deps/node-heatmap/lib/heatmap.js
-	cp $^ $@
-
-$(ROOT_CA)/deps/node-png/png.node: deps/node-png/build/default/png.node
-	cp $^ $@
-
-$(ROOT_CA)/deps/node-kstat/kstat.node: deps/node-kstat/build/default/kstat.node
-	cp $^ $@
-
-$(ROOT_CA)/deps/node-uname/uname.node: deps/node-uname/build/default/uname.node
-	cp $^ $@
-
-$(ROOT_CA)/deps/node-libGeoIP/libGeoIP.node: deps/node-libGeoIP/build/default/libGeoIP.node
-	cp $^ $@
-
-$(ROOT_CA)/deps/node-libdtrace/libdtrace.node: deps/node-libdtrace/build/default/libdtrace.node
-	cp $^ $@
-
-$(ROOT_CA)/deps/node/node: deps/node-install/bin/node
-	cp $^ $@
+lib/ca/errno.js: /usr/include/sys/errno.h
+	$(MKERRNO) $^ > $@
 
 #
-# The "release" target creates a ca-pkg.tar.bz2 suitable for release to the
-# head-node. To formally release this, it should be copied to assets.joyent.us
-# and placed into the /data/assets/templates/liveimg directory.  (Access
-# assets.joyent.us via the user "jill", for which access is exclusively via
-# authorized ssh key.)  That is, to formally release it, from build/dist:
+# The "check" target checks the syntax of various files.
 #
-#     scp ca-pkg*bz2 jill@assets.joyent.us:/data/assets/templates/liveimg
+check: check-metadata check-metad check-shell check-manifests check-jsstyle \
+    check-jsl check-json
+	@echo check okay
+
+check-metadata: tools $(METADATA_FILES:%=%.check)
+
+check-metad: tools
+	$(CAMD) $(METAD_FILES)
+
+metadata/profile/%.json.check: metadata/profile/%.json tools
+	$(CAPROF) $<
+
+metadata/metric/%.json.check: metadata/metric/%.json tools
+	$(CAMCHK) $<
+
+check-manifests: $(SMF_MANIFESTS)
+	$(XMLLINT) --dtdvalid $(SMF_DTD) $(SMF_MANIFESTS)
+
+check-shell: $(SH_SCRIPTS)
+	$(BASH) -n $(SH_SCRIPTS)
+
+check-jsl: check-jsl-main check-jsl-web
+
+check-jsl-main: tools $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
+	$(JSL) --conf=$(JSL_CONF_MAIN) $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
+
+check-jsl-web: tools $(WEBJS_FILES)
+	$(JSL) --conf=$(JSL_CONF_WEB) $(WEBJS_FILES)
+
+check-jsstyle: tools $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
+	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
+
+check-json: $(JSON_FILES:%=%.check)
+
+%.json.check: %.json tools
+	$(JSONCHK) $<
+
 #
-# Subsequent head-node builds will then pick up the new release.
+# The "test" target runs catest.
 #
-release: pkg $(DIST) $(DIST)/ca-pkg-$(CA_VERSION).tar.bz2
-
-$(DIST):
-	mkdir -p $@
-
-$(ROOT)/pkg:
-	cd $(ROOT) && ln -s ../pkg .
-
-$(DIST)/ca-pkg-$(CA_VERSION).tar.bz2: install $(ROOT)/pkg
-	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz) | \
-	    bzip2 > $(DIST)/ca-pkg-$(CA_VERSION).tar.bz2
+test: release
+	tools/catest -a
 
 #
-# "clean" target removes created files -- we currently have none
+# The "pbchk" target runs pre-push checks.
+#
+pbchk: check test
+
+#
+# The "xref" target builds the cscope cross-reference.
+#
+xref: cscope.files
+	$(CSCOPE) -bqR
+
+cscope.files:
+	find deps \
+	    $(JS_SUBDIRS) $(DEMO_JSFILES) $(DEMO_WEBJSFILES) $(TST_SUBDIRS) \
+	    -type f -name '*.js' -o -name '*.c' -o \
+	    -name '*.cpp' -o -name '*.cc' -o -name '*.h' > cscope.files
+
+.PHONY: cscope.files
+
+#
+# The "clean" target removes created files -- we currently have none
 #
 clean:
 	-rm -f lib/ca/errno.js
@@ -470,3 +384,11 @@ dist-clean: clean
 	-(cd deps/node-libGeoIP && $(NODE_WAF) distclean)
 	-(cd deps/node && $(MAKE) distclean)
 	-$(RMTREE) $(BUILD) deps/node-install
+
+#
+# "FORCE" target is used as a dependency to require a given target to run every
+# time.  This should rarely be necessary.
+#
+FORCE:
+
+.PHONY: FORCE

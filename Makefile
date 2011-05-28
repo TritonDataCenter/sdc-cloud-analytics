@@ -208,14 +208,15 @@ deps/node-install:
 
 #
 # The "release" target creates a ca-pkg.tar.bz2 suitable for release to the
-# head-node. To formally release this, it should be copied to assets.joyent.us
-# and placed into the /data/assets/templates/liveimg directory.  (Access
-# assets.joyent.us via the user "jill", for which access is exclusively via
-# authorized ssh key.)  That is, to formally release it, from build/dist:
+# head-node. To formally release this, it should be copied to the build server
+# as follows:
 #
-#     scp ca-pkg*bz2 jill@assets.joyent.us:/data/assets/templates/liveimg
+#    scp build/dist/ca-pkg-*.tar.bz2 \
+#	bamboo@10.2.0.190:/rpool/data/coal/live_147/assets
 #
-# Subsequent head-node builds will then pick up the new release.
+# Subsequent head-node builds will then pick up the new release.  (This address
+# can only be accessed through the Bellingham VPN, and access via the user
+# "bamboo" is exclusively by ssh key.)
 #
 release: $(RELEASE_TARBALL)
 

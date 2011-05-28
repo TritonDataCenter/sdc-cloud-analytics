@@ -276,13 +276,12 @@ function aggData(msg)
 	 */
 	interval = dataset.normalizeInterval(time, time);
 	time = interval['start_time'];
-	ASSERT.ok(dataset.nreporting(time) <= dataset.nsources(),
-	    caSprintf('nreporting: %d, nsources: %d', dataset.nreporting(time),
-	    dataset.nsources()));
+
 	if (dataset.nreporting(time) < aggExpected(dataset, time))
 		return;
 
 	inst.save();
+
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
 		rq = inst.agi_requests[ii];
 

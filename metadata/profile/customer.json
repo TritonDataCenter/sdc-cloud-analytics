@@ -35,8 +35,8 @@
 		"stat": "httpd_ops",
 		"fields": [
 		    "zonename", "pid", "execname", "psargs", "ppid",
-		    "pexecname", "ppsargs", "raddr", "rport", "http_method",
-		    "http_url", "http_path", "latency"
+		    "pexecname", "ppsargs", "http_origin", "raddr", "rport",
+		    "http_method", "http_url", "http_path", "latency"
 		]
 	}, {
 		"module": "node",

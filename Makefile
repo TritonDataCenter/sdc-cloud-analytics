@@ -271,7 +271,7 @@ deps/%/.git: | deps/%
 $(PKGROOT)/cabase/cmd/node: deps/node/node
 	cp $^ $@
 
-$(PKGROOT)/cabase/lib/node.d: deps/node-install/lib/dtrace/node.d
+$(PKGROOT)/cabase/lib/node.d: lib/node.d
 	cp $^ $@
 
 $(PKGROOT)/cabase/%: %

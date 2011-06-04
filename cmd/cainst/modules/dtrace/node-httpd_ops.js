@@ -8,7 +8,7 @@ var desc = {
     stat: 'httpd_ops',
     fields: [ 'hostname', 'zonename', 'pid', 'execname', 'psargs', 'ppid',
 	'pexecname', 'ppsargs', 'http_method', 'http_url', 'raddr', 'rport',
-	'http_path', 'latency' ],
+	'http_path', 'http_origin', 'latency' ],
     metad: {
 	locals: [
 	    { fd: 'int' }
@@ -36,6 +36,11 @@ var desc = {
 				    '(node_dtrace_http_request_t *)' +
 				    'arg0))->url, "?")',
 				store: 'global[pid,this->fd]'
+			}, http_origin: {
+				gather: '((xlate <node_http_request_t *>' +
+				    '((node_dtrace_http_request_t *)arg0))->' +
+				    'forwardedFor)',
+				store: 'global[pid,this->fd]'
 			}
 		},
 		local: [ {
@@ -60,6 +65,7 @@ var desc = {
 			zonename: 'count()',
 			ppid: 'count()',
 			execname: 'count()',
+			http_origin: 'count()',
 			psargs: 'count()',
 			pid: 'count()',
 			http_path: 'count()',
@@ -86,7 +92,11 @@ var desc = {
 			ppsargs:
 			    'curthread->t_procp->p_parent->p_user.u_psargs',
 			pexecname: 'curthread->t_procp->p_parent->' +
-			    'p_user.u_comm'
+			    'p_user.u_comm',
+			http_origin: 'strlen($0[pid,this->fd]) == 0 ? ' +
+			    '((xlate <node_connection_t *>' +
+			    '((node_dtrace_connection_t *)arg0))->' +
+			    'remoteAddress) : strtok($0[pid,this->fd], ",")'
 		},
 		verify: {
 			http_url: '$0[pid,((xlate <node_connection_t *>' +
@@ -95,6 +105,11 @@ var desc = {
 			    '((node_dtrace_connection_t *)arg0))->fd)]',
 			http_method: '$0[pid,((xlate <node_connection_t *>' +
 			    '((node_dtrace_connection_t *)arg0))->fd)]',
+			/*
+			 * The origin that we gather can actually be the empty
+			 * string, but we don't want to skip this probe.
+			 */
+			http_origin: '1',
 			http_path: '$0[pid,((xlate <node_connection_t *>' +
 			    '((node_dtrace_connection_t *)arg0))->fd)]'
 		}
@@ -109,6 +124,7 @@ var desc = {
 			http_url: '$0[pid,this->fd]',
 			http_method: '$0[pid,this->fd]',
 			latency: '$0[pid,this->fd]',
+			http_origin: '$0[pid,this->fd]',
 			http_path: '$0[pid,this->fd]'
 		}
 	    }

@@ -52,6 +52,7 @@
 	"gctype":	{ "label": "GC type" },
 	"hostname":	{ "label": "server hostname" },
 	"http_method":	{ "label": "method" },
+	"http_origin":	{ "label": "reported origin IP" },
 	"http_path":	{ "label": "URL path" },
 	"http_url":	{ "label": "URL" },
 	"iops":		{ "label": "I/O operations", "type": "number" },
@@ -223,8 +224,8 @@
 	"unit":		"operations",
 	"fields":	[
 	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
-	    "pexecname", "ppsargs", "http_method", "http_url", "raddr",
-	    "rport", "http_path", "latency"
+	    "pexecname", "ppsargs", "http_method", "http_url", "http_origin",
+	    "raddr", "rport", "http_path", "latency"
 	]
     }, {
 	"module":	"node",

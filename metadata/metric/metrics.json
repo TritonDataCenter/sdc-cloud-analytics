@@ -44,6 +44,7 @@
 	"conntype":	{ "label": "connection type" },
 	"cpu":		{ "label": "CPU identifier" },
 	"cputime":	{ "label": "CPU time", "type": "time" },
+	"cpumode":	{ "label": "CPU mode" },
 	"disk":		{ "label": "device name" },
 	"direction":	{ "label": "sent/received" },
 	"execname":	{ "label": "application name" },
@@ -97,6 +98,18 @@
 	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
 	    "pexecname", "ppsargs", "leavereason", "runtime"
 	]
+    }, {
+	"module":	"cpu",
+	"stat":		"usage",
+	"label":	"aggregated CPU usage",
+	"unit":		"percent of 1 CPU",
+	"fields":	[ "hostname", "zonename", "cpumode" ]
+    }, {
+	"module":	"cpu",
+	"stat":		"waittime",
+	"label":	"aggregated wait time",
+	"type":		"time",
+	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"disk",
 	"stat":		"disks",

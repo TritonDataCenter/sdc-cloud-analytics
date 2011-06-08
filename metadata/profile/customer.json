@@ -9,6 +9,14 @@
 		    "pexecname", "ppsargs", "leavereason", "runtime"
 		]
 	}, {
+		"module": "cpu",
+		"stat": "usage",
+		"fields": [ "zonename", "cpumode" ]
+	}, {
+		"module": "cpu",
+		"stat": "waittime",
+		"fields": [ "zonename" ]
+	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [

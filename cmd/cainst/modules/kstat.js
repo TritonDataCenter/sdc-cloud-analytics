@@ -169,6 +169,44 @@ var inskMetrics = [ {
 		}
 	}
 }, {
+	module: 'cpu',
+	stat: 'usage',
+	kstat: { module: 'zones', class: 'zone_misc' },
+	extract: function (fields, kstat, kprev, interval) {
+		var newd = kstat['data'];
+		var oldd = kprev['data'];
+		var key = (fields['cpumode'] == 'kernel') ?
+		    'nsec_sys' : 'nsec_user';
+		return (Math.floor(100 *
+		    (newd[key] - oldd[key]) / interval));
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		},
+		cpumode: {
+			values: function () { return ([ 'kernel', 'user' ]); }
+		}
+	}
+}, {
+	module: 'cpu',
+	stat: 'waittime',
+	kstat: { module: 'zones', class: 'zone_misc' },
+	extract: function (fields, kstat, kprev) {
+		var newd = kstat['data'];
+		var oldd = kprev['data'];
+		return (newd['nsec_waitrq'] - oldd['nsec_waitrq']);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
+}, {
 	module: 'nic',
 	stat: 'nics',
 	kstat: { module: 'link', class: 'net' },
@@ -662,7 +700,7 @@ function inskMemLimit(value)
  */
 function insKstatAutoMetric(desc, metric, metadata)
 {
-	var field, arity, ndiscrete, nnumeric, ii;
+	var field, arity, ndiscrete, nnumeric, ii, onlyzones;
 
 	this.iam_kstat = caDeepCopy(desc.kstat);
 	this.iam_fields = caDeepCopy(desc.fields);
@@ -709,14 +747,16 @@ function insKstatAutoMetric(desc, metric, metadata)
 	 * predicate that selects these zonenames.
 	 */
 	if (metric.is_zones) {
-		this.iam_predicate = {
-		    and: [
-			{ or: metric.is_zones.map(function (zone) {
-				return ({ eq: [ 'zonename', zone ] });
-				}) },
-			metric.is_predicate
-		    ]
-		};
+		onlyzones = { or: metric.is_zones.map(function (zone) {
+			return ({ eq: [ 'zonename', zone ] });
+		}) };
+
+		if (mod_capred.caPredNonTrivial(metric.is_predicate))
+			this.iam_predicate = {
+			    and: [ onlyzones, metric.is_predicate ]
+			};
+		else
+			this.iam_predicate = onlyzones;
 	} else {
 		this.iam_predicate = metric.is_predicate;
 	}

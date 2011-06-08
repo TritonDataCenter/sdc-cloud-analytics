@@ -6,6 +6,14 @@
 		"fields": [ "hostname", "cpu", "utilization" ]
 	}, {
 		"module": "cpu",
+		"stat": "usage",
+		"fields": [ "hostname", "zonename", "cpumode" ]
+	}, {
+		"module": "cpu",
+		"stat": "waittime",
+		"fields": [ "hostname", "zonename" ]
+	}, {
+		"module": "cpu",
 		"stat": "thread_executions",
 		"fields": [
 		    "hostname", "zonename", "pid", "execname", "psargs",

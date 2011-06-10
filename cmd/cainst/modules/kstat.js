@@ -322,6 +322,50 @@ var inskMetrics = [ {
 		}
 	}
 }, {
+	module: 'nic',
+	stat: 'vnic_bytes',
+	kstat: { module: 'link', class: 'net' },
+	filter: inskVnicFilter,
+	extract: function (fields, kstat, kprev) {
+		var newd = kstat['data'];
+		var oldd = kprev['data'];
+		var key = (fields['direction'] == 'sent') ?
+		    'obytes64' : 'rbytes64';
+		return (newd[key] - oldd[key]);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		},
+		direction: {
+			values: function () { return ([ 'sent', 'received' ]); }
+		}
+	}
+}, {
+	module: 'nic',
+	stat: 'vnic_packets',
+	kstat: { module: 'link', class: 'net' },
+	filter: inskVnicFilter,
+	extract: function (fields, kstat, kprev) {
+		var newd = kstat['data'];
+		var oldd = kprev['data'];
+		var key = (fields['direction'] == 'sent') ?
+		    'opackets64' : 'ipackets64';
+		return (newd[key] - oldd[key]);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		},
+		direction: {
+			values: function () { return ([ 'sent', 'received' ]); }
+		}
+	}
+}, {
 	module: 'disk',
 	stat: 'disks',
 	kstat: { class: 'disk' },
@@ -607,6 +651,12 @@ function inskNicFilter(kstat)
 	 * global zone where we run in production.
 	 */
 	return (/^(e1000g|bnx|net)\d+$/.test(kstat['name']));
+}
+
+function inskVnicFilter(kstat)
+{
+	return ('zonename' in kstat['data'] &&
+	    kstat['data']['zonename'] != 'global');
 }
 
 function inskDiskFilter(kstat)

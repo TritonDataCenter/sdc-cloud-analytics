@@ -212,6 +212,18 @@
 	"unit":		"packets",
 	"fields":	[ "hostname", "nic", "direction" ]
     }, {
+	"module":	"nic",
+	"stat":		"vnic_bytes",
+	"label":	"VNIC bytes sent and received",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename", "direction" ]
+    }, {
+	"module":	"nic",
+	"stat":		"vnic_packets",
+	"label":	"VNIC packets sent and received",
+	"unit":		"packets",
+	"fields":	[ "hostname", "zonename", "direction" ]
+    }, {
 	"module":	"node",
 	"stat":		"gc_ops",
 	"label":	"garbage collection operations",

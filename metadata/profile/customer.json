@@ -54,5 +54,13 @@
 		    "pexecname", "ppsargs", "optype", "raddr", "rport", "size",
 	    	    "buffered"
 		]
+	}, {
+		"module": "nic",
+		"stat": "vnic_bytes",
+		"fields": [ "zonename", "direction" ]
+	}, {
+		"module": "nic",
+		"stat": "vnic_packets",
+		"fields": [ "zonename", "direction" ]
 	} ]
 }

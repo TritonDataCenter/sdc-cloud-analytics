@@ -121,6 +121,14 @@
 		"stat": "packets",
 		"fields": [ "hostname", "nic", "direction" ]
 	}, {
+		"module": "nic",
+		"stat": "vnic_bytes",
+		"fields": [ "hostname", "zonename", "direction" ]
+	}, {
+		"module": "nic",
+		"stat": "vnic_packets",
+		"fields": [ "hostname", "zonename", "direction" ]
+	}, {
 		"module": "tcp",
 		"stat": "connections",
 		"fields": [ "hostname", "tcpstack", "conntype" ]

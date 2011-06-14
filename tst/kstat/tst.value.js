@@ -6,6 +6,7 @@ var mod_assert = require('assert');
 var ASSERT = mod_assert.ok;
 
 var mod_ca = require('../../lib/ca/ca-common');
+var mod_instr = require('../../lib/ca/ca-instr');
 var mod_metric = require('../../lib/ca/ca-metric');
 var mod_tl = require('../../lib/tst/ca-test');
 var mod_cakstat = require('../../cmd/cainst/modules/kstat');
@@ -29,7 +30,7 @@ var desc = {
 			}
 		},
 		bytes_read: {
-			bucketize: mod_cakstat.caMakeLogLinearBucketize(
+			bucketize: mod_instr.caInstrLogLinearBucketize(
 			    10, 2, 11, 100),
 			values: function (kstat, klast) {
 				var after = kstat['data']['nread'];
@@ -60,6 +61,8 @@ metadata.addFromHost({
 mod_tl.ctStdout.info('%j', metadata);
 ASSERT(metadata.problems().length === 0);
 
+var instrbei = new mod_tl.caFakeInstrBackendInterface(metadata);
+
 function make_metric(decomp)
 {
 	return (new mod_cakstat.insKstatAutoMetric(desc, {
@@ -67,11 +70,11 @@ function make_metric(decomp)
 		is_stat: desc['stat'],
 		is_predicate: { ne: [ 'disk', 'sd1' ] },
 		is_decomposition: decomp
-	}, metadata));
+	}, instrbei));
 }
 
 var metric_raw, metric_byhostname, metric_bydisk, metric_bybytes, metric_byboth;
-var ndisks, value, key, sum;
+var ndisks, key, sum;
 
 metric_raw = make_metric([]);
 metric_byhostname = make_metric(['hostname']);
@@ -128,37 +131,87 @@ for (ii = 0; ii < metrics.length; ii++) {
  * First values should be all zeroes.
  */
 mod_tl.ctStdout.info('initial values');
-ASSERT(metric_raw.value() === 0);
-mod_assert.deepEqual(metric_byhostname.value(), {});
-mod_assert.deepEqual(metric_bydisk.value(), {});
-mod_assert.deepEqual(metric_bybytes.value(), []);
-mod_assert.deepEqual(metric_byboth.value(), {});
+
+mod_tl.ctPushFunc(function () {
+	metric_raw.value(function (value) {
+		mod_assert.equal(value, 0);
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(function () {
+	metric_byhostname.value(function (value) {
+		mod_assert.deepEqual(value, {});
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(function () {
+	metric_bydisk.value(function (value) {
+		mod_assert.deepEqual(value, {});
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(function () {
+	metric_bybytes.value(function (value) {
+		mod_assert.deepEqual(value, []);
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(function () {
+	metric_byboth.value(function (value) {
+		mod_assert.deepEqual(value, {});
+		mod_tl.advance();
+	});
+});
 
 /*
  * Subsequent values should be known values.
  */
-value = metric_raw.value();
-mod_tl.ctStdout.info('value raw: %j', value);
-ASSERT(value === 2);
-
-value = metric_byhostname.value();
-mod_tl.ctStdout.info('value by hostname: %j', value);
-mod_assert.deepEqual(value, { 'testhostname': 2 });
-
-value = metric_bydisk.value();
-mod_tl.ctStdout.info('value by disk: %j', value);
-mod_assert.deepEqual(value, { sd0: 1, sd2: 1 });
-
-value = metric_bybytes.value();
-mod_tl.ctStdout.info('value by bytes: %j', value);
-mod_assert.deepEqual(value, [[[100, 109], 2]]);
-
-value = metric_byboth.value();
-mod_tl.ctStdout.info('value by both: %j', value);
-mod_assert.deepEqual(value, {
-	sd0: [[[100, 109], 1]],
-	sd2: [[[100, 109], 1]]
+mod_tl.ctPushFunc(function () {
+	metric_raw.value(function (value) {
+		mod_tl.ctStdout.info('value raw: %j', value);
+		ASSERT(value === 2);
+		mod_tl.advance();
+	});
 });
 
-mod_tl.ctStdout.info('done');
-process.exit(0);
+mod_tl.ctPushFunc(function () {
+	metric_byhostname.value(function (value) {
+		mod_tl.ctStdout.info('value by hostname: %j', value);
+		mod_assert.deepEqual(value, { 'testhostname': 2 });
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(function () {
+	metric_bydisk.value(function (value) {
+		mod_tl.ctStdout.info('value by disk: %j', value);
+		mod_assert.deepEqual(value, { sd0: 1, sd2: 1 });
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(function () {
+	metric_bybytes.value(function (value) {
+		mod_tl.ctStdout.info('value by bytes: %j', value);
+		mod_assert.deepEqual(value, [[[100, 109], 2]]);
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(function () {
+	metric_byboth.value(function (value) {
+		mod_tl.ctStdout.info('value by both: %j', value);
+		mod_assert.deepEqual(value, {
+			sd0: [[[100, 109], 1]],
+			sd2: [[[100, 109], 1]]
+		});
+		mod_tl.advance();
+	});
+});
+
+mod_tl.ctPushFunc(mod_tl.ctDoExitSuccess);
+mod_tl.advance();

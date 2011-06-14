@@ -7,7 +7,8 @@
 	"nic":		{ "label": "Network interface"		},
 	"node":		{ "label": "Node.js 0.4.x"		},
 	"syscall":	{ "label": "System calls"		},
-	"tcp": 		{ "label": "TCP"			}
+	"tcp": 		{ "label": "TCP"			},
+	"zfs": 		{ "label": "ZFS"			}
     },
 
     "types": {
@@ -80,7 +81,9 @@
 	"syscall":	{ "label": "syscall" },
 	"tcpstack":	{ "label": "TCP instance" },
 	"utilization":	{ "label": "utilization", "type": "percent" },
-	"zonename":	{ "label": "zone name" }
+	"zdataset":	{ "label": "ZFS dataset" },
+	"zonename":	{ "label": "zone name" },
+	"zpool":	{ "label": "ZFS pool" }
     },
 
     "metrics": [ {
@@ -289,5 +292,41 @@
 	"label":	"segments",
 	"unit":		"segments",
 	"fields":	[ "hostname", "tcpstack", "direction" ]
+    }, {
+	"module":	"zfs",
+	"stat":		"dataset_unused_quota",
+	"label":	"unused quota",
+	"type":		"size",
+	"fields":	[ "hostname", "zdataset" ]
+    }, {
+	"module":	"zfs",
+	"stat":		"dataset_used",
+	"label":	"used space",
+	"type":		"size",
+	"fields":	[ "hostname", "zdataset" ]
+    }, {
+	"module":	"zfs",
+	"stat":		"dataset_quota",
+	"label":	"quota size",
+	"type":		"size",
+	"fields":	[ "hostname", "zdataset" ]
+    }, {
+	"module":	"zfs",
+	"stat":		"pool_free",
+	"label":	"free space in pool",
+	"type":		"size",
+	"fields":	[ "hostname", "zpool" ]
+    }, {
+	"module":	"zfs",
+	"stat":		"pool_used",
+	"label":	"used space in pool",
+	"type":		"size",
+	"fields":	[ "hostname", "zpool" ]
+    }, {
+	"module":	"zfs",
+	"stat":		"pool_total",
+	"label":	"total space in pool",
+	"type":		"size",
+	"fields":	[ "hostname", "zpool" ]
     } ]
 }

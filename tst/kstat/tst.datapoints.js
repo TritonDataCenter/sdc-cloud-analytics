@@ -20,7 +20,7 @@ function setup(metric_desc)
 			is_stat: metric_desc['stat'],
 			is_predicate: {},
 			is_decomposition: []
-		});
+		}, new mod_tl.caFakeInstrBackendInterface());
 
 		klast = metric.iam_reader.read();
 		setTimeout(mod_tl.advance, 1000);

@@ -11,7 +11,7 @@ var mod_cakstat = require('../../cmd/cainst/modules/kstat');
 
 mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
 
-var desc, metric, kdata;
+var desc, instrbei, metric, kdata;
 
 /*
  * Test 1: No filtering
@@ -35,12 +35,13 @@ desc = {
 	}
 };
 
+instrbei = new mod_tl.caFakeInstrBackendInterface();
 metric = new mod_cakstat.insKstatAutoMetric(desc, {
 	is_module: desc['module'],
 	is_stat: desc['stat'],
 	is_predicate: {},
 	is_decomposition: []
-});
+}, instrbei);
 
 kdata = metric.read();
 mod_tl.ctStdout.dbg('%j', kdata);
@@ -83,7 +84,7 @@ metric = new mod_cakstat.insKstatAutoMetric(desc, {
 	is_stat: desc['stat'],
 	is_predicate: {},
 	is_decomposition: []
-});
+}, instrbei);
 
 kdata = metric.read();
 mod_tl.ctStdout.dbg('filter = %j', filter);

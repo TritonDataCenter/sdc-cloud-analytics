@@ -39,10 +39,10 @@ insTestMetricSeconds.prototype.deinstrument = function (callback)
 	callback();
 };
 
-insTestMetricSeconds.prototype.value = function ()
+insTestMetricSeconds.prototype.value = function (callback)
 {
 	var msecs = new Date().getTime() - this.itms_start.getTime();
-	return (parseInt(msecs / 1000, 10));
+	return (callback(parseInt(msecs / 1000, 10)));
 };
 
 function insTestMetricRandom()
@@ -59,7 +59,7 @@ insTestMetricRandom.prototype.deinstrument = function (callback)
 	callback();
 };
 
-insTestMetricRandom.prototype.value = function ()
+insTestMetricRandom.prototype.value = function (callback)
 {
-	return (parseInt(Math.random() * 100, 10));
+	return (callback(parseInt(Math.random() * 100, 10)));
 };

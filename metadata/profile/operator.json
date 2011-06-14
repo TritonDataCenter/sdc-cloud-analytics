@@ -77,16 +77,16 @@
 		"module": "node",
 		"stat": "socket_ops",
 		"fields": [
-	    	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
-	    	    "pexecname", "ppsargs", "raddr", "rport", "optype", "size",
-	    	    "buffered"
+		    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "raddr", "rport", "optype", "size",
+		    "buffered"
 		]
 	}, {
 		"module": "syscall",
 		"stat": "syscalls",
 		"fields": [
-	    	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
-	    	    "pexecname", "ppsargs", "syscall", "latency", "cputime"
+		    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "syscall", "latency", "cputime"
 		]
 	}, {
 		"module": "disk",
@@ -109,7 +109,7 @@
 		"module": "nic",
 		"stat": "nics",
 		"fields": [
-	    	    "hostname", "nic", "packets", "packets_in", "packets_out",
+		    "hostname", "nic", "packets", "packets_in", "packets_out",
 		    "bytes", "bytes_read", "bytes_write"
 		]
 	}, {
@@ -136,5 +136,29 @@
 		"module": "tcp",
 		"stat": "errors",
 		"fields": [ "hostname", "tcpstack", "errtype" ]
+	}, {
+		"module": "zfs",
+		"stat": "dataset_unused_quota",
+		"fields": [ "hostname", "zdataset" ]
+	}, {
+		"module": "zfs",
+		"stat": "dataset_used",
+		"fields": [ "hostname", "zdataset" ]
+	}, {
+		"module": "zfs",
+		"stat": "dataset_quota",
+		"fields": [ "hostname", "zdataset" ]
+	}, {
+		"module": "zfs",
+		"stat": "pool_free",
+		"fields": [ "hostname", "zpool" ]
+	}, {
+		"module": "zfs",
+		"stat": "pool_used",
+		"fields": [ "hostname", "zpool" ]
+	}, {
+		"module": "zfs",
+		"stat": "pool_total",
+		"fields": [ "hostname", "zpool" ]
 	} ]
 }

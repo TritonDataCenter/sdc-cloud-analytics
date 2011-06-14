@@ -11,6 +11,7 @@ var mod_log = require('../lib/ca/ca-log');
 var mod_capred = require('../lib/ca/ca-pred');
 var mod_md = require('../lib/ca/ca-metadata');
 var mod_metric = require('../lib/ca/ca-metric');
+var mod_instr = require('../lib/ca/ca-instr');
 
 var ins_name = 'instsvc';	/* component name */
 var ins_vers = '0.0';		/* component version */
@@ -157,15 +158,15 @@ insBackendInterface.prototype.metadata = function ()
  *				specified metric.  Invoke the specified callback
  *				when deinstrumentation is complete.
  *
- *	value():		Retrieve the current value of the metric.  The
- *				returned data describes the events since the
- *				last value was reported.  This method will be
- *				invoked at a frequency determined by the
- *				granularity of the instrumentation.  If
- *				granularity is 1 second, this method will be
- *				invoked once per second.  If granularity is 60
- *				seconds, this will only be invoked once per
- *				minute.
+ *	value(callback):	Retrieve the current value of the metric.  The
+ *				callback should be invoked with a value
+ *				describing the events since the last value was
+ *				reported.  This method will be invoked at a
+ *				frequency determined by the granularity of the
+ *				instrumentation.  If granularity is 1 second,
+ *				this method will be invoked once per second.  If
+ *				granularity is 60 seconds, this will only be
+ *				invoked once per minute.
  *
  *	tick():			If specified, tick() is invoked once per
  *	[optional]		second.  This is useful for backends that must
@@ -244,6 +245,15 @@ insBackendInterface.prototype.registerReporter = function (name, reporter)
 	ins_status_callbacks[name] = reporter;
 };
 
+insBackendInterface.prototype.applyPredicate = mod_instr.caInstrApplyPredicate;
+
+insBackendInterface.prototype.computeValue = function (bucketizers, decomps,
+    datapts)
+{
+	return (mod_instr.caInstrComputeValue(ins_metadata, bucketizers,
+	    decomps, datapts));
+};
+
 /*
  * Search for installed Instrumenter backend plugins and load them.  We
  * currently hardcode this list, but ideally we'd find everything in some
@@ -256,7 +266,7 @@ function insInitBackends()
 	 * they are to use) is implicitly defined by the order in which they're
 	 * loaded, not an explicit cost.
 	 */
-	var backends = [ 'kstat', 'dtrace' ];
+	var backends = [ 'kstat', 'dtrace', 'zfs' ];
 	var bemgr = new insBackendInterface();
 	var plugin, ii;
 
@@ -268,6 +278,7 @@ function insInitBackends()
 		} catch (ex) {
 			ins_log.warn('FAILED to load module "%s": %r',
 			    backends[ii], ex);
+			continue;
 		}
 
 		plugin.insinit(bemgr, ins_log);
@@ -308,7 +319,7 @@ var ins_last;
 
 function insTick()
 {
-	var id, when, whenms, instn, value;
+	var when, whenms;
 
 	whenms = new Date().getTime();
 	when = Math.floor(whenms / 1000);
@@ -321,7 +332,9 @@ function insTick()
 	if (ins_last && ins_last == when)
 		return;
 
-	for (id in ins_insts) {
+	Object.keys(ins_insts).forEach(function (id) {
+		var instn;
+
 		instn = ins_insts[id];
 
 		if (instn.is_impl.tick)
@@ -339,15 +352,16 @@ function insTick()
 		 * small.
 		 */
 		if (when % instn.is_granularity !== 0)
-			continue;
+			return;
 
-		value = instn.is_impl.value();
+		instn.is_impl.value(function (value) {
+			if (value === undefined)
+				ins_log.warn('undefined value from instn %s',
+				    id);
 
-		if (value === undefined)
-			ins_log.warn('undefined value from inst %s', id);
-
-		ins_cap.sendData(ins_insts[id].is_inst_key, id, value, whenms);
-	}
+			ins_cap.sendData(instn.is_inst_key, id, value, whenms);
+		});
+	});
 
 	ins_last = when;
 }

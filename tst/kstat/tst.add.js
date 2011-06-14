@@ -6,13 +6,14 @@ var mod_assert = require('assert');
 var ASSERT = mod_assert.ok;
 
 var mod_ca = require('../../lib/ca/ca-common');
+var mod_instr = require('../../lib/ca/ca-instr');
 var mod_metric = require('../../lib/ca/ca-metric');
 var mod_tl = require('../../lib/tst/ca-test');
 var mod_cakstat = require('../../cmd/cainst/modules/kstat');
 
 mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
 
-var desc, metric;
+var desc, metric, instrbei;
 
 desc = {
 	module: 'disk',
@@ -31,7 +32,7 @@ desc = {
 			}
 		},
 		bytes_read: {
-			bucketize: mod_cakstat.caMakeLogLinearBucketize(
+			bucketize: mod_instr.caInstrLogLinearBucketize(
 			    10, 2, 11, 100),
 			values: function (kstat, klast) {
 				var after = kstat['data']['nread'];
@@ -62,12 +63,13 @@ metadata.addFromHost({
 mod_tl.ctStdout.info('%j', metadata);
 ASSERT(metadata.problems().length === 0);
 
+instrbei = new mod_tl.caFakeInstrBackendInterface(metadata);
 metric = new mod_cakstat.insKstatAutoMetric(desc, {
     is_module: desc['module'],
     is_stat: desc['stat'],
     is_predicate: {},
     is_decomposition: []
-}, metadata);
+}, instrbei);
 
 var value, data;
 
@@ -82,28 +84,35 @@ data = [ {
     value: 100
 } ];
 
-value = metric.addDecompositions(data, [], 0);
+function addDecompositions(datapts, decomps)
+{
+	return (instrbei.computeValue({
+	    bytes_read: desc['fields']['bytes_read']['bucketize']
+	}, decomps, datapts));
+}
+
+value = addDecompositions(data, [], 0);
 mod_tl.ctStdout.dbg('value with no decomps = %j', value);
 ASSERT(value === 303);
 
-value = metric.addDecompositions(data, [ 'hostname' ], 0);
+value = addDecompositions(data, [ 'hostname' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by hostname = %j', value);
 mod_assert.deepEqual({ 'testhostname': 203, 'testhostname2': 100 }, value);
 
-value = metric.addDecompositions(data, [ 'disk' ], 0);
+value = addDecompositions(data, [ 'disk' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by disk = %j', value);
 mod_assert.deepEqual({ 'sd0': 102, 'sd1': 201 }, value);
 
-value = metric.addDecompositions(data, [ 'bytes_read' ], 0);
+value = addDecompositions(data, [ 'bytes_read' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by bytes_read = %j', value);
 mod_assert.deepEqual([[[1000, 1090], 303]], value);
 
-value = metric.addDecompositions(data, [ 'hostname', 'disk' ], 0);
+value = addDecompositions(data, [ 'hostname', 'disk' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by hostname and disk = %j', value);
 mod_assert.deepEqual({ 'testhostname': { sd0: 102, sd1: 101 },
     'testhostname2': { sd1: 100 } }, value);
 
-value = metric.addDecompositions(data, [ 'disk', 'bytes_read' ], 0);
+value = addDecompositions(data, [ 'disk', 'bytes_read' ], 0);
 mod_tl.ctStdout.dbg('value with decomp by disk and bytes_read = %j', value);
 mod_assert.deepEqual({ 'sd0': [[[1000, 1090], 102 ]],
     'sd1': [[[1000, 1090], 201]] }, value);

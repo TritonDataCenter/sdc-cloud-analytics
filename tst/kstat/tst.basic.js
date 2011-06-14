@@ -11,7 +11,7 @@ var mod_cakstat = require('../../cmd/cainst/modules/kstat');
 
 mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
 
-var desc, metric, kdata;
+var desc, metric, kdata, instrbei;
 
 desc = {
 	module: 'disk',
@@ -32,12 +32,13 @@ desc = {
 	}
 };
 
+instrbei = new mod_tl.caFakeInstrBackendInterface();
 metric = new mod_cakstat.insKstatAutoMetric(desc, {
 	is_module: desc['module'],
 	is_stat: desc['stat'],
 	is_predicate: { ne: [ 'disk', 'sd1' ] },
 	is_decomposition: []
-});
+}, instrbei);
 
 /*
  * Check that instrument() and deinstrument() invoke our callbacks.
@@ -88,14 +89,13 @@ metric.read = function ()
 	return (val);
 };
 
-var value;
+metric.value(function (value) {
+	mod_tl.ctStdout.dbg('value = %s', value);
+	mod_assert.equal(value, 0);
 
-value = metric.value();
-mod_tl.ctStdout.dbg('value = %s', value);
-ASSERT(value === 0);
-
-value = metric.value();
-mod_tl.ctStdout.dbg('value = %s', value);
-ASSERT(value === 612);
-
-process.exit(0);
+	metric.value(function (newvalue) {
+		mod_tl.ctStdout.dbg('value = %s', newvalue);
+		mod_assert.equal(newvalue,  612);
+		process.exit(0);
+	});
+});

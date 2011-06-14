@@ -141,7 +141,7 @@ insDTraceMetric.prototype.error = function (probe, record)
 	insd_log.dbg('DTRACE ERROR: %j', record['data']);
 };
 
-insDTraceMetric.prototype.value = function ()
+insDTraceMetric.prototype.value = function (callback)
 {
 	var agg = {};
 	var iteragg = function (id, key, val) {
@@ -159,7 +159,7 @@ insDTraceMetric.prototype.value = function ()
 	 * reenable it.
 	 */
 	if (!this.cad_dtr)
-		return (undefined);
+		return (callback(undefined));
 
 	try {
 		this.cad_dtr.aggwalk(iteragg);
@@ -179,10 +179,10 @@ insDTraceMetric.prototype.value = function ()
 		insd_log.error('re-enabling instrumentation due to error ' +
 		    'reading aggregation: %r', ex);
 		this.instrument();
-		return (undefined);
+		return (callback(undefined));
 	}
 
-	return (this.reduce(agg));
+	return (callback(this.reduce(agg)));
 };
 
 function insDTraceVectorMetric(prog, hasdecomps, zero, hasdists)
@@ -291,17 +291,22 @@ insDTraceMetricArray.prototype.deinstrument = function (callback)
  * If we don't copy zero, the initial value will end up getting modified. This
  * can lead to an ever-increasing value.
  */
-insDTraceMetricArray.prototype.value = function ()
+insDTraceMetricArray.prototype.value = function (callback)
 {
 	var adder = this.cad_progs[0].cadv_adder;
 	var zero = caDeepCopy(this.cad_progs[0].cadv_zero);
-	var data = this.cad_progs.map(function (x) {
-		var val = x.value();
-		if (val === undefined)
-			return (x.cadv_zero);
-		else
-			return (val);
+	var data = [];
+
+	/*
+	 * We're assuming here that the value() functions are actually
+	 * effectively synchronous.
+	 */
+	this.cad_progs.forEach(function (x) {
+		x.value(function (val) {
+			data.push(val === undefined ? x.cadv_zero : val);
+		});
 	});
 
-	return (data.reduce(adder, zero));
+	ASSERT.equal(this.cad_progs.length, data.length);
+	return (callback(data.reduce(adder, zero)));
 };

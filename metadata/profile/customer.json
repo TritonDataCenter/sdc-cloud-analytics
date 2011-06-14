@@ -17,6 +17,37 @@
 		"stat": "waittime",
 		"fields": [ "zonename" ]
 	}, {
+		"module": "memory",
+		"stat": "rss",
+		"fields": [ "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "rss_limit",
+		"fields": [ "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "swap",
+		"fields": [ "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "swap_limit",
+		"fields": [ "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "reclaimed_bytes",
+		"fields": [ "zonename" ]
+	}, {
+		"module": "memory",
+		"stat": "pageins",
+		"fields": [ "zonename" ]
+	}, {
+		"module": "syscall",
+		"stat": "syscalls",
+		"fields": [
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "syscall", "latency", "cputime"
+		]
+	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [
@@ -62,5 +93,17 @@
 		"module": "nic",
 		"stat": "vnic_packets",
 		"fields": [ "zonename", "direction" ]
+	}, {
+		"module": "zfs",
+		"stat": "dataset_unused_quota",
+		"fields": [ "zdataset" ]
+	}, {
+		"module": "zfs",
+		"stat": "dataset_used",
+		"fields": [ "zdataset" ]
+	}, {
+		"module": "zfs",
+		"stat": "dataset_quota",
+		"fields": [ "zdataset" ]
 	} ]
 }

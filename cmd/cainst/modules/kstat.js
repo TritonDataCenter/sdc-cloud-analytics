@@ -8,6 +8,7 @@ var ASSERT = mod_assert.ok;
 var mod_kstat = require('kstat');
 var mod_ca = require('../../../lib/ca/ca-common');
 var mod_capred = require('../../../lib/ca/ca-pred');
+var mod_instr = require('../../../lib/ca/ca-instr');
 
 var inskLog;
 var inskHostname;
@@ -32,7 +33,7 @@ function inskInitAutoMetrics(instr)
 	metadata = instr.metadata();
 	impl = function (desc) {
 		return (function (mm) {
-			return (new insKstatAutoMetric(desc, mm, metadata));
+			return (new insKstatAutoMetric(desc, mm, instr));
 		});
 	};
 
@@ -154,7 +155,7 @@ var inskMetrics = [ {
 			}
 		},
 		utilization: {
-			bucketize: caMakeLinearBucketize(1),
+			bucketize: mod_instr.caInstrLinearBucketize(1),
 			values: function (kstat, kprev, interval) {
 				var oldd, newd, oldsum, newsum;
 				oldd = kprev['data'];
@@ -219,7 +220,8 @@ var inskMetrics = [ {
 			}
 		},
 		packets: {
-			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var oldd, newd, oldsum, newsum;
 				oldd = kprev['data'];
@@ -232,7 +234,8 @@ var inskMetrics = [ {
 			}
 		},
 		packets_in: {
-			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -241,7 +244,8 @@ var inskMetrics = [ {
 			}
 		},
 		packets_out: {
-			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -250,7 +254,8 @@ var inskMetrics = [ {
 			}
 		},
 		bytes: {
-			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var oldd, newd, oldsum, newsum;
 				oldd = kprev['data'];
@@ -261,7 +266,8 @@ var inskMetrics = [ {
 			}
 		},
 		bytes_read: {
-			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -269,7 +275,8 @@ var inskMetrics = [ {
 			}
 		},
 		bytes_write: {
-			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -378,7 +385,8 @@ var inskMetrics = [ {
 			}
 		},
 		iops: {
-			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -388,7 +396,8 @@ var inskMetrics = [ {
 			}
 		},
 		iops_read: {
-			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -396,7 +405,8 @@ var inskMetrics = [ {
 			}
 		},
 		iops_write: {
-			bucketize: caMakeLogLinearBucketize(10, 0, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 0, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -404,7 +414,8 @@ var inskMetrics = [ {
 			}
 		},
 		bytes: {
-			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -414,7 +425,8 @@ var inskMetrics = [ {
 			}
 		},
 		bytes_read: {
-			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -422,7 +434,8 @@ var inskMetrics = [ {
 			}
 		},
 		bytes_write: {
-			bucketize: caMakeLogLinearBucketize(10, 2, 11, 100),
+			bucketize: mod_instr.caInstrLogLinearBucketize(
+			    10, 2, 11, 100),
 			values: function (kstat, kprev) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -431,7 +444,7 @@ var inskMetrics = [ {
 			}
 		},
 		busytime: {
-			bucketize: caMakeLinearBucketize(1),
+			bucketize: mod_instr.caInstrLinearBucketize(1),
 			values: function (kstat, kprev, interval) {
 				var newd = kstat['data'];
 				var oldd = kprev['data'];
@@ -748,9 +761,9 @@ function inskMemLimit(value)
  * desribed by "desc" and the actual instrumentation request described by
  * "metric".
  */
-function insKstatAutoMetric(desc, metric, metadata)
+function insKstatAutoMetric(desc, metric, instrbei)
 {
-	var field, arity, ndiscrete, nnumeric, ii, onlyzones;
+	var field, arity, ndiscrete, nnumeric, ii, onlyzones, bucketizers;
 
 	this.iam_kstat = caDeepCopy(desc.kstat);
 	this.iam_fields = caDeepCopy(desc.fields);
@@ -760,7 +773,7 @@ function insKstatAutoMetric(desc, metric, metadata)
 	this.iam_reader = new mod_kstat.Reader(this.iam_kstat);
 	this.iam_last = null;
 	this.iam_decompositions = [];
-	this.iam_metadata = metadata;
+	this.iam_metadata = instrbei.metadata();
 
 	/*
 	 * Discrete decompositions must come first, and there can be at most one
@@ -771,7 +784,7 @@ function insKstatAutoMetric(desc, metric, metadata)
 	for (ii = 0; ii < metric.is_decomposition.length; ii++) {
 		field = metric.is_decomposition[ii];
 		ASSERT(field in desc['fields']);
-		arity = metadata.fieldArity(field);
+		arity = this.iam_metadata.fieldArity(field);
 
 		if (arity == mod_ca.ca_field_arity_discrete) {
 			this.iam_decompositions.unshift(field);
@@ -810,6 +823,20 @@ function insKstatAutoMetric(desc, metric, metadata)
 	} else {
 		this.iam_predicate = metric.is_predicate;
 	}
+
+	this.iam_applypred = instrbei.applyPredicate.bind(
+	    instrbei, this.iam_predicate);
+
+	bucketizers = {};
+	for (field in this.iam_fields) {
+		if (!('bucketize' in this.iam_fields[field]))
+			continue;
+
+		bucketizers[field] = this.iam_fields[field]['bucketize'];
+	}
+
+	this.iam_compute = instrbei.computeValue.bind(instrbei,
+	    bucketizers, this.iam_decompositions);
 }
 
 exports.insKstatAutoMetric = insKstatAutoMetric; /* for testing */
@@ -854,19 +881,6 @@ insKstatAutoMetric.prototype.read = function ()
 };
 
 /*
- * Given a list of data points, return a new list comprised of those which match
- * the predicate.  This is factored out for use in the test suite.
- */
-insKstatAutoMetric.prototype.applyPredicate = function (datapts)
-{
-	var predicate = this.iam_predicate;
-
-	return (datapts.filter(function (elt) {
-		return (mod_capred.caPredEval(predicate, elt['fields']));
-	}));
-};
-
-/*
  * When the value for a kstat-based metric is needed, the framework does the
  * following:
  *
@@ -908,7 +922,7 @@ insKstatAutoMetric.prototype.applyPredicate = function (datapts)
  *	    (c) If a numeric decomposition was specified, bucketize the values
  *	        according to the "bucketize" function specified for this field.
  */
-insKstatAutoMetric.prototype.value = function ()
+insKstatAutoMetric.prototype.value = function (callback)
 {
 	var kdata, klast, datapts, interval, key;
 
@@ -922,7 +936,7 @@ insKstatAutoMetric.prototype.value = function ()
 	this.iam_last = kdata;
 
 	if (klast === null)
-		return (caDeepCopy(this.iam_zero));
+		return (callback(caDeepCopy(this.iam_zero)));
 
 	datapts = [];
 	for (key in kdata) {
@@ -938,64 +952,12 @@ insKstatAutoMetric.prototype.value = function ()
 		    this.kstatDataPoints(kdata[key], klast[key], interval));
 	}
 
-	datapts = this.applyPredicate(datapts);
-
 	/*
-	 * Compute the actual value based on the decompositions.
+	 * Apply the predicate and compute the actual value based on the
+	 * decompositions.
 	 */
-	return (this.addDecompositions(datapts, this.iam_decompositions, 0));
-};
-
-/*
- * Given a set of datapoints and decompositions, compute the value.
- */
-insKstatAutoMetric.prototype.addDecompositions = function (datapts, decomps, ii)
-{
-	var field, arity, rv, key, fieldvalues, subdata, jj;
-
-	/*
-	 * Simple case: scalar values.  Just add them up.
-	 */
-	if (ii >= decomps.length) {
-		return (datapts.reduce(function (sum, elt) {
-			return (sum + elt['value']);
-		}, 0));
-	}
-
-	field = this.iam_fields[decomps[ii]];
-	arity = this.iam_metadata.fieldArity(decomps[ii]);
-
-	if (arity == mod_ca.ca_field_arity_numeric) {
-		/* numeric decompositions must be last */
-		ASSERT(ii == decomps.length - 1);
-		rv = [];
-		for (jj = 0; jj < datapts.length; jj++) {
-			field['bucketize'](rv,
-			    datapts[jj]['fields'][decomps[ii]],
-			    datapts[jj]['value']);
-		}
-
-		return (rv);
-	}
-
-	ASSERT(arity == mod_ca.ca_field_arity_discrete);
-	rv = {};
-	fieldvalues = {};
-	for (jj = 0; jj < datapts.length; jj++) {
-		key = datapts[jj]['fields'][decomps[ii]];
-		fieldvalues[key] = true;
-	}
-
-	/* XXX this is terribly inefficient */
-	for (key in fieldvalues) {
-		subdata = datapts.filter(function (elt) {
-			return (elt['fields'][decomps[ii]] == key);
-		});
-
-		rv[key] = this.addDecompositions(subdata, decomps, ii + 1);
-	}
-
-	return (rv);
+	datapts = this.iam_applypred(datapts);
+	return (callback(this.iam_compute(datapts)));
 };
 
 /*
@@ -1105,82 +1067,3 @@ insKstatAutoMetric.prototype.kstatDataPointsFrom = function (rv, kstat, klast,
 	while (extra.length > 0)
 		rv.push(extra.pop());
 };
-
-function caMakeLinearBucketize(step)
-{
-	return (function (rv, value, card) {
-		return (caLinearBucketize(rv, value, card, step));
-	});
-}
-
-exports.caMakeLinearBucketize = caMakeLinearBucketize;
-
-function caLinearBucketize(rv, value, card, step)
-{
-	var ii, ent;
-
-	for (ii = 0; ii < rv.length; ii++) {
-		if (value >= rv[ii][0][0] && value <= rv[ii][0][1]) {
-			rv[ii][1] += card;
-			return;
-		}
-
-		if (value < rv[ii][0][0])
-			break;
-	}
-
-	ASSERT(ii == rv.length || value < rv[ii][0][0]);
-	ASSERT(ii === 0 || value > rv[ii - 1][0][1]);
-
-	ent = [ [ 0, 0 ], card ];
-	ent[0][0] = Math.floor(value / step) * step;
-	ent[0][1] = ent[0][0] + step - 1;
-	rv.splice(ii, 0, ent);
-	return (rv);
-}
-
-function caMakeLogLinearBucketize(base, min, max, nbuckets)
-{
-	return (function (rv, value, card) {
-		return (caLogLinearBucketize(rv, value, card, base, min, max,
-		    nbuckets));
-	});
-}
-
-exports.caMakeLogLinearBucketize = caMakeLogLinearBucketize;
-
-function caLogLinearBucketize(rv, value, card, base, min, max, nbuckets)
-{
-	var ii, ent, logbase, step, offset;
-
-	for (ii = 0; ii < rv.length; ii++) {
-		if (value >= rv[ii][0][0] && value <= rv[ii][0][1]) {
-			rv[ii][1] += card;
-			return;
-		}
-
-		if (value < rv[ii][0][0])
-			break;
-	}
-
-	ASSERT(ii == rv.length || value < rv[ii][0][0]);
-	ASSERT(ii === 0 || value > rv[ii - 1][0][1]);
-
-	ent = [ [ 0, 0 ], card ];
-
-	if (value < Math.pow(base, min)) {
-		ent[0][0] = 0;
-		ent[0][1] = Math.pow(base, min);
-	} else {
-		logbase = Math.floor(Math.log(value) / Math.log(base));
-		step = Math.pow(base, logbase + 1) / nbuckets;
-		offset = value - Math.pow(base, logbase);
-
-		ent[0][0] = Math.pow(base, logbase) +
-		    (Math.floor(offset / step) * step);
-		ent[0][1] = ent[0][0] + step - (step / base);
-	}
-
-	rv.splice(ii, 0, ent);
-	return (rv);
-}

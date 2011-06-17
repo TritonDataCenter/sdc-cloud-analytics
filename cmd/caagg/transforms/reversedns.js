@@ -40,7 +40,7 @@ exports.agginit = function (agg, log)
 function transReverseDNS(keys)
 {
 	var ret = {};
-	var key, addr, ii;
+	var key, ii;
 	var lookup = [];
 
 	for (ii = 0; ii < keys.length; ii++) {
@@ -55,10 +55,8 @@ function transReverseDNS(keys)
 			ret[key] = dns_cache[key];
 	}
 
-	for (ii = 0; ii < lookup.length; ii++) {
-		addr = lookup[ii];
+	lookup.forEach(function (addr) {
 		mod_dns.reverse(addr, function (err, result) {
-			var index = addr;
 			if (err) {
 				switch (err.errno) {
 				case mod_dns.NXDOMAIN:
@@ -70,10 +68,9 @@ function transReverseDNS(keys)
 				}
 			}
 
-			dns_cache[index] = result;
+			dns_cache[addr] = result;
 		});
-		delete (lookup[key]);
-	}
+	});
 
 	return (ret);
 }

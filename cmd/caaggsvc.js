@@ -285,10 +285,9 @@ function aggData(msg)
 	for (ii = 0; ii < inst.agi_requests.length; ii++) {
 		rq = inst.agi_requests[ii];
 
-		if (rq.datatime + rq.duration <= time) {
+		if (rq.latest() <= time) {
 			inst.agi_requests.splice(ii--, 1);
-			rq.callback(id, rq.datatime, rq.duration,
-			    rq.request, rq.response, now - rq.rqtime);
+			rq.complete(now);
 		}
 	}
 }
@@ -322,25 +321,6 @@ function aggNotifyConfigReset()
 {
 	agg_log.info('config reset');
 	agg_insts = {};
-}
-
-function aggHttpRouter(server)
-{
-	var infixes = [ '', 'customers/:custid/' ];
-	var ii, base;
-
-	server.get(agg_http_baseuri + 'admin/status', aggHttpAdminStatus);
-
-	for (ii = 0; ii < infixes.length; ii++) {
-		base = agg_http_baseuri + infixes[ii] +
-		    'instrumentations/:instid/value';
-		server.get(base, aggHttpValueList);
-		server.get(base + '/raw', aggHttpValueRaw);
-		server.get(base + '/heatmap', aggHttpValueHeatmapList);
-		server.get(base + '/heatmap/image', aggHttpValueHeatmapImage);
-		server.get(base + '/heatmap/details',
-		    aggHttpValueHeatmapDetails);
-	}
 }
 
 function aggAdminStatus()
@@ -394,618 +374,6 @@ function aggAdminStatus()
 	return (ret);
 }
 
-function aggHttpAdminStatus(request, response)
-{
-	response.send(HTTP.OK, aggAdminStatus());
-}
-
-var aggValueParams = {
-	duration: {
-	    type: 'number',
-	    min: 1,
-	    max: 3600
-	},
-	start_time: {
-	    type: 'number',
-	    min: 0
-	}
-};
-
-/*
- * Process the request to retrieve a metric's value.
- * XXX parameter for "don't wait" or "max time to wait"?
- */
-function aggHttpValueCommon(request, response, callback, default_duration,
-    exact)
-{
-	var custid = request.params['custid'];
-	var instid = request.params['instid'];
-	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst, dataset, interval, now, start, duration, since;
-
-	if (!(fqid in agg_insts)) {
-		response.send(HTTP.ENOTFOUND);
-		return;
-	}
-
-	inst = agg_insts[fqid];
-	now = new Date().getTime();
-	since = inst.agi_since.getTime();
-	dataset = inst.agi_dataset;
-
-	try {
-		start = mod_ca.caHttpParam(aggValueParams, request.ca_params,
-		    'start_time');
-		duration = mod_ca.caHttpParam(aggValueParams, request.ca_params,
-		    'duration');
-
-		if (duration !== undefined && exact &&
-		    duration != default_duration)
-			throw (new caValidationError(
-			    'unsupported value for "duration"'));
-
-		if (duration === undefined)
-			duration = default_duration;
-
-		if (start === undefined)
-			start = parseInt(now / 1000, 10) - duration -
-			    inst.agi_instrumentation['granularity'];
-		else if ((start + duration) * 1000 > now + agg_http_req_timeout)
-			throw (new caValidationError(
-			    'start_time + duration is in the future'));
-
-		aggHttpVerifyTransformations(fqid, request);
-	} catch (ex) {
-		if (!(ex instanceof caValidationError))
-			throw (ex);
-
-		response.sendError(ex);
-		return;
-	}
-
-	interval = dataset.normalizeInterval(start, duration);
-	start = interval['start_time'];
-	duration = interval['duration'];
-
-	if ((start + duration) * 1000 < since ||
-	    dataset.nreporting(start + duration) >=
-	    aggExpected(dataset, start + duration)) {
-		callback(fqid, start, duration, request, response, 0);
-		return;
-	}
-
-	/*
-	 * We don't have all the data we're expecting for this time index yet,
-	 * but we expect to get it in the near future.  We add a record to this
-	 * instrumentation's list of outstanding requests.  When new data comes
-	 * in, we'll figure out if we should process this request.  There's also
-	 * a timer that periodically times these out.
-	 */
-	inst.agi_requests.push({
-	    rqtime: now,
-	    datatime: start,
-	    duration: duration,
-	    request: request,
-	    response: response,
-	    callback: callback
-	});
-}
-
-function aggHttpValueList(request, response)
-{
-	var url = request.url;
-	var rv = {};
-
-	while (url[url.length - 1] === '/')
-		url = url.substring(0, url.length - 1);
-
-	rv = [ {
-		name: 'value_raw',
-		uri: url + '/raw'
-	} ];
-
-	if (aggHttpValueHeatmapCheck(request)) {
-		rv.push({
-			name: 'value_heatmap',
-			uri: url + '/heatmap'
-		});
-	}
-
-	response.send(HTTP.OK, rv);
-}
-
-function aggHttpValueRaw(request, response)
-{
-	aggHttpValueCommon(request, response, aggHttpValueRawDone, 1, true);
-}
-
-function aggHttpValueRawDone(id, start, duration, request, response, delay)
-{
-	var inst = agg_insts[id];
-	var dataset = inst.agi_dataset;
-	var ret, keys, transform;
-
-	ASSERT.ok(duration ==
-	    dataset.normalizeInterval(start, 1)['duration']);
-
-	ret = {};
-	ret.duration = duration;
-	ret.start_time = start;
-	ret.nsources = dataset.nsources();
-	ret.value = dataset.dataForTime(start);
-	ret.minreporting = dataset.nreporting(start);
-	aggHttpValueFill(ret, request);
-
-	keys = (typeof (ret.value) == 'object' &&
-	    ret.value.constructor == Object) ?  Object.keys(ret.value) : [];
-	transform = aggHttpValueTransform(id, request, keys);
-	if (transform != null)
-		ret.transformations = transform;
-
-	if (delay > 0)
-		ret.delayed = delay;
-
-	response.send(HTTP.OK, ret);
-}
-
-/*
- * Performs validity checks on the given heatmap request.  Currently we just
- * verify that the instrumentation is of the proper type to support a heatmap.
- */
-function aggHttpValueHeatmapCheck(request)
-{
-	var custid = request.params['custid'];
-	var instid = request.params['instid'];
-	var fqid = mod_ca.caQualifiedId(custid, instid);
-	var inst;
-
-	if (!(fqid in agg_insts))
-		return (false);
-
-	inst = agg_insts[fqid];
-	if (inst.agi_instrumentation['value-arity'] === mod_ca.ca_arity_numeric)
-		return (true);
-
-	return (false);
-}
-
-function aggHttpValueHeatmapList(request, response)
-{
-	var url = request.url;
-	var rv = {};
-
-	if (!aggHttpValueHeatmapCheck(request)) {
-		response.send(HTTP.ENOTFOUND);
-		return;
-	}
-
-	while (url[url.length - 1] === '/')
-		url = url.substring(0, url.length - 1);
-
-	rv = [ {
-		name: 'image',
-		uri: url + '/image'
-	}, {
-		name: 'details',
-		uri: url + '/details'
-	} ];
-
-	response.send(HTTP.OK, rv);
-}
-
-function aggHttpValueHeatmapImage(request, response)
-{
-	if (!aggHttpValueHeatmapCheck(request)) {
-		response.send(HTTP.ENOTFOUND);
-		return;
-	}
-
-	aggHttpValueCommon(request, response, aggHttpValueHeatmapImageDone, 60);
-}
-
-function aggHttpValueHeatmapDetails(request, response)
-{
-	if (!aggHttpValueHeatmapCheck(request)) {
-		response.send(HTTP.ENOTFOUND);
-		return;
-	}
-
-	aggHttpValueCommon(request, response, aggHttpValueHeatmapDetailsDone,
-	    60);
-}
-
-var aggValueHeatmapParams = {
-	height: {
-	    type: 'number',
-	    default: 300,
-	    min: 10,
-	    max: 1000
-	},
-	width: {
-	    type: 'number',
-	    default: 600,
-	    min: 10,
-	    max: 1000
-	},
-	ymin: {
-	    type: 'number',
-	    default: 0,
-	    min: 0,
-	    max: 1000000000000		/* 1000s */
-	},
-	ymax: {
-	    type: 'number',
-	    default: undefined,		/* auto-scale */
-	    min: 0,
-	    max: 1000000000000		/* 1000s */
-	},
-	nbuckets: {
-	    type: 'number',
-	    default: 100,
-	    min: 1,
-	    max: 100
-	},
-	selected: {
-	    type: 'array',
-	    default: []
-	},
-	isolate: {
-	    type: 'boolean',
-	    default: false
-	},
-	exclude: {
-	    type: 'boolean',
-	    default: false
-	},
-	hues: {
-	    type: 'array',
-	    default: undefined
-	},
-	weights: {
-	    type: 'enum',
-	    default: 'weights',
-	    choices: { count: true, weight: true }
-	},
-	coloring: {
-	    type: 'enum',
-	    default: 'rank',
-	    choices: { rank: true, linear: true }
-	},
-	decompose_all: {
-	    type: 'boolean',
-	    default: false
-	},
-	x: {
-	    type: 'number',
-	    required: true,
-	    min: 0
-	},
-	y: {
-	    type: 'number',
-	    required: true,
-	    min: 0
-	}
-};
-
-function aggHttpHeatmapHues(nselected, isolate)
-{
-	var hues, ii;
-
-	hues = [ 21 ];
-
-	for (ii = 0; ii < nselected; ii++)
-		hues.push((hues[hues.length - 1] + 91) % 360);
-
-	if (isolate)
-		hues.shift();
-
-	return (hues);
-}
-
-function aggHttpHeatmapConf(request, start, duration, isolate, nselected)
-{
-	var conf, formals, actuals, max, nhues, hue, hues;
-	var ii;
-
-	formals = aggValueHeatmapParams;
-	actuals = request.ca_params;
-
-	conf = {};
-	conf.base = start;
-	conf.nsamples = duration;
-	conf.height = mod_ca.caHttpParam(formals, actuals, 'height');
-	conf.width = mod_ca.caHttpParam(formals, actuals, 'width');
-	conf.nbuckets = mod_ca.caHttpParam(formals, actuals, 'nbuckets');
-	conf.min = mod_ca.caHttpParam(formals, actuals, 'ymin');
-	max = mod_ca.caHttpParam(formals, actuals, 'ymax');
-	if (max !== undefined)
-		conf.max = max;
-	conf.weighbyrange = mod_ca.caHttpParam(formals, actuals,
-	    'weights') == 'weight';
-	conf.linear = mod_ca.caHttpParam(formals, actuals,
-	    'coloring') == 'linear';
-	hues = mod_ca.caHttpParam(formals, actuals, 'hues');
-
-	if (conf.ymin >= conf.ymax)
-		throw (new caValidationError(
-		    '"ymax" must be greater than "ymin"'));
-
-	nhues = nselected + (isolate ? 0 : 1);
-
-	if (hues !== undefined) {
-		if (nhues > hues.length)
-			throw (new caValidationError(
-			    'need ' + nhues + ' hues'));
-
-		for (ii = 0; ii < hues.length; ii++) {
-			hue = hues[ii] = parseInt(hues[ii], 10);
-
-			if (isNaN(hue) || hue < 0 || hue >= 360)
-				throw (new caValidationError(
-				    'invalid hue'));
-		}
-
-		conf.hue = hues;
-	}
-
-	return (conf);
-}
-
-function aggHttpValueFill(ret, request, hmconf)
-{
-	var rqstart, rqduration;
-
-	rqstart = mod_ca.caHttpParam(aggValueParams, request.ca_params,
-	    'start_time');
-	rqduration = mod_ca.caHttpParam(aggValueParams, request.ca_params,
-	    'duration');
-
-	if (rqstart !== undefined)
-		ret.requested_start_time = rqstart;
-
-	if (rqduration !== undefined)
-		ret.requested_duration = rqduration;
-
-	if (hmconf === undefined)
-		return;
-
-	ret.nbuckets = hmconf['nbuckets'];
-	ret.width = hmconf['width'];
-	ret.height = hmconf['height'];
-}
-
-function aggHttpValueHeatmapImageDone(id, start, duration, request, response,
-    delay)
-{
-	var conf, selected, isolate, exclude, rainbow;
-	var inst, dataset, datasets, count;
-	var ii, ret, transforms, buffer, png;
-	var param = function (formals, key) {
-		return (mod_ca.caHttpParam(formals, request.ca_params, key));
-	};
-
-	var tk = new mod_ca.caTimeKeeper();
-
-	inst = agg_insts[id];
-	dataset = inst.agi_dataset;
-
-	try {
-		selected = param(aggValueHeatmapParams, 'selected');
-		isolate = param(aggValueHeatmapParams, 'isolate');
-		exclude = param(aggValueHeatmapParams, 'exclude');
-		rainbow = param(aggValueHeatmapParams, 'decompose_all');
-		conf = aggHttpHeatmapConf(request, start, duration, isolate,
-		    selected.length);
-
-		count = 0;
-		if (isolate)
-			count++;
-		if (exclude)
-			count++;
-		if (rainbow)
-			count++;
-
-		if (count > 1)
-			throw (new caValidationError(
-			    'only one of "isolate", "exclude", and ' +
-			    '"decompose_all" may be specified'));
-	} catch (ex) {
-		if (!(ex instanceof caValidationError))
-			throw (ex);
-
-		response.sendError(ex);
-		return;
-	}
-
-	ret = {};
-	ret.start_time = start;
-	ret.duration = duration;
-	ret.nsources = dataset.nsources();
-	ret.minreporting = dataset.nreporting(start, duration);
-	ret.present = dataset.keysForTime(start, duration);
-	aggHttpValueFill(ret, request, conf);
-
-	if (rainbow)
-		selected = ret.present.sort();
-
-	if (delay > 0)
-		ret.delayed = delay;
-
-	datasets = [];
-	datasets.push(dataset.total());
-
-	for (ii = 0; ii < selected.length; ii++)
-		datasets.push(dataset.dataForKey(selected[ii]));
-
-	for (ii = 0; ii < datasets.length; ii++)
-		datasets[ii] = mod_heatmap.bucketize(datasets[ii], conf);
-
-	if (!conf.hue)
-		conf.hue = aggHttpHeatmapHues(datasets.length - 1, isolate);
-
-	if (isolate) {
-		datasets.shift();
-
-		if (datasets.length === 0) {
-			datasets = [ mod_heatmap.bucketize({}, conf) ];
-			conf.hue = [ 0 ];
-		}
-	} else {
-		for (ii = 1; ii < datasets.length; ii++)
-			mod_heatmap.deduct(datasets[0], datasets[ii]);
-
-		if (exclude)
-			datasets = [ datasets[0] ];
-	}
-
-	/*
-	 * We can have more than the expected number of hues here because we
-	 * won't always have entries for an empty dataset or because the user
-	 * simply provided more hues than were necessary.
-	 */
-	tk.step('up to bucketize + deduction');
-	ASSERT.ok(conf.hue.length >= datasets.length);
-	conf.hue = conf.hue.slice(0, datasets.length);
-	mod_heatmap.normalize(datasets, conf);
-
-	conf.base = 0;
-	conf.saturation = [ 0, 0.9 ];
-	conf.value = 0.95;
-
-	tk.step('normalize');
-	png = mod_heatmap.generate(datasets, conf);
-
-	tk.step('generate');
-	transforms = aggHttpValueTransform(id, request, ret.present);
-	if (transforms != null)
-		ret.transformations = transforms;
-
-	ret.ymin = conf.min;
-	ret.ymax = conf.max;
-	tk.step('transform + samplerange');
-	buffer = png.encodeSync();
-	tk.step('png encoding');
-	ret.image = buffer.toString('base64');
-	response.send(HTTP.OK, ret);
-	tk.step('response sent');
-
-	if (agg_profile)
-		agg_log.dbg('%s', tk);
-}
-
-function aggHttpValueHeatmapDetailsDone(id, start, duration, request, response,
-    delay)
-{
-	var inst, conf, detconf, xx, yy;
-	var dataset, range, present, ii, ret, value;
-	var param = function (formals, key) {
-		return (mod_ca.caHttpParam(formals, request.ca_params, key));
-	};
-
-	inst = agg_insts[id];
-	dataset = inst.agi_dataset;
-
-	try {
-		conf = aggHttpHeatmapConf(request, start, duration, false, 0);
-		xx = param(aggValueHeatmapParams, 'x');
-		yy = param(aggValueHeatmapParams, 'y');
-
-		if (!conf.max)
-			throw (new caValidationError(
-			    '"ymax" must be specified'));
-
-		if (xx >= conf.width)
-			throw (new caValidationError(
-			    '"x" must be less than "width"'));
-
-		if (yy >= conf.height)
-			throw (new caValidationError(
-			    '"y" must be less than "height"'));
-	} catch (ex) {
-		if (!(ex instanceof caValidationError))
-			throw (ex);
-
-		response.sendError(ex);
-		return;
-	}
-
-	range = mod_heatmap.samplerange(xx, yy, conf);
-	range[0] = dataset.normalizeInterval(range[0], duration)['start_time'];
-
-	ret = {};
-	ret.bucket_time = range[0];
-	ret.bucket_ymin = range[1][0];
-	ret.bucket_ymax = range[1][1];
-	ret.start_time = start;
-	ret.duration = duration;
-	ret.nsources = dataset.nsources();
-	ret.minreporting = dataset.nreporting(range[0]);
-	aggHttpValueFill(ret, request, conf);
-
-	if (delay > 0)
-		ret.delayed = delay;
-
-	detconf = {
-		base: range[0],
-		min: range[1][0],
-		max: range[1][1],
-		nbuckets: 1,
-		nsamples: 1
-	};
-
-	/*
-	 * Our goal is to return the sum of values at a particular point as well
-	 * as the actual decomposition of values.  Recall that these values can
-	 * be fractional in cases where the underlying data included intervals
-	 * larger than the bucket size because in those cases we assign the
-	 * values proportionally to the buckets in the interval.  We'd rather
-	 * avoid presenting this detail to the user, since it doesn't generally
-	 * matter and can be rather confusing, so we always want to present
-	 * integer values for both the total and decompositions.  We could
-	 * simply round both the total and component values, but then we could
-	 * run into paradoxical situations in which the user sees non-zero data
-	 * in the heatmap but the total and components all round to zero so the
-	 * decomposition contains no data.  You could also wind up in situations
-	 * where the total didn't match the sum of the components because of
-	 * rounding errors.  To keep our lives simple, we say that the value for
-	 * each non-zero component is the maximum of 1 and the rounded value
-	 * from the underlying data, and the total is defined as the sum of the
-	 * components.  This works reasonably for cases where we have a
-	 * decomposition; in those where we don't, we apply the same rounded-
-	 * but-at-least-one rule to derive the total directly from the data.
-	 */
-	present = dataset.keysForTime(range[0], 1);
-	ret.present = {};
-
-	if (present.length === 0) {
-		/*
-		 * Maybe there's no data here, or maybe there's just no
-		 * decomposition.  Either way, calculate the total separately.
-		 */
-		value = mod_heatmap.bucketize(dataset.total(), detconf)[0][0];
-		if (value === 0)
-			ret.total = 0;
-		else
-			ret.total = Math.max(1, Math.round(value));
-	} else {
-		ret.total = 0;
-
-		for (ii = 0; ii < present.length; ii++) {
-			value = mod_heatmap.bucketize(
-			    dataset.dataForKey(present[ii]), detconf)[0][0];
-
-			if (!value)
-				continue;
-
-			value = Math.max(1, Math.round(value));
-			ret.present[present[ii]] = value;
-			ret.total += value;
-		}
-	}
-
-	response.send(HTTP.OK, ret);
-}
-
 /*
  * We define the number of sources we expect to be reporting data at a given
  * time as the number of sources that reported data "recently".  For simplicity,
@@ -1050,12 +418,11 @@ function aggTick()
 		for (ii = 0; ii < inst.agi_requests.length; ii++) {
 			rq = inst.agi_requests[ii];
 
-			ASSERT.ok(rq.rqtime <= now);
+			ASSERT.ok(rq.rqtime() <= now);
 
-			if (now - rq.rqtime >= agg_http_req_timeout) {
+			if (now - rq.rqtime() >= rq.timeout()) {
 				inst.agi_requests.splice(ii--, 1);
-				rq.callback(id, rq.datatime, rq.duration,
-				    rq.request, rq.response, now - rq.rqtime);
+				rq.complete(now);
 			}
 		}
 
@@ -1075,181 +442,6 @@ function aggTick()
 	}
 
 	setTimeout(aggTick, 1000);
-}
-
-/*
- * Transformation modules:
- *
- * A transformation is a post processing action that can be applied to raw data.
- * For example, one could perform geolocation or reverse DNS on data.
- *
- * A transformation module defines a single object which it uses to register
- * with the aggregator. The object contains the following four fields:
- *
- *	name			The id for this transformation as a string
- *
- *	label			The human readable name for this transformation
- *				as a string
- *
- *	fields			An array of fields that this transformation
- *				supports operating on
- *
- *	transform		A function of the form object (*transform)(raw).
- *				This takes the raw data and transforms it per
- *				the module specific transformation. It then
- *				returns the data in an object in a
- *				module-specific format.
- *
- * Data from transformations is assembled into a larger object where each key is
- * the name of the transformation and the value is the data returned from
- * calling the transform function.
- */
-
-function aggBackendInterface() {}
-
-/*
- * Function called to register a transformation. Args should be an object as
- * described above. We currently require that the name of each transformation be
- * unique. To indicate an error we throw an exception.
- */
-aggBackendInterface.prototype.registerTransformation = function (args)
-{
-	var name, label, fields, transform;
-
-	name = mod_ca.caFieldExists(args, 'name', '');
-	label = mod_ca.caFieldExists(args, 'label', '');
-	fields = mod_ca.caFieldExists(args, 'fields', []);
-	transform = mod_ca.caFieldExists(args, 'transform',
-	    aggBackendInterface);
-
-	if (name in agg_transforms)
-		throw (new caValidationError('Transformation module "' +
-		    '" already declared'));
-
-	agg_transforms[name] = {
-	    label: label,
-	    fields: fields,
-	    transform: transform
-	};
-};
-
-/*
- * Attempts to load the known transformations and add them to the set of
- * available transformations. If no transformations load successfully, it
- * barrels on. The lack of valid transformations should not stop the aggregator
- * from initializing and doing what it needs to.
- */
-function aggInitBackends()
-{
-	var backends = [ 'geolocate', 'reversedns' ];
-	var bemgr = new aggBackendInterface();
-	var plugin, ii;
-
-	for (ii = 0; ii < backends.length; ii++) {
-		try {
-			plugin = require('./caagg/transforms/' + backends[ii]);
-			plugin.agginit(bemgr, agg_log);
-			agg_log.info('Loaded transformation: ' + backends[ii]);
-		} catch (ex) {
-			agg_log.warn(mod_ca.caSprintf('FAILED loading ' +
-			    'transformation "%s": %s', backends[ii],
-			    ex.toString()));
-		}
-	}
-
-	agg_log.info('Finished loading modules');
-}
-
-/*
- * Verifies that the requested transformations exist and make sense for the
- * specific aggregation.
- */
-function aggHttpVerifyTransformations(id, request)
-{
-	var trans, ii, validtrans;
-
-	trans = mod_ca.caHttpParam({
-	    transformations: {
-		type: 'array',
-		default: []
-	    }
-	}, request.ca_params, 'transformations');
-
-	validtrans = agg_insts[id].agi_instrumentation['transformations'];
-
-	for (ii = 0; ii < trans.length; ii++) {
-		if (!(trans[ii] in agg_transforms))
-			throw (new caValidationError(mod_ca.caSprintf(
-			    'Requested non-existant transformation: %s',
-			    trans[ii])));
-
-
-		if (!(trans[ii] in validtrans))
-			throw (new caValidationError(mod_ca.caSprintf(
-			    'Requested incompatible transformation: %s',
-			    trans[ii])));
-	}
-}
-
-/*
- * Handles fulfilling all the requested transformations. The request should
- * have previously been validated by aggHttpVerifyTransformations. We iterate
- * over each transformation and call the transform function it registered with
- * the aggregator and combine all the results into one object.
- *
- * Input Parameters:
- *
- *	id		The id for the instrumentation
- *
- *	request		The HTTP request that we are processing
- *
- *	raw		Array of keys to be transformed
- *
- * Return values:
- *
- *	If 0 transformations requested: null
- *
- *	If >0 transformations:
- *		An object where each key corresponds to a requested
- *		transformation. It will have the data for that transformation,
- *		if that transformation is valid and can be done for the specific
- *		instrumentation. Otherwise, the key will be null.
- */
-function aggHttpValueTransform(id, request, raw)
-{
-	var ret = null;
-	var trans, ii;
-
-	trans = mod_ca.caHttpParam({
-	    transformations: {
-		type: 'array',
-		default: []
-	    }
-	}, request.ca_params, 'transformations');
-
-	if (mod_ca.caIsEmpty(trans))
-		return (ret);
-
-	ret = {};
-
-	/*
-	 * If for some reason one of our transformation backends blow up, we
-	 * shouldn't abort everything because of that. We should log what
-	 * happened and set their return value to be the empty object. It's
-	 * important that the user still be able to get the data they requested.
-	 */
-	for (ii = 0; ii < trans.length; ii++) {
-		try {
-			ret[trans[ii]] =
-			    agg_transforms[trans[ii]].transform(raw);
-		} catch (ex) {
-			ret[trans[ii]] = {};
-			agg_log.error(mod_ca.caSprintf('EXCEPTION from ' +
-			    'transform %s: %s', trans[ii], ex.toString()));
-		}
-	}
-
-	return (ret);
 }
 
 /*
@@ -1471,5 +663,495 @@ aggInstn.prototype.deleteData = function ()
 		agg_log.info('instn %s data deleted', instn.agi_id);
 	    });
 };
+
+/*
+ * Registers handlers for all of the HTTP resources we service.
+ */
+function aggHttpRouter(server)
+{
+	var infixes = [ '', 'customers/:custid/' ];
+	var ii, base;
+
+	server.get(agg_http_baseuri + 'admin/status', aggHttpAdminStatus);
+
+	for (ii = 0; ii < infixes.length; ii++) {
+		base = agg_http_baseuri + infixes[ii] +
+		    'instrumentations/:instid/value';
+		server.get(base, aggHttpValueList);
+		server.get(base + '/heatmap', aggHttpValueHeatmapList);
+
+		server.get(base + '/raw', aggHttpValueRetrieve.bind(
+		    null, mod_caagg.caAggrRawImpl));
+		server.get(base + '/heatmap/image', aggHttpValueRetrieve.bind(
+		    null, mod_caagg.caAggrHeatmapImageImpl));
+		server.get(base + '/heatmap/details', aggHttpValueRetrieve.bind(
+		    null, mod_caagg.caAggrHeatmapDetailsImpl));
+	}
+}
+
+/*
+ * Given an HTTP request/response for a per-instrumentation resource, returns
+ * the instrumentation specified in the request.  If that instrumentation does
+ * not exist, responds with a 404 error and returns false.
+ */
+function aggHttpInstn(request, response)
+{
+	var custid, instid, fqid;
+
+	custid = request.params['custid'];
+	instid = request.params['instid'];
+	fqid = mod_ca.caQualifiedId(custid, instid);
+
+	if (!(fqid in agg_insts)) {
+		response.send(HTTP.ENOTFOUND);
+		return (undefined);
+	}
+
+	ASSERT.ok(agg_insts[fqid]);
+	return (agg_insts[fqid]);
+}
+
+/*
+ * Services requests for admin/status.
+ */
+function aggHttpAdminStatus(request, response)
+{
+	response.send(HTTP.OK, aggAdminStatus());
+}
+
+/*
+ * Services requests for the (static) resource .../value.
+ */
+function aggHttpValueList(request, response)
+{
+	var instn, url, rv;
+
+	if (!(instn = aggHttpInstn(request, response)))
+		return;
+
+	url = request.url;
+	rv = {};
+
+	while (url[url.length - 1] === '/')
+		url = url.substring(0, url.length - 1);
+
+	rv = [ {
+		name: 'value_raw',
+		uri: url + '/raw'
+	} ];
+
+	if (mod_caagg.caAggrSupportsHeatmap(instn)) {
+		rv.push({
+			name: 'value_heatmap',
+			uri: url + '/heatmap'
+		});
+	}
+
+	response.send(HTTP.OK, rv);
+}
+
+/*
+ * Services requests for the (static) resource .../value/heatmap.
+ */
+function aggHttpValueHeatmapList(request, response)
+{
+	var instn, rv, url;
+
+	if (!(instn = aggHttpInstn(request, response)))
+		return;
+
+	if (!mod_caagg.caAggrSupportsHeatmap(instn)) {
+		response.send(HTTP.ENOTFOUND);
+		return;
+	}
+
+	url = request.url;
+
+	while (url[url.length - 1] === '/')
+		url = url.substring(0, url.length - 1);
+
+	rv = [ {
+		name: 'image',
+		uri: url + '/image'
+	}, {
+		name: 'details',
+		uri: url + '/details'
+	} ];
+
+	response.send(HTTP.OK, rv);
+}
+
+var aggValueParams = {
+	duration: {
+	    type: 'number',
+	    min: 1,
+	    max: 3600
+	},
+	end_time: {
+	    type: 'number',
+	    min: 0
+	},
+	ndatapoints: {
+	    type: 'number',
+	    min: 1,
+	    default: 1
+	},
+	start_time: {
+	    type: 'number',
+	    min: 0
+	},
+	timeout: {
+	    type: 'number',
+	    min: 0,
+	    max: 5000,
+	    default: agg_http_req_timeout
+	},
+	transformations: {
+	    type: 'array',
+	    default: []
+	}
+};
+
+/*
+ * Services requests for instrumentation values.  The caAggrValueRequest class
+ * handles the bulk of this work, delegating to "impl" to actually extract the
+ * requested values.
+ */
+function aggHttpValueRetrieve(impl, request, response)
+{
+	var instn, aggrq;
+
+	if ((instn = aggHttpInstn(request, response)) === undefined)
+		return;
+
+	/* XXX stick into global debug state */
+	aggrq = new caAggrValueRequest(instn, impl, request, response);
+	aggrq.start();
+}
+
+/*
+ * Applies the specified transformations on the given "keys".  Returns an object
+ * where each key corresponds to a requested transformation, and the
+ * corresponding value maps elements of "keys" to the transformed value.
+ */
+function aggHttpValueTransform(xforms, keys)
+{
+	var ret, xform, ii;
+
+	ret = {};
+
+	/*
+	 * If for some reason one of our transformation backends blow up, we
+	 * shouldn't abort everything because of that. We should log what
+	 * happened and set their return value to be the empty object. It's
+	 * important that the user still be able to get the data they requested.
+	 */
+	for (ii = 0; ii < xforms.length; ii++) {
+		xform = xforms[ii];
+
+		try {
+			ret[xform] = agg_transforms[xform].transform(keys);
+		} catch (ex) {
+			ret[xform] = {};
+			agg_log.error('ERROR from transform %s: %r', xform, ex);
+		}
+	}
+
+	return (ret);
+}
+
+/*
+ * Represents an HTTP request to retrieve one or more data points and
+ * encapsulates the process of servicing the request.  "instn" represents the
+ * aggregator's representation of the instrumentation, and "impl" represents the
+ * backend implementation that handles this type of value request.
+ */
+function caAggrValueRequest(instn, impl, request, response)
+{
+	this.avr_instn = instn;
+	this.avr_gran = instn.agi_instrumentation['granularity'];
+	this.avr_rqtime = new Date().getTime();
+	this.avr_impl = impl;
+	this.avr_request = request;
+	this.avr_response = response;
+}
+
+/*
+ * Processes the request.
+ */
+caAggrValueRequest.prototype.start = function ()
+{
+	var response, dataset;
+
+	response = this.avr_response;
+	dataset = this.avr_instn.agi_dataset;
+
+	ASSERT.ok(this.avr_input === undefined,
+	    'this object cannot be used to process multiple requests');
+
+	if (!this.avr_impl.ai_check(this))
+		return (response.send(HTTP.ENOTFOUND));
+
+	try {
+		this.loadParameters();
+	} catch (ex) {
+		if (!(ex instanceof caValidationError))
+			throw (ex);
+
+		return (response.sendError(ex));
+	}
+
+	if (this.avr_latest_end === undefined)
+		return (response.send(HTTP.OK, []));
+
+	if (this.avr_latest_end * 1000 > this.avr_rqtime + this.avr_timeout)
+		return (response.sendError(new caValidationError(
+		    'requested data point is too far in the future')));
+
+	if (dataset.nreporting(this.avr_latest_end - this.avr_gran) >=
+	    aggExpected(dataset, this.avr_latest_end - this.avr_gran))
+		return (this.complete());
+
+	this.avr_instn.agi_requests.push(this);
+	return (undefined);
+};
+
+/*
+ * Used internally to load instance state from the request parameters.
+ */
+caAggrValueRequest.prototype.loadParameters = function ()
+{
+	var params, param, oival, nival, npoints, point, default_duration;
+	var end, ii;
+
+	/*
+	 * Extract and validate parameters.
+	 */
+	params = this.avr_request.ca_json || this.avr_request.ca_params;
+	param = mod_ca.caHttpParam.bind(null, aggValueParams, params);
+
+	this.avr_timeout = param('timeout');
+	this.avr_xforms = param('transformations');
+	this.avr_input = {
+	    start_time: param('start_time'),
+	    duration: param('duration'),
+	    end_time: param('end_time'),
+	    ndatapoints: param('ndatapoints')
+	};
+
+	this.avr_usearray = 'ndatapoints' in params;
+	this.validate();
+
+	/*
+	 * Compute the list of individual data points specified in this request.
+	 * While it's suboptimal to build this list in-memory, we have to keep
+	 * the result list in-memory anyway (at least until we have a streaming
+	 * version of JSON.stringify()).
+	 */
+	default_duration = this.avr_impl.ai_duration;
+	this.avr_points = [];
+
+	oival = mod_caagg.caAggrInterval(this.avr_input,
+	    this.avr_rqtime, default_duration, this.avr_gran);
+
+	nival = this.avr_instn.agi_dataset.normalizeInterval(
+	    oival['start_time'], oival['duration']);
+
+	npoints = this.avr_input['ndatapoints'];
+
+	for (ii = 0; ii < npoints; ii++) {
+		point = {
+		    start_time: nival['start_time'] + ii * nival['duration'],
+		    duration: nival['duration'],
+		    requested_start_time: oival['start_time'] +
+			ii * oival['duration'],
+		    requested_duration: oival['duration'],
+		    requested_end_time: oival['start_time'] +
+			(ii + 1) * oival['duration']
+		};
+
+		this.avr_points.push(point);
+
+		end = point['start_time'] + point['duration'];
+		if (this.avr_latest_end === undefined ||
+		    end > this.avr_latest_end)
+			this.avr_latest_end = end;
+	}
+};
+
+/*
+ * Used internally to validate parameters.
+ */
+caAggrValueRequest.prototype.validate = function ()
+{
+	var valid_xforms, xform, ii;
+
+	valid_xforms = this.avr_instn.agi_instrumentation['transformations'];
+
+	for (ii = 0; ii < this.avr_xforms.length; ii++) {
+		xform = this.avr_xforms[ii];
+
+		if (!(xform in agg_transforms))
+			throw (new caInvalidFieldError('transformations',
+			    this.avr_xforms, 'transformation "%s" does not ' +
+			    'exist', xform));
+
+		if (!(xform in valid_xforms))
+			throw (new caInvalidFieldError('transformations',
+			    this.avr_xforms, 'transformation "%s" is not ' +
+			    'allowed on this instrumentation', xform));
+	}
+};
+
+/*
+ * Complete the request.  This function is invoked when we either have
+ * sufficient data to satisfy the request or we've timed out waiting for that
+ * data.
+ */
+caAggrValueRequest.prototype.complete = function (delaynow)
+{
+	var response, xform, dataset, ret, val, point, ii;
+
+	response = this.avr_response;
+	dataset = this.avr_instn.agi_dataset;
+	xform = aggHttpValueTransform.bind(null, this.avr_xforms);
+	ret = [];
+
+	for (ii = 0; ii < this.avr_points.length; ii++) {
+		point = this.avr_points[ii];
+
+		try {
+			val = this.avr_impl.ai_value(dataset,
+			    point['start_time'], point['duration'], xform,
+			    this.avr_request);
+		} catch (ex) {
+			response.sendError(new caError(
+			    ex instanceof caError ? ex.code() : ECA_UNKNOWN, ex,
+			    'failed to process data point "%s" (%j)', ii + 1,
+			    point));
+			return;
+		}
+
+		if (delaynow)
+			val['delay'] = delaynow - this.avr_rqtime;
+		val['start_time'] = point['start_time'];
+		val['duration'] = point['duration'];
+		val['nsources'] = dataset.nsources();
+		val['minreporting'] = dataset.nreporting(
+		    point['start_time'], point['duration']);
+		val['requested_start_time'] = point['requested_start_time'];
+		val['requested_duration'] = point['requested_duration'];
+		val['requested_end_time'] = point['requested_end_time'];
+		ret.push(val);
+	}
+
+	if (this.avr_usearray)
+		return (response.send(HTTP.OK, ret));
+
+	ASSERT.equal(ret.length, 1);
+	return (response.send(HTTP.OK, ret[0]));
+};
+
+caAggrValueRequest.prototype.instn = function ()
+{
+	return (this.avr_instn);
+};
+
+caAggrValueRequest.prototype.latest = function ()
+{
+	return (this.avr_latest_end - this.avr_gran);
+};
+
+caAggrValueRequest.prototype.rqtime = function ()
+{
+	return (this.avr_rqtime);
+};
+
+caAggrValueRequest.prototype.timeout = function ()
+{
+	return (this.avr_timeout);
+};
+
+/*
+ * Transformation modules:
+ *
+ * A transformation is a post processing action that can be applied to raw data.
+ * For example, one could perform geolocation or reverse DNS on data.
+ *
+ * A transformation module defines a single object which it uses to register
+ * with the aggregator. The object contains the following four fields:
+ *
+ *	name			The id for this transformation as a string
+ *
+ *	label			The human readable name for this transformation
+ *				as a string
+ *
+ *	fields			An array of fields that this transformation
+ *				supports operating on
+ *
+ *	transform		A function of the form object (*transform)(raw).
+ *				This takes the raw data and transforms it per
+ *				the module specific transformation. It then
+ *				returns the data in an object in a
+ *				module-specific format.
+ *
+ * Data from transformations is assembled into a larger object where each key is
+ * the name of the transformation and the value is the data returned from
+ * calling the transform function.
+ */
+function aggBackendInterface() {}
+
+/*
+ * Function called to register a transformation. Args should be an object as
+ * described above. We currently require that the name of each transformation be
+ * unique. To indicate an error we throw an exception.
+ */
+aggBackendInterface.prototype.registerTransformation = function (args)
+{
+	var name, label, fields, transform;
+
+	name = mod_ca.caFieldExists(args, 'name', '');
+	label = mod_ca.caFieldExists(args, 'label', '');
+	fields = mod_ca.caFieldExists(args, 'fields', []);
+	transform = mod_ca.caFieldExists(args, 'transform',
+	    aggBackendInterface);
+
+	if (name in agg_transforms)
+		throw (new caValidationError('Transformation module "' +
+		    '" already declared'));
+
+	agg_transforms[name] = {
+	    label: label,
+	    fields: fields,
+	    transform: transform
+	};
+};
+
+/*
+ * Attempts to load the known transformations and add them to the set of
+ * available transformations. If no transformations load successfully, it
+ * barrels on. The lack of valid transformations should not stop the aggregator
+ * from initializing and doing what it needs to.
+ */
+function aggInitBackends()
+{
+	var backends = [ 'geolocate', 'reversedns' ];
+	var bemgr = new aggBackendInterface();
+	var plugin, ii;
+
+	for (ii = 0; ii < backends.length; ii++) {
+		try {
+			plugin = require('./caagg/transforms/' + backends[ii]);
+			plugin.agginit(bemgr, agg_log);
+			agg_log.info('Loaded transformation: ' + backends[ii]);
+		} catch (ex) {
+			agg_log.warn(mod_ca.caSprintf('FAILED loading ' +
+			    'transformation "%s": %s', backends[ii],
+			    ex.toString()));
+		}
+	}
+
+	agg_log.info('Finished loading modules');
+}
 
 main();

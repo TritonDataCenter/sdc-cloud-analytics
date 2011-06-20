@@ -296,8 +296,8 @@ function check_global_uris()
 		ASSERT.ok(response.statusCode == HTTP.OK);
 		ASSERT.deepEqual(rv, {
 		    types: {
-			string: { name: 'string', arity: 'discrete' },
-			time: { name: 'time', arity: 'numeric' }
+			string: { name: 'string', arity: 'discrete', unit: '' },
+			time: { name: 'time', arity: 'numeric', unit: '' }
 		    },
 		    transformations: {},
 		    fields: {

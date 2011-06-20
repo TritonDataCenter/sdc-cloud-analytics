@@ -114,6 +114,12 @@
 	"type":		"time",
 	"fields":	[ "hostname", "zonename" ]
     }, {
+	"module":	"cpu",
+	"stat":		"loadavg1",
+	"label":	"1-minute load average",
+	"type":		"number",
+	"fields":	[ "hostname", "zonename" ]
+    }, {
 	"module":	"disk",
 	"stat":		"disks",
 	"label":	"disks",

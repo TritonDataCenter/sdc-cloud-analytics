@@ -20,6 +20,10 @@
 		    "ppid", "pexecname", "ppsargs", "leavereason", "runtime"
 		]
 	}, {
+		"module": "cpu",
+		"stat": "loadavg1",
+		"fields": [ "hostname", "zonename" ]
+	}, {
 		"module": "memory",
 		"stat": "rss",
 		"fields": [ "hostname", "zonename" ]

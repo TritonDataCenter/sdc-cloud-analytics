@@ -13,6 +13,8 @@ var mod_instr = require('../../../lib/ca/ca-instr');
 var inskLog;
 var inskHostname;
 
+var FSCALE = 256;	/* see sys/param.h */
+
 /*
  * Invoked by the instrumenter service to initialize the kstat-based metrics.
  */
@@ -199,6 +201,20 @@ var inskMetrics = [ {
 		var newd = kstat['data'];
 		var oldd = kprev['data'];
 		return (newd['nsec_waitrq'] - oldd['nsec_waitrq']);
+	},
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		}
+	}
+}, {
+	module: 'cpu',
+	stat: 'loadavg1',
+	kstat: { module: 'zones', class: 'zone_misc' },
+	extract: function (fields, kstat, kprev) {
+		return (kstat['data']['avenrun_1min'] / FSCALE);
 	},
 	fields: {
 		zonename: {

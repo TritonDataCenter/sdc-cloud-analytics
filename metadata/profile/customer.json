@@ -55,6 +55,14 @@
 		    "pexecname", "ppsargs", "fstype", "optype", "latency"	
 		]
 	}, {
+		"module": "fs",
+		"stat": "logical_rwops",
+		"fields": [ "zonename", "optype" ]
+	}, {
+		"module": "fs",
+		"stat": "logical_rwbytes",
+		"fields": [ "zonename", "optype" ]
+	}, {
 		"module": "node",
 		"stat": "gc_ops",
 		"fields": [

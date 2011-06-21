@@ -558,7 +558,7 @@ var inskMetrics = [ {
 	fields: {
 		zonename: {
 			values: function (kstat) {
-				return ([ kstat['name'] ]);
+				return ([ kstat['data']['zonename'] ]);
 			}
 		},
 		optype: {
@@ -573,7 +573,7 @@ var inskMetrics = [ {
 	fields: {
 		zonename: {
 			values: function (kstat) {
-				return ([ kstat['name'] ]);
+				return ([ kstat['data']['zonename'] ]);
 			}
 		},
 		optype: {

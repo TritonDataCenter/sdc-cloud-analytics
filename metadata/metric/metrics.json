@@ -91,6 +91,7 @@
 	"stat":		"cpus",
 	"label":	"CPUs",
 	"unit":		"CPUs",
+	"interval":	"point",
 	"fields":	[ "hostname", "cpu", "utilization" ]
     }, {
 	"module":	"cpu",
@@ -106,6 +107,7 @@
 	"stat":		"usage",
 	"label":	"aggregated CPU usage",
 	"unit":		"percent of 1 CPU",
+	"interval":	"point",
 	"fields":	[ "hostname", "zonename", "cpumode" ]
     }, {
 	"module":	"cpu",
@@ -118,12 +120,14 @@
 	"stat":		"loadavg1",
 	"label":	"1-minute load average",
 	"type":		"number",
+	"interval":	"point",
 	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"disk",
 	"stat":		"disks",
 	"label":	"disks",
 	"unit":		"disks",
+	"interval":	"point",
 	"fields":	[
 	    "hostname", "disk", "iops", "iops_read", "iops_write", "bytes",
 	    "bytes_read", "bytes_write", "busytime"
@@ -168,24 +172,28 @@
 	"stat":		"rss",
 	"label":	"resident set size",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"memory",
 	"stat":		"rss_limit",
 	"label":	"maximum resident set size",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"memory",
 	"stat":		"swap",
 	"label":	"anonymous memory used",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"memory",
 	"stat":		"swap_limit",
 	"label":	"maximum anonymous memory used",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"memory",
@@ -204,6 +212,7 @@
 	"stat":		"nics",
 	"label":	"NICs",
 	"unit":		"NICs",
+	"interval":	"point",
 	"fields":	[
 	    "hostname", "nic", "packets", "packets_in", "packets_out", "bytes",
 	    "bytes_read", "bytes_write"
@@ -303,36 +312,42 @@
 	"stat":		"dataset_unused_quota",
 	"label":	"unused quota",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zdataset" ]
     }, {
 	"module":	"zfs",
 	"stat":		"dataset_used",
 	"label":	"used space",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zdataset" ]
     }, {
 	"module":	"zfs",
 	"stat":		"dataset_quota",
 	"label":	"quota size",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zdataset" ]
     }, {
 	"module":	"zfs",
 	"stat":		"pool_free",
 	"label":	"free space in pool",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zpool" ]
     }, {
 	"module":	"zfs",
 	"stat":		"pool_used",
 	"label":	"used space in pool",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zpool" ]
     }, {
 	"module":	"zfs",
 	"stat":		"pool_total",
 	"label":	"total space in pool",
 	"type":		"size",
+	"interval":	"point",
 	"fields":	[ "hostname", "zpool" ]
     } ]
 }

@@ -16,6 +16,7 @@ var dataset, ii;
 dataset = mod_caagg.caDatasetForInstrumentation({
 	'value-arity': mod_ca.ca_arity_scalar,
 	'value-dimension': 1,
+	'value-scope': 'interval',
 	'nsources': 2,
 	'granularity': 10
 });

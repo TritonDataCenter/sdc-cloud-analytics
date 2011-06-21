@@ -74,6 +74,7 @@ function check_instrumentation(test, code, response, rv)
 	ASSERT.equal(rv['stat'], inp['stat']);
 	ASSERT.deepEqual(rv['decomposition'], decomp);
 	ASSERT.deepEqual(rv['predicate'], pred);
+	ASSERT.equal(rv['value-scope'], 'interval');
 	if (!('granularity' in exp))
 		ASSERT.equal(rv['granularity'], 1);
 	if (!('retention-time' in exp))
@@ -312,6 +313,7 @@ function check_global_uris()
 			stat: 'ops1',
 			label: 'test ops 1',
 			type: 'time',
+			interval: 'interval',
 			fields: [ 'hostname', 'latency' ]
 		    } ]
 		});

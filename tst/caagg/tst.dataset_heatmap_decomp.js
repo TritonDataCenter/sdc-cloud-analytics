@@ -10,6 +10,7 @@ var mod_tl = require('../../lib/tst/ca-test');
 var spec = {
     'value-arity': mod_ca.ca_arity_numeric,
     'value-dimension': 3,
+    'value-scope': 'interval',
     'granularity': 1
 };
 

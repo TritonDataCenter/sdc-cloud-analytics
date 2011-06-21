@@ -46,6 +46,7 @@ var instn_initial = {
 	granularity: 5,
 	'value-dimension': 2,
 	'value-arity': 'discrete-decomposition',
+	'value-scope': 'interval',
 	enabled: true,
 	nsources: 1,
 	transformations: []
@@ -77,6 +78,7 @@ var instn_clones = [ {
 	granularity: 5,
 	'value-dimension': 2,
 	'value-arity': 'numeric-decomposition',
+	'value-scope': 'interval',
 	enabled: true,
 	nsources: 1,
 	transformations: []
@@ -104,6 +106,7 @@ var instn_clones = [ {
 	granularity: 10,
 	'value-dimension': 3,
 	'value-arity': 'numeric-decomposition',
+	'value-scope': 'interval',
 	enabled: true,
 	nsources: 1,
 	transformations: []

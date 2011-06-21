@@ -8,24 +8,28 @@ var mod_agg = require('../../lib/ca/ca-agg');
 exports.spec_scalar = {
     'value-arity': mod_ca.ca_arity_scalar,
     'value-dimension': 1,
+    'value-scope': 'interval',
     'granularity': 1
 };
 
 exports.spec_discrete = {
     'value-arity': mod_ca.ca_arity_discrete,
     'value-dimension': 2,
+    'value-scope': 'interval',
     'granularity': 1
 };
 
 exports.spec_numeric = {
     'value-arity': mod_ca.ca_arity_numeric,
     'value-dimension': 2,
+    'value-scope': 'interval',
     'granularity': 1
 };
 
 exports.spec_both = {
     'value-arity': mod_ca.ca_arity_numeric,
     'value-dimension': 3,
+    'value-scope': 'interval',
     'granularity': 1
 };
 

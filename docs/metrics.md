@@ -14,6 +14,8 @@ Each metric description includes:
   from end users.  End users are also only allowed to see data pertaining to
   their own zones and ZFS datasets.
 
+For documentation on the various decompositions provided by metrics, see
+"Fields" below.
 
 # Metrics
 
@@ -654,3 +656,71 @@ can be decomposed by hostname and ZFS dataset.
 
 In raw form, this metric reports the sum of all space for all ZFS pools.  This
 can be decomposed by hostname and ZFS dataset.
+
+
+# Fields
+
+Fields are used for decomposition and predicating.  To see which fields are
+provided by which metrics, see "Metrics" above.
+
+## Discrete fields
+
+The following fields' values are strings.  Decomposing by one of these fields
+could yield a stacked line graph rather than a single line graph (or, for
+individual values, a vector rather than a scalar):
+
+* **conntype**: type of TCP connection, either "active" (client) or "passive"
+  (server)
+* **cpu**: CPU identifier (e.g., "cpu0")
+* **cpumode**: CPU mode, either "user" or "kernel"
+* **disk**: disk identifier
+* **direction**: direction of bytes transferred, either "sent" or "received"
+* **execname**: application name
+* **errtype**: TCP error description
+* **fstype**: filesystem name (e.g., "zfs")
+* **gctype**: type of garbage collection (e.g., "scavenge")
+* **hostname**: server name
+* **http_method**: HTTP request method (e.g., "GET")
+* **http_origin**: Origin IP address for HTTP request, as reported by
+  "X-Forwarded-For" header
+* **http_path**: HTTP request URL path (URL without query parameters)
+* **http_url**: HTTP request URL
+* **leavereason**: description of why a process came off-CPU
+* **nic**: network interface identifier (e.g., "e1000g0")
+* **optype**: operation type, often "read" or "write" but can be any operation
+  depending on the  metric
+* **pexecname**: parent process application name
+* **pid**: process identifier
+* **ppid**: parent process identifier
+* **psargs**: process name and arguments
+* **ppsargs**: parent process name and arguments
+* **raddr**: remote IP address
+* **rport**: remote TCP port
+* **syscall**: name of a system call
+* **zdataset**: ZFS dataset name
+* **zonename**: Zone (or SmartMachine or Virtual Machine) name
+* **zpool**: ZFS pool name
+
+## Numeric fields
+
+The following fields' values are numbers.  Decomposing by one of these fields
+typically yields a heatmap rather than a scalar or vector:
+
+* **busytime**: percent of time spent doing work (e.g., processing I/O)
+* **bytes**: number of bytes, both read and written
+* **bytes_read**: number of bytes read
+* **bytes_write**: number of bytes written
+* **buffered**: number of bytes currently buffered in memory
+* **cputime**: time spent actually on-CPU
+* **iops**: I/O operations, both read and write
+* **iops_read**: read I/O operations
+* **iops_write**: write I/O operations
+* **latency**: how long an operation took
+* **offset**: byte offset within a file or block device
+* **packets**: number of packets sent or received
+* **packets_in**: number of packets received
+* **packets_out**: number of packets sent
+* **runtime**: time spent running continuously on CPU
+* **size**: size in bytes of a packet or operation
+* **utilization**: percent of overall resource utilized (for CPUs, this is the
+  same as percent of time busy)

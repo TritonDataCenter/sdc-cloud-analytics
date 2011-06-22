@@ -184,14 +184,14 @@
     }, {
 	"module":	"memory",
 	"stat":		"swap",
-	"label":	"anonymous memory used",
+	"label":	"virtual memory reserved",
 	"type":		"size",
 	"interval":	"point",
 	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"memory",
 	"stat":		"swap_limit",
-	"label":	"maximum anonymous memory used",
+	"label":	"maximum virtual memory reserved",
 	"type":		"size",
 	"interval":	"point",
 	"fields":	[ "hostname", "zonename" ]

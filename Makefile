@@ -37,6 +37,7 @@ CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
 JSONCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/jsonchk.js
+MARKDOWN	 = $(TOOLSDIR)/markdown
 MKERRNO		 = $(TOOLSDIR)/mkerrno
 NODE		:= $(NODEDIR)/node
 NODE_WAF	:= $(NODEDIR)/node-waf
@@ -184,6 +185,9 @@ NATIVE_DEPS = \
 	deps/node-png/build/default/png.node			\
 	deps/node-uname/build/default/uname.node		\
 	deps/node-libGeoIP/build/default/libGeoIP.node
+
+DOC_FILES = \
+	docs/metrics.htm
 
 #
 # Targets
@@ -368,9 +372,20 @@ cscope.files:
 .PHONY: cscope.files
 
 #
+# The "doc" target builds docs HTML from markdown.
+#
+doc: $(DOC_FILES)
+
+docs/%.htm: docs/%.md docs/header.htm docs/footer.htm
+	cat docs/header.htm > $@
+	$(MARKDOWN) $< >> $@
+	cat docs/footer.htm >> $@
+
+#
 # The "clean" target removes created files -- we currently have none
 #
 clean:
+	-rm -f $(DOC_FILES)
 	-rm -f lib/ca/errno.js
 	-rm -f $(WEBREV)/bin/codereview 
 

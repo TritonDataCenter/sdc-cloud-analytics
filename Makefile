@@ -105,7 +105,7 @@ PKGDIRS_cabase := \
 	$(PKGROOT)/cabase/cmd/cainst/modules	\
 	$(PKGROOT)/cabase/cmd/cainst/modules/dtrace	\
 	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)	\
-	$(PKGROOT)/cabase/doc			\
+	$(PKGROOT)/cabase/docs			\
 	$(PKGROOT)/cabase/lib			\
 	$(PKGROOT)/cabase/lib/ca		\
 	$(PKGROOT)/cabase/lib/tst		\

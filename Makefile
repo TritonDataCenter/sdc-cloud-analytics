@@ -187,7 +187,8 @@ NATIVE_DEPS = \
 	deps/node-libGeoIP/build/default/libGeoIP.node
 
 DOC_FILES = \
-	docs/metrics.htm
+	docs/metrics.htm	\
+	docs/overview.htm
 
 #
 # Targets

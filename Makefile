@@ -105,6 +105,7 @@ PKGDIRS_cabase := \
 	$(PKGROOT)/cabase/cmd/cainst/modules	\
 	$(PKGROOT)/cabase/cmd/cainst/modules/dtrace	\
 	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)	\
+	$(PKGROOT)/cabase/doc			\
 	$(PKGROOT)/cabase/lib			\
 	$(PKGROOT)/cabase/lib/ca		\
 	$(PKGROOT)/cabase/lib/tst		\
@@ -123,6 +124,7 @@ PKGFILES_cabase = \
 	$(PKGROOT)/cabase/cmd/node			\
 	$(PKGROOT)/cabase/cmd/cactl.js			\
 	$(DEMO_FILES:%=$(PKGROOT)/cabase/%)		\
+	$(DOC_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
@@ -187,7 +189,6 @@ NATIVE_DEPS = \
 	deps/node-libGeoIP/build/default/libGeoIP.node
 
 DOC_FILES = \
-	docs/metrics.htm	\
 	docs/overview.htm
 
 #

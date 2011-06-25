@@ -885,6 +885,13 @@ insKstatAutoMetric.prototype.read = function ()
 	kdata = {};
 
 	for (ii = 0; ii < kraw.length; ii++) {
+		if ('error' in kraw[ii]) {
+			if (inskLog)
+				inskLog.warn('skipping bad kstat: %j',
+				    kraw[ii]);
+			continue;
+		}
+
 		if (this.iam_filter && !(this.iam_filter(kraw[ii])))
 			continue;
 

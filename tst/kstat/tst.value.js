@@ -80,7 +80,7 @@ metric_raw = make_metric([]);
 metric_byhostname = make_metric(['hostname']);
 metric_bydisk = make_metric(['disk']);
 metric_bybytes = make_metric(['bytes_read']);
-metric_byboth = make_metric(['bytes_read', 'disk']);
+metric_byboth = make_metric(['disk', 'bytes_read']);
 
 /*
  * Set up fake data.

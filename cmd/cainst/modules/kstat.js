@@ -791,24 +791,18 @@ function insKstatAutoMetric(desc, metric, instrbei)
 	this.iam_decompositions = [];
 	this.iam_metadata = instrbei.metadata();
 
-	/*
-	 * Discrete decompositions must come first, and there can be at most one
-	 * numeric decomposition, but we do support more than one discrete
-	 * decomposition.
-	 */
 	ndiscrete = nnumeric = 0;
 	for (ii = 0; ii < metric.is_decomposition.length; ii++) {
 		field = metric.is_decomposition[ii];
 		ASSERT(field in desc['fields']);
 		arity = this.iam_metadata.fieldArity(field);
 
-		if (arity == mod_ca.ca_field_arity_discrete) {
-			this.iam_decompositions.unshift(field);
+		if (arity == mod_ca.ca_field_arity_discrete)
 			ndiscrete++;
-		} else {
-			this.iam_decompositions.push(field);
+		else
 			nnumeric++;
-		}
+
+		this.iam_decompositions.push(field);
 	}
 
 	ASSERT(nnumeric <= 1);

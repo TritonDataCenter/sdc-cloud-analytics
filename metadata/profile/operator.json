@@ -48,6 +48,22 @@
 		"stat": "pageins",
 		"fields": [ "hostname", "zonename" ]
 	}, {
+		"module": "mysql",
+		"stat": "queries",
+		"fields": [ "hostname", "zonename", "pid", "execname",
+		    "psargs", "querysubstr", "database", "user", "client",
+		    "latency", "cputime" ]
+	}, {
+		"module": "mysql",
+		"stat": "connections",
+		"fields": [ "hostname", "zonename", "pid", "execname",
+		    "psargs", "user", "client", "latency" ]
+	}, {
+		"module": "mysql",
+		"stat": "filesort",
+		"fields": [ "hostname", "zonename", "pid", "execname",
+		    "psargs", "database", "table", "latency", "cputime" ]
+	}, {
 		"module": "fs",
 		"stat": "logical_ops",
 		"fields": [

@@ -4,6 +4,7 @@
 	"disk":		{ "label": "Disk"			},
 	"fs":		{ "label": "Filesystem"			},
 	"memory":	{ "label": "Memory"			},
+	"mysql":	{ "label": "MySQL"			},
 	"nic":		{ "label": "Network interface"		},
 	"node":		{ "label": "Node.js 0.4.x"		},
 	"syscall":	{ "label": "System calls"		},
@@ -43,9 +44,11 @@
 	"bytes_write":	{ "label": "bytes written", "type": "size" },
 	"buffered":	{ "label": "bytes buffered on socket", "type": "size" },
 	"conntype":	{ "label": "connection type" },
+	"client":	{ "label": "client hostname" },
 	"cpu":		{ "label": "CPU identifier" },
 	"cputime":	{ "label": "CPU time", "type": "time" },
 	"cpumode":	{ "label": "CPU mode" },
+	"database":	{ "label": "database name" },
 	"disk":		{ "label": "device name" },
 	"direction":	{ "label": "sent/received" },
 	"execname":	{ "label": "application name" },
@@ -74,12 +77,15 @@
 	"ppid":		{ "label": "parent process identifier" },
 	"psargs":	{ "label": "process arguments" },
 	"ppsargs":	{ "label": "parent process arguments" },
+	"querysubstr":	{ "label": "query substring" },
 	"raddr":	{ "label": "remote IP address" },
 	"rport":	{ "label": "remote TCP port" },
 	"runtime":	{ "label": "time on CPU", "type": "time" },
 	"size":		{ "label": "size", "type": "size" },
 	"syscall":	{ "label": "syscall" },
+	"table":	{ "label": "table name" },
 	"tcpstack":	{ "label": "TCP instance" },
+	"user":		{ "label": "client username" },
 	"utilization":	{ "label": "utilization", "type": "percent" },
 	"zdataset":	{ "label": "ZFS dataset" },
 	"zonename":	{ "label": "zone name" },
@@ -207,6 +213,27 @@
 	"label":	"pages paged in",
 	"unit":		"pages",
 	"fields":	[ "hostname", "zonename" ]
+    }, {
+	"module":	"mysql",
+	"stat":		"queries",
+	"label":	"queries",
+	"unit":		"queries",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "querysubstr", "database", "user", "client", "latency", "cputime" ]
+    }, {
+	"module":	"mysql",
+	"stat":		"connections",
+	"label":	"connections",
+	"unit":		"connections",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "user", "client", "latency" ]
+    }, {
+	"module":	"mysql",
+	"stat":		"filesort",
+	"label":	"filesort",
+	"unit":		"filesorts",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "database", "table", "latency", "cputime" ]
     }, {
 	"module":	"nic",
 	"stat":		"nics",

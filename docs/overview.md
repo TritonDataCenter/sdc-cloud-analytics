@@ -1481,6 +1481,67 @@ this metric shows when the zone is experiencing latency as a result of having
 previously exceeded its memory limit.
 
 
+## MySQL-related metrics
+
+The MySQL metrics report activity for MySQL and Percona master database
+servers.  These are only available for versions which support the DTrace mysql
+provider, which is currently versions 5.5 and later which have been compiled
+with ENABLE_DTRACE.  The metrics show connection, query and filesort details.
+
+
+### MySQL: connections
+
+**Name:** mysql.connections.  
+**Raw metric:** number of client connections to the database.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, user, client,
+latency (heatmap).  
+**Visibility:** operators and end users.  
+
+This shows client connections to the database, providing breakdowns to show
+the client username and client hostname.  The "latency" field shows a heatmap
+depicting the entire duration of the connection, which may last many seconds
+and span many queries.
+
+
+### MySQL: queries
+
+**Name:** mysql.queries.  
+**Raw metric:** number of database queries.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, querysubstr,
+database, user, client, latency (heatmap), cputime (heatmap).  
+**Visibility:** operators and end users.  
+
+This shows query requests that are served by the database, and has a number
+of breakdowns to show general characteristics of the workload: including the
+database name, user name and client hostname.  The "latency" breakdown shows
+query performance in detail, which can be used to identify single outliers and
+patterns of degraded performance.  The latency heatmap can be visually compared
+to the "cputime" heatmap, which shows the time spent on-CPU for each query.
+If these heatmaps look similar, then the queries are spending most of their
+time on-CPU in the database.  If the latency heatmap shows much higher latency
+than the cputime heatmap, then queries are blocked off-CPU for some reason,
+which can include waiting on file system I/O (including disk I/O), locks,
+and for their turn on-CPU.
+
+
+### MySQL: filesort
+
+**Name:** mysql.filesort.  
+**Raw metric:** number of database filesorts.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, database,
+table, latency (heatmap), cputime (heatmap).  
+**Visibility:** operators and end users.  
+
+This shows the filesort operation in MySQL databases, which can be expensive
+component of a query, both in terms of CPU time and file system I/O.
+Breakdowns provide information on the database and table that were the subject
+to filesort.  The latency and cputime fields allow the time spent doing
+filesort, and the time spent on-CPU to be examined.  If these heatmaps are
+different with "latency" much higher than "cputime", it can indicate that
+time is spent waiting on file system I/O (including disk I/O) rather than
+performing work on-CPU.
+
+
 ## NIC-related metrics
 
 The NIC metrics allow operators and end users to observe network activity as it
@@ -1806,10 +1867,12 @@ The following fields' values are strings.  Decomposing by one of these fields
 could yield a stacked line graph rather than a single line graph (or, for
 individual values, a vector rather than a scalar):
 
+* **client**: client hostname
 * **conntype**: type of TCP connection, either "active" (client) or "passive"
   (server)
 * **cpu**: CPU identifier (e.g., "cpu0")
 * **cpumode**: CPU mode, either "user" or "kernel"
+* **database**: database name
 * **disk**: disk identifier
 * **direction**: direction of bytes transferred, either "sent" or "received"
 * **execname**: application name
@@ -1831,9 +1894,12 @@ individual values, a vector rather than a scalar):
 * **ppid**: parent process identifier
 * **psargs**: process name and arguments
 * **ppsargs**: parent process name and arguments
+* **querysubstr**: query substring (first 6 characters of the raw query string)
 * **raddr**: remote IP address
 * **rport**: remote TCP port
 * **syscall**: name of a system call
+* **table**: database table name
+* **user**: client username
 * **zdataset**: ZFS dataset name
 * **zonename**: Zone (or SmartMachine or Virtual Machine) name
 * **zpool**: ZFS pool name

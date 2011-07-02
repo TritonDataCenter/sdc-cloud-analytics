@@ -44,6 +44,7 @@
 	"bytes_write":	{ "label": "bytes written", "type": "size" },
 	"buffered":	{ "label": "bytes buffered on socket", "type": "size" },
 	"conntype":	{ "label": "connection type" },
+	"command":	{ "label": "command" },
 	"client":	{ "label": "client hostname" },
 	"cpu":		{ "label": "CPU identifier" },
 	"cputime":	{ "label": "CPU time", "type": "time" },
@@ -234,6 +235,13 @@
 	"unit":		"filesorts",
 	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
 	    "database", "table", "latency", "cputime" ]
+    }, {
+	"module":	"mysql",
+	"stat":		"commands",
+	"label":	"commands",
+	"unit":		"commands",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "command", "user", "client", "latency", "cputime" ]
     }, {
 	"module":	"nic",
 	"stat":		"nics",

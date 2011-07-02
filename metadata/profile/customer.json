@@ -48,6 +48,11 @@
 		    "latency", "cputime" ]
 	}, {
 		"module": "mysql",
+		"stat": "commands",
+		"fields": [ "zonename", "pid", "execname", "psargs",
+		    "command", "user", "client", "latency", "cputime" ]
+	}, {
+		"module": "mysql",
 		"stat": "connections",
 		"fields": [ "zonename", "pid", "execname", "psargs",
 		    "user", "client", "latency" ]

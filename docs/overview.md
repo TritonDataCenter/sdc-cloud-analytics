@@ -1486,7 +1486,8 @@ previously exceeded its memory limit.
 The MySQL metrics report activity for MySQL and Percona master database
 servers.  These are only available for versions which support the DTrace mysql
 provider, which is currently versions 5.5 and later which have been compiled
-with ENABLE_DTRACE.  The metrics show connection, query and filesort details.
+with ENABLE_DTRACE.  The metrics show connection, query, command and filesort
+details.
 
 
 ### MySQL: connections
@@ -1511,7 +1512,7 @@ and span many queries.
 database, user, client, latency (heatmap), cputime (heatmap).  
 **Visibility:** operators and end users.  
 
-This shows query requests that are served by the database, and has a number
+This shows query commands that are served by the database, and has a number
 of breakdowns to show general characteristics of the workload: including the
 database name, user name and client hostname.  The "latency" breakdown shows
 query performance in detail, which can be used to identify single outliers and
@@ -1522,6 +1523,37 @@ time on-CPU in the database.  If the latency heatmap shows much higher latency
 than the cputime heatmap, then queries are blocked off-CPU for some reason,
 which can include waiting on file system I/O (including disk I/O), locks,
 and for their turn on-CPU.
+
+There are other command types which a client may request that are not visible
+in this metric, including the execution of prepared statements.  The MySQL
+commands metric covers all command types, including queries.
+
+
+### MySQL: commands
+
+**Name:** mysql.commands.  
+**Raw metric:** number of database commands.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, command,
+user, client, latency (heatmap), cputime (heatmap).  
+**Visibility:** operators and end users.  
+
+This shows commands that are served by the database, and has a number
+of breakdowns to show general characteristics of the workload: including the
+command type, user name and client hostname.  The "latency" and "cputime"
+heatmaps provide detailed performance data, and can be compared in the same
+way as with the queries metric, described earlier.
+
+A query is one of the command types; others include preparing and executing
+statements.  Because of this, this command metric has a more complete view
+of database requests than the queries metric.  The commands themselves are
+presented as their numeric values.  The "Command Probes" section of the
+MySQL 5.5+ Reference Manual lists commands and their descriptions.
+Common command types include:
+
+* 1: close connection
+* 3: execute a query
+* 22: prepare a statement
+* 23: execute a prepared statement
 
 
 ### MySQL: filesort

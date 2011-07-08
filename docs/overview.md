@@ -342,6 +342,8 @@ clicked on:
 This level of detail is critical for understanding hot spots or other patterns
 in the heatmap.
 
+Finally, heatmaps also provide resources for estimating the average value and
+Nth percentile value for each column.  See the API reference for details.
 
 ## Data granularity and data retention
 
@@ -1087,10 +1089,53 @@ The returned value includes the following properties:
 
 For examples, see "Heatmaps" under "Cloud Analytics" above.
 
+### `GET /ca/instrumentations/:id/value/heatmap/average`: Retrieve heatmap column average value
+
+This resource allows you to retrieve the estimated average value for a
+particular time as computed from the heatmap.  For example, if you're looking
+at a heatmap of system calls decomposed by latency, you can retrieve the 
+average system call latency using this resource.  The following properties can
+be specified:
+
+* optional: `nbuckets`: same as heatmap image (determines resolution used in
+  computing the average)
+* optional: `ymin`: same as heatmap image
+* optional: `ymax`: same as heatmap image
+
+The returned value contains the following property:
+
+* `average`: the average value in the specified heatmap column
+
+Note that the value is an approximation since nearby values in heatmaps are
+grouped into buckets.
+
+### `GET /ca/instrumentations/:id/value/heatmap/percentile`: Retrieve heatmap column Nth percentile value
+
+This resource allows you to retrieve the estimated value for the Nth percentile
+as computed from the heatmap.  For example, if you're looking at a heatmap of
+system calls decomposed by latency, you can retrieve the 90th percentile
+latency value, which is the smallest latency such that 90% of system calls
+completed with lower latency.  The following properties can be specified:
+
+* required: `percentile`: desired percentile, expressed as a number between 0
+  (0%) and 1 (100%)
+* optional: `nbuckets`: same as heatmap image (determines resolution used in
+  computing the average)
+* optional: `ymin`: same as heatmap image
+* optional: `ymax`: same as heatmap image
+
+The returned value contains the following property:
+
+* `percentile`: the Nth percentile value in the specified heatmap column
+
+Note that the value is an approximation since nearby values in heatmaps are
+grouped into buckets.
+
+
 ## Versioning and version history
 
 The API version MUST be specified in the X-API-Version header.  This protocol
-version is "ca/0.1.7".  All protocol versions start with "ca/" and end with a
+version is "ca/0.1.8".  All protocol versions start with "ca/" and end with a
 semantic version number.  If no X-API-Version header is specified, version
 "ca/0.1.0" is assumed.
 
@@ -1102,6 +1147,9 @@ can still make use of features from version X+1. The server only cares about the
 version for cases where the semantics of parameters changed from version X to
 version X + 1, or the structure of return payloads changed between those
 versions.
+
+Changes in 0.1.8:
+* "average" and "percentile" heatmap resources
 
 Changes in 0.1.7:
 

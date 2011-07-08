@@ -515,11 +515,16 @@ function gDecompSelected()
  *	customer_id	Customer ID for creating new instrumentations
  *			If unspecified, the global scope is assumed.
  *
+ * The following additional options MAY be specified:
+ *
  *	uri		Instrumentation's URI
  *			If undefined, instrumentation must not yet exist.
  *
- *	uris		List of instrumentation's value URIs.
- *			If undefined, instrumentation must not yet exist.
+ *	hmmode		if 'average', displays line graph of heatmap average
+ *			value rather than the heatmap itself
+ *
+ *	hmpctile	if specified, displays line graph of specified
+ *			percentile value rather than the heatmap itself
  */
 function gGraph(conf)
 {
@@ -537,6 +542,12 @@ function gGraph(conf)
 	this.g_legend_mode = 'summary';
 
 	this.g_title = conf.metric.ca_label;
+
+	if (conf.hmmode == 'average')
+		this.g_title = 'Average of ' + this.g_title;
+	else if (conf.hmpctile !== undefined)
+		this.g_title = conf.hmpctile * 100 + 'th percentile of ' +
+		    this.g_title;
 
 	if (conf.decomps.length !== 0) {
 		this.g_title += ' decomposed by ' +
@@ -556,35 +567,11 @@ function gGraph(conf)
 	if (conf.uri)
 		this.g_uri = conf.uri;
 
-	this.initDetails();
-
-	if (conf.uris)
-		this.initUris(conf.uris);
-
+	this.initDetails(conf);
 	this.initDom();
 }
 
 gGraph.gId = 0;
-
-gGraph.prototype.initUris = function (uris)
-{
-	var ii;
-
-	for (ii = 0; ii < uris.length; ii++) {
-		if (this.g_subtype != 'heatmap' &&
-		    uris[ii]['name'] == 'value_raw') {
-			this.g_uri_val = uris[ii]['uri'];
-			break;
-		}
-
-		if (this.g_subtype == 'heatmap') {
-			if (uris[ii]['name'] == 'value_heatmap')
-				this.g_uri_val = uris[ii]['uri'];
-			else if (uris[ii]['name'] == 'details_heatmap')
-				this.g_uri_details = uris[ii]['uri'];
-		}
-	}
-};
 
 /*
  * Examines the selected metric and decomposition to determine the type and
@@ -606,7 +593,7 @@ gGraph.prototype.initUris = function (uris)
  *
  * Additional subtype-specific fields are also initialized here.
  */
-gGraph.prototype.initDetails = function ()
+gGraph.prototype.initDetails = function (conf)
 {
 	var fieldname, discrete_decomp, label, ii, jj;
 	var metric = this.g_metric, decomps = this.g_decomps;
@@ -620,11 +607,15 @@ gGraph.prototype.initDetails = function ()
 	if (decomps.length === 0) {
 		this.g_type = 'scalar';
 		this.g_subtype = 'raw';
+		this.g_rawrsrc = 'raw';
+		this.g_rawfield = 'value';
 		this.g_columns =  [ { sTitle: '' }, { sTitle: label } ];
 		this.g_options = gScalarOptions;
 	} else {
 		this.g_type = 'vector';
 		this.g_subtype = 'raw';
+		this.g_rawrsrc = 'raw';
+		this.g_rawfield = 'value';
 		this.g_options = gVectorOptions;
 
 		this.g_columns = [];
@@ -638,6 +629,8 @@ gGraph.prototype.initDetails = function ()
 
 				if (gFieldToArity(fieldname) == 'numeric') {
 					this.g_subtype = 'heatmap';
+					this.g_rawrsrc = 'heatmap/image';
+					this.g_rawfield = 'image';
 					this.g_numeric_decomp =
 					    gFields[fieldname];
 					continue;
@@ -660,6 +653,21 @@ gGraph.prototype.initDetails = function ()
 
 	if (!isEmpty(this.g_predicate)) {
 		this.g_body += '&predicate=' + JSON.stringify(this.g_predicate);
+	}
+
+	if (conf.hmmode == 'average') {
+		this.g_subtype = 'raw';
+		this.g_rawrsrc = 'heatmap/average';
+		this.g_rawfield = 'average';
+		this.g_type = 'scalar';
+		this.g_options = gScalarOptions;
+	} else if (conf.hmpctile) {
+		this.g_subtype = 'raw';
+		this.g_rawrsrc = 'heatmap/percentile';
+		this.g_rawfield = 'percentile';
+		this.g_type = 'scalar';
+		this.g_options = gScalarOptions;
+		this.g_pctile = conf.hmpctile;
 	}
 
 	if (this.g_subtype == 'raw') {
@@ -900,6 +908,21 @@ gGraph.prototype.createToolbar = function ()
 
 	subdiv.className += ' gNumeric';
 
+	subdiv.appendChild(this.createButton({
+		text: true,
+		label: 'avg'
+	}, function () { graph.showAverage(); }));
+
+	subdiv.appendChild(this.createButton({
+		text: true,
+		label: 'median'
+	}, function () { graph.showPercentile(0.5); }));
+
+	subdiv.appendChild(this.createButton({
+		text: true,
+		label: '99.99'
+	}, function () { graph.showPercentile(0.9999); }));
+
 	subdiv.appendChild(this.createToggleButton('show', [ {
 	    label: 'show: all, highlight selected',
 	    value: 'all'
@@ -1049,7 +1072,6 @@ gGraph.prototype.serverCreate = function (callback)
 
 		value = JSON.parse(request.responseText);
 		graph.g_uri = value.uri;
-		graph.initUris(value.uris);
 
 		setTimeout(function () {
 			callback(null, value);
@@ -1090,44 +1112,50 @@ gGraph.prototype.uriParams = function (duration, start)
 	var url = '', value;
 
 	if (start)
-		url = 'start_time=' + start;
+		url = 'start_time=' + start + '&';
 
-	if (this.g_subtype != 'heatmap')
+	if (this.g_subtype != 'heatmap' && this.g_pctile === undefined)
 		return (url ? '?' + url : '');
 
-	url += 'width=' + gPlotWidth + '&';
-	url += 'height=' + gPlotHeight + '&';
+	if (this.g_pctile !== undefined) {
+		url += 'percentile=' + this.g_pctile + '&';
+	} else {
+		url += 'width=' + gPlotWidth + '&';
+		url += 'height=' + gPlotHeight + '&';
+		url += 'coloring=' + this.g_coloring + '&';
+		url += 'weights=' + this.g_weights + '&';
+		url += 'duration=' + duration + '&';
+	}
+
 	url += 'ymin=' + this.g_ymin + '&';
-	if (this.g_ymax !== undefined && this.g_ymax !== this.g_scalemax)
+	if (this.g_pctile !== undefined ||
+	    (this.g_ymax !== undefined && this.g_ymax !== this.g_scalemax))
 		url += 'ymax=' + this.g_ymax + '&';
-	url += 'duration=' + duration + '&';
 	url += 'nbuckets=' + gnBuckets + '&';
-	url += 'coloring=' + this.g_coloring + '&';
-	url += 'weights=' + this.g_weights;
 
 	switch (this.g_show) {
 	case 'rainbow':
-		url += '&decompose_all=true';
+		url += 'decompose_all=true&';
 		break;
 
 	case 'isolate':
-		url += '&isolate=true';
+		url += 'isolate=true&';
 		break;
 
 	case 'exclude':
-		url += '&exclude=true';
+		url += 'exclude=true&';
 		/*jsl:fallthru*/
 
 	case 'all':
 	default:
-		url += '&hues=21';
+		url += 'hues=21';
 		break;
 	}
 
 	if (this.g_show != 'rainbow') {
 		for (value in this.g_selected) {
-			url += '&selected=' + encodeURIComponent(value);
-			url += '&hues=' + this.g_selected[value];
+			url += 'selected=' + encodeURIComponent(value) + '&';
+			url += 'hues=' + this.g_selected[value] + '&';
 		}
 	}
 
@@ -1144,7 +1172,7 @@ gGraph.prototype.retrieveDatum = function (duration, start_time)
 	var request, url, params;
 
 	params = this.uriParams(duration, start_time);
-	url = this.g_http + this.g_uri_val + params;
+	url = this.g_http + this.g_uri + '/value/' + this.g_rawrsrc + params;
 	request = new XMLHttpRequest();
 	request.open('GET', url, true);
 	request.send(null);
@@ -1323,7 +1351,7 @@ gGraph.prototype.updateRaw = function (value)
 	graph = this;
 
 	if (value)
-		this.g_data[value.start_time] = value.value;
+		this.g_data[value.start_time] = value[this.g_rawfield];
 
 	data = this.rawRecompute();
 	this.g_plot = $.plot(this.g_elt_graph, data, this.g_options);
@@ -1772,8 +1800,8 @@ gGraph.prototype.heatmapClicked = function (event)
 	xx = event.pageX - offset.left;
 	yy = event.pageY - offset.top;
 
-	url = this.g_http + this.g_uri_details + this.g_uri_params +
-	    '&x=' + xx + '&y=' + yy;
+	url = this.g_http + this.g_uri + '/value/heatmap/details' +
+	    this.g_uri_params + '&x=' + xx + '&y=' + yy;
 	request = new XMLHttpRequest();
 	request.open('GET', url, true);
 	request.send(null);
@@ -1889,6 +1917,32 @@ gGraph.prototype.scrollForward = function ()
 
 	this.pauseInternal();
 	this.refresh(true);
+};
+
+gGraph.prototype.showAverage = function ()
+{
+	var graph = new gGraph({
+		metric: this.g_metric,
+		decomps: this.g_decomps,
+		predicate: this.g_predicate,
+		customer_id: gCustId() || undefined,
+		hmmode: 'average'
+	});
+
+	gAppendGraph(graph);
+};
+
+gGraph.prototype.showPercentile = function (pctile)
+{
+	var graph = new gGraph({
+		metric: this.g_metric,
+		decomps: this.g_decomps,
+		predicate: this.g_predicate,
+		customer_id: gCustId() || undefined,
+		hmpctile: pctile
+	});
+
+	gAppendGraph(graph);
 };
 
 /*

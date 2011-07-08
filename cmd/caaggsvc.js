@@ -686,6 +686,11 @@ function aggHttpRouter(server)
 		    null, mod_caagg.caAggrHeatmapImageImpl));
 		server.get(base + '/heatmap/details', aggHttpValueRetrieve.bind(
 		    null, mod_caagg.caAggrHeatmapDetailsImpl));
+		server.get(base + '/heatmap/average', aggHttpValueRetrieve.bind(
+		    null, mod_caagg.caAggrHeatmapAverageImpl));
+		server.get(base + '/heatmap/percentile',
+		    aggHttpValueRetrieve.bind(null,
+		    mod_caagg.caAggrHeatmapPercentileImpl));
 	}
 }
 
@@ -776,6 +781,12 @@ function aggHttpValueHeatmapList(request, response)
 	}, {
 		name: 'details',
 		uri: url + '/details'
+	}, {
+		name: 'average',
+		uri: url + '/average'
+	}, {
+		name: 'percentile',
+		uri: url + '/percentile'
 	} ];
 
 	response.send(HTTP.OK, rv);
@@ -1025,6 +1036,8 @@ caAggrValueRequest.prototype.complete = function (delaynow)
 			    point['start_time'], point['duration'], xform,
 			    this.avr_request);
 		} catch (ex) {
+			agg_log.error('failed to process value request: %r',
+			    ex);
 			response.sendError(new caError(
 			    ex instanceof caError ? ex.code() : ECA_UNKNOWN, ex,
 			    'failed to process data point "%s" (%j)', ii + 1,

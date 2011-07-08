@@ -127,6 +127,12 @@ function check_static_heatmap()
 		}, {
 		    name: 'details',
 		    uri: '/ca/instrumentations/1/value/heatmap/details'
+		}, {
+		    name: 'average',
+		    uri: '/ca/instrumentations/1/value/heatmap/average'
+		}, {
+		    name: 'percentile',
+		    uri: '/ca/instrumentations/1/value/heatmap/percentile'
 		} ]);
 
 		mod_tl.advance();

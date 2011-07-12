@@ -170,6 +170,7 @@ function check_rawval(orv)
 	mod_assert.deepEqual(orv, {
 	    start_time: time2,			/* normalized by server */
 	    duration: 10,			/* normalized by server */
+	    end_time: time2 + 10,
 	    requested_start_time: time2 + 1,	/* see above */
 	    requested_duration: 8,		/* see above */
 	    requested_end_time: time2 + 9,	/* computed from above */
@@ -189,6 +190,7 @@ function check_rawval(orv)
 		mod_assert.deepEqual(rv, [ {
 		    start_time: time1 - 10,
 		    duration: 10,
+		    end_time: time1,
 		    requested_start_time: time1 - 9,
 		    requested_duration: 10,
 		    requested_end_time: time1 + 1,
@@ -199,6 +201,7 @@ function check_rawval(orv)
 		}, {
 		    start_time: time1,
 		    duration: 10,
+		    end_time: time1 + 10,
 		    requested_start_time: time1 + 1,
 		    requested_duration: 10,
 		    requested_end_time: time2 + 1,
@@ -209,6 +212,7 @@ function check_rawval(orv)
 		}, {
 		    start_time: time2,
 		    duration: 10,
+		    end_time: time2 + 10,
 		    requested_start_time: time2 + 1,
 		    requested_duration: 10,
 		    requested_end_time: time2 + 11,
@@ -282,6 +286,7 @@ function check_xforms()
 		mod_assert.deepEqual(rv, {
 		    start_time: time2,
 		    duration: 10,
+		    end_time: time2 + 10,
 		    requested_start_time: time2,
 		    requested_duration: 1,
 		    requested_end_time: time2 + 1,

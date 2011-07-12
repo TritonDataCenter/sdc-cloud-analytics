@@ -1049,6 +1049,7 @@ caAggrValueRequest.prototype.complete = function (delaynow)
 			val['delay'] = delaynow - this.avr_rqtime;
 		val['start_time'] = point['start_time'];
 		val['duration'] = point['duration'];
+		val['end_time'] = point['start_time'] + point['duration'];
 		val['nsources'] = dataset.nsources();
 		val['minreporting'] = dataset.nreporting(
 		    point['start_time'], point['duration']);

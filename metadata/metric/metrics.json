@@ -73,6 +73,7 @@
 	    "type": "number" },
 	"packets_in":	{ "label": "packets received", "type": "number" },
 	"packets_out":	{ "label": "packets sent", "type": "number" },
+	"parsed":	{ "label": "parsed" },
 	"pexecname":	{ "label": "parent application name" },
 	"pid":		{ "label": "process identifier" },
 	"ppid":		{ "label": "parent process identifier" },
@@ -80,9 +81,13 @@
 	"ppsargs":	{ "label": "parent process arguments" },
 	"querysubstr":	{ "label": "query substring" },
 	"raddr":	{ "label": "remote IP address" },
+	"rowsmatched":	{ "label": "rows matched", "type": "number" },
+	"rowschanged":	{ "label": "rows changed", "type": "number" },
 	"rport":	{ "label": "remote TCP port" },
 	"runtime":	{ "label": "time on CPU", "type": "time" },
 	"size":		{ "label": "size", "type": "size" },
+	"statement":	{ "label": "statement type" },
+	"status":	{ "label": "status" },
 	"syscall":	{ "label": "syscall" },
 	"table":	{ "label": "table name" },
 	"tcpstack":	{ "label": "TCP instance" },
@@ -216,13 +221,6 @@
 	"fields":	[ "hostname", "zonename" ]
     }, {
 	"module":	"mysql",
-	"stat":		"queries",
-	"label":	"queries",
-	"unit":		"queries",
-	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
-	    "querysubstr", "database", "user", "client", "latency", "cputime" ]
-    }, {
-	"module":	"mysql",
 	"stat":		"connections",
 	"label":	"connections",
 	"unit":		"connections",
@@ -230,18 +228,34 @@
 	    "user", "client", "latency" ]
     }, {
 	"module":	"mysql",
+	"stat":		"commands",
+	"label":	"commands",
+	"unit":		"commands",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "command", "user", "client", "status", "latency", "cputime" ]
+    }, {
+	"module":	"mysql",
+	"stat":		"queries",
+	"label":	"queries",
+	"unit":		"queries",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "querysubstr", "database", "user", "client", "parsed", "status",
+	    "latency", "cputime" ]
+    }, {
+	"module":	"mysql",
+	"stat":		"statements",
+	"label":	"statements",
+	"unit":		"statements",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "statement", "status", "rowsmatched", "rowschanged", "latency",
+	    "cputime" ]
+    }, {
+	"module":	"mysql",
 	"stat":		"filesort",
 	"label":	"filesort",
 	"unit":		"filesorts",
 	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
 	    "database", "table", "latency", "cputime" ]
-    }, {
-	"module":	"mysql",
-	"stat":		"commands",
-	"label":	"commands",
-	"unit":		"commands",
-	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
-	    "command", "user", "client", "latency", "cputime" ]
     }, {
 	"module":	"nic",
 	"stat":		"nics",

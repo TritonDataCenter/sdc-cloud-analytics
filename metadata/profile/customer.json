@@ -42,20 +42,27 @@
 		"fields": [ "zonename" ]
 	}, {
 		"module": "mysql",
-		"stat": "queries",
+		"stat": "connections",
 		"fields": [ "zonename", "pid", "execname", "psargs",
-		    "querysubstr", "database", "user", "client",
-		    "latency", "cputime" ]
+		    "user", "client", "latency" ]
 	}, {
 		"module": "mysql",
 		"stat": "commands",
 		"fields": [ "zonename", "pid", "execname", "psargs",
-		    "command", "user", "client", "latency", "cputime" ]
+		    "command", "user", "client", "status", "latency",
+		    "cputime" ]
 	}, {
 		"module": "mysql",
-		"stat": "connections",
+		"stat": "queries",
 		"fields": [ "zonename", "pid", "execname", "psargs",
-		    "user", "client", "latency" ]
+		    "querysubstr", "database", "user", "client", "parsed",
+		    "status", "latency", "cputime" ]
+	}, {
+		"module": "mysql",
+		"stat": "statements",
+		"fields": [ "zonename", "pid", "execname", "psargs",
+		    "statement", "status", "rowsmatched", "rowschanged",
+		    "latency", "cputime" ]
 	}, {
 		"module": "mysql",
 		"stat": "filesort",

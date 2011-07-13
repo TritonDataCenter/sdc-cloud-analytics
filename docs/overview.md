@@ -1534,8 +1534,31 @@ previously exceeded its memory limit.
 The MySQL metrics report activity for MySQL and Percona master database
 servers.  These are only available for versions which support the DTrace mysql
 provider, which is currently versions 5.5 and later which have been compiled
-with ENABLE_DTRACE.  The metrics show connection, query, command and filesort
-details.
+with ENABLE_DTRACE.  The metrics show connection, command, query, statement
+and filesort details.
+
+Some of these metrics follow an execution heirarchy, which is:
+
+	connection
+	 |
+	 | command
+	 |  |
+	 |  | query
+	 |  |  |
+	 |  |  | statement
+	 |  |  |  |
+	 |  |  |  |
+	 |  |  |  V
+	 |  |  V
+	 |  V  
+	 | ...
+	 V     
+
+This makes it possible to analyze the MySQL database from different
+perspectives.  The commands metric is the most inclusive, covering queries and
+other command types, and including all latency incurred.  The statements metric
+is most specific, which can show the SQL statement type and result of the
+statement in terms of rows.
 
 
 ### MySQL: connections
@@ -1552,56 +1575,85 @@ depicting the entire duration of the connection, which may last many seconds
 and span many queries.
 
 
-### MySQL: queries
-
-**Name:** mysql.queries.  
-**Raw metric:** number of database queries.  
-**Decompositions:** hostname, zonename, pid, execname, psargs, querysubstr,
-database, user, client, latency (heatmap), cputime (heatmap).  
-**Visibility:** operators and end users.  
-
-This shows query commands that are served by the database, and has a number
-of breakdowns to show general characteristics of the workload: including the
-database name, user name and client hostname.  The "latency" breakdown shows
-query performance in detail, which can be used to identify single outliers and
-patterns of degraded performance.  The latency heatmap can be visually compared
-to the "cputime" heatmap, which shows the time spent on-CPU for each query.
-If these heatmaps look similar, then the queries are spending most of their
-time on-CPU in the database.  If the latency heatmap shows much higher latency
-than the cputime heatmap, then queries are blocked off-CPU for some reason,
-which can include waiting on file system I/O (including disk I/O), locks,
-and for their turn on-CPU.
-
-There are other command types which a client may request that are not visible
-in this metric, including the execution of prepared statements.  The MySQL
-commands metric covers all command types, including queries.
-
-
 ### MySQL: commands
 
 **Name:** mysql.commands.  
 **Raw metric:** number of database commands.  
 **Decompositions:** hostname, zonename, pid, execname, psargs, command,
-user, client, latency (heatmap), cputime (heatmap).  
+user, client, status, latency (heatmap), cputime (heatmap).  
 **Visibility:** operators and end users.  
 
 This shows commands that are served by the database, and has a number
 of breakdowns to show general characteristics of the workload: including the
-command type, user name and client hostname.  The "latency" and "cputime"
-heatmaps provide detailed performance data, and can be compared in the same
-way as with the queries metric, described earlier.
+command type, user name and client hostname.  The command result, success or
+fail, can be seen using "status".
 
-A query is one of the command types; others include preparing and executing
-statements.  Because of this, this command metric has a more complete view
-of database requests than the queries metric.  The commands themselves are
-presented as their numeric values.  The "Command Probes" section of the
-MySQL 5.5+ Reference Manual lists commands and their descriptions.
-Common command types include:
+The "latency" breakdown shows command performance in detail, which can be used
+to identify single outliers and patterns of degraded performance.  The latency
+heatmap can be visually compared to the "cputime" heatmap, which shows the time
+spent on-CPU for each command.  If these heatmaps look similar, then the
+commands are spending most of their time on-CPU in the database.  If the
+latency heatmap shows much higher latency than the cputime heatmap, then
+commands are blocked off-CPU for some reason, which can include waiting on file
+system I/O (including disk I/O), locks, and for their turn on-CPU.
+
+A query command is one of the command types; others include preparing and
+executing statements, and getting statistics.  Because of this, this command
+metric has a more complete view of database requests than the queries metric.
+The commands themselves are presented as their numeric values.  The "Command
+Probes" section of the MySQL 5.5+ Reference Manual lists commands and their
+descriptions.  Common command types include:
 
 * 1: close connection
 * 3: execute a query
+* 9: get statistics
 * 22: prepare a statement
 * 23: execute a prepared statement
+
+
+### MySQL: queries
+
+**Name:** mysql.queries.  
+**Raw metric:** number of database queries.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, querysubstr,
+database, user, client, status, latency (heatmap), cputime (heatmap).  
+**Visibility:** operators and end users.  
+
+This shows the queries performed by the database, including query cache hits
+and the execution of prepared statements.  This metric has a number of
+decompositions to show general characteristics of the workload: including
+the database name, user name and client hostname.  The query result, success
+or fail, can be seen using "status".
+
+The "latency" and "cputime" heatmaps provide detailed performance data, and
+can be compared in the same way as with the commands metric, described
+earlier.
+
+
+### MySQL: statements
+
+**Name:** mysql.statements.  
+**Raw metric:** number of database statements.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, statement,
+status, rowsmatched, rowschanged, latency (heatmap), cputime (heatmap).  
+**Visibility:** operators and end users.  
+
+This metric shows the execution of SQL statements contained within a query,
+and can be used to characterize the workload applied to the database, and to
+investigate performance in terms of latency and number of rows the statements
+operate on.  These are statements that are executed, and do not contain
+queries that return from the query cache (query cache hits).
+
+The "statement" decomposition will show the statement type, such as "select",
+"insert", "update", "delete".  The "rowsmatched" decomposition shows the number
+of rows matched by the statement: for SELECT this is the number of rows
+returned, for INSERT and DELETE the number of rows affected, and for UPDATE
+this is the rows matched by the WHERE clause - although they may not be
+modified if their value is already set to the new value.  The "rowschanged"
+decomposition is only valid for UPDATE, and shows the number of rows that were
+actually changed.  The "latency" and "cputime" heatmaps show the distribution
+of statement execution time, and can be compared in the same way as with the
+queries metric described earlier.
 
 
 ### MySQL: filesort

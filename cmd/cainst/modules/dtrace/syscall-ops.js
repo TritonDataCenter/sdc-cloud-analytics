@@ -46,7 +46,7 @@ var desc = {
 			execname: 'execname',
 			syscall: 'probefunc',
 			pid: 'lltostr(pid)',
-			ppid: 'lltostr(pid)',
+			ppid: 'lltostr(ppid)',
 			psargs: 'curpsinfo->pr_psargs',
 			latency: 'timestamp - $0',
 			ppsargs:

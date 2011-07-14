@@ -1224,6 +1224,34 @@ and viewed as a heatmap, allowing operators to quickly see which CPUs are hot
 within the datacenter or on a particular server.
 
 
+### CPU: thread samples
+
+**Name:** cpu.thread_samples.  
+**Raw metric:** number of samples a thread was running on-CPU.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, ppid, pexecname,
+ppsargs, subsecond (heatmap).  
+**Visibility:** operators and end users.  
+
+This raw metric counts the number of times a non-idle thread was sampled on-CPU.
+The sampling is performed at 99 Hertz (samples per second) per CPU, not 100
+Hertz, to avoid sampling in lockstep with a timed activity.  This rate means
+that each sample represents roughly 10 ms of CPU time.  The sampling is
+performed across all CPUs, so the total samples possible during a second will
+be 99 x number of CPUs.
+
+This can be used to understand CPU usage at a coarse-grained level.  The
+"subsecond" heatmap shows the time within a second on the y-axis, so that
+regular timed activity can be observed as patterns, indicating how often during
+a second a thread was on-CPU doing work.  A timed activity that occured once
+per second at the same time would appear as a single horizontal line.  One that
+crept over time by performing work and then sleeping for a full second would
+appear as a diagonal line, the slope of which showing how much CPU work was
+performed during each wakeup: steeper for more.
+
+This lightweight metric may be a good starting point for CPU usage
+investigations.  For more detail, see the CPU thread executions metric.
+
+
 ### CPU: thread executions
 
 **Name:** cpu.thread_executions.  
@@ -1233,12 +1261,12 @@ ppsargs, leavereason, runtime (heatmap).
 **Visibility:** operators and end users.  
 
 This raw metric counts the number of times any thread was taken off CPU.  This
-can be used to understand CPU utilization at a very fine-grained level, since
-you can observe which applications are running, for how long they're running
-before being kicked off CPU, and why they're being kicked off CPU.  This in turn
-can help understand whether an application is actually using a lot of CPU
-directly (e.g., on CPU for long periods doing computation) vs. not (e.g., on CPU
-for many short bursts, then waiting for I/O).
+can be used to understand CPU usage at a very fine-grained level, since you can
+observe which applications are running, for how long they're running before
+being kicked off CPU, and why they're being kicked off CPU.  This in turn can
+help understand whether an application is actually using a lot of CPU directly
+(e.g., on CPU for long periods doing computation) vs. not (e.g., on CPU for
+many short bursts, then waiting for I/O).
 
 
 ### CPU: aggregated CPU usage
@@ -2057,5 +2085,6 @@ typically yields a heatmap rather than a scalar or vector:
 * **packets_out**: number of packets sent
 * **runtime**: time spent running continuously on CPU
 * **size**: size in bytes of a packet or operation
+* **subsecond**: time offset during a second for when the event occurred
 * **utilization**: percent of overall resource utilized (for CPUs, this is the
   same as percent of time busy)

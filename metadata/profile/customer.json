@@ -3,6 +3,13 @@
 	"label": "Customer",
 	"metrics": [ {
 		"module": "cpu",
+		"stat": "thread_samples",
+		"fields": [
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "subsecond"
+		]
+	}, {
+		"module": "cpu",
 		"stat": "thread_executions",
 		"fields": [
 		    "zonename", "pid", "execname", "psargs", "ppid",

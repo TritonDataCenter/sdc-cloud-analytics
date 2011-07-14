@@ -34,6 +34,13 @@
 	    "abbr": "s",
 	    "base": 10,
 	    "power": -9
+	},
+	"subsecond": {
+	    "arity": "numeric",
+	    "unit": "seconds",
+	    "abbr": "s",
+	    "base": 10,
+	    "power": -3
 	}
     },
 
@@ -88,6 +95,7 @@
 	"size":		{ "label": "size", "type": "size" },
 	"statement":	{ "label": "statement type" },
 	"status":	{ "label": "status" },
+	"subsecond":	{ "label": "subsecond offset", "type": "subsecond" },
 	"syscall":	{ "label": "syscall" },
 	"table":	{ "label": "table name" },
 	"tcpstack":	{ "label": "TCP instance" },
@@ -105,6 +113,15 @@
 	"unit":		"CPUs",
 	"interval":	"point",
 	"fields":	[ "hostname", "cpu", "utilization" ]
+    }, {
+	"module":	"cpu",
+	"stat":		"thread_samples",
+	"label":	"thread samples",
+	"unit":		"samples",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "subsecond"
+	]
     }, {
 	"module":	"cpu",
 	"stat":		"thread_executions",

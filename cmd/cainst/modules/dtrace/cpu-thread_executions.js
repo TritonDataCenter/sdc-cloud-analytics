@@ -1,5 +1,7 @@
 /*
  * DTrace metric for CPU Thread operations.
+ *
+ * The idle thread is filtered out by checking that t_pri != -1.
  */
 var mod_ca = require('../../../../lib/ca/ca-common');
 
@@ -7,7 +9,7 @@ var desc = {
     module: 'cpu',
     stat: 'thread_executions',
     fields: [ 'hostname', 'zonename', 'pid', 'execname', 'psargs', 'ppid',
-	'pexecname', 'ppsargs', 'leavereason', 'runtime' ],
+	'pexecname', 'ppsargs', 'leavereason', 'runtime', 'subsecond' ],
     metad: {
 	locals: [
 	    { state: 'int' },
@@ -19,8 +21,13 @@ var desc = {
 		runtime: {
 		    gather: 'timestamp',
 		    store: 'thread'
+		},
+		subsecond: {
+		    gather: 'timestamp',
+		    store: 'thread'
 		}
-	    }
+	    },
+	    predicate: 'curthread->t_pri != -1'
 	}, {
 	    probes: [ 'sched:::off-cpu' ],
 	    local: [
@@ -61,7 +68,8 @@ var desc = {
 		psargs: 'curpsinfo->pr_psargs',
 		ppsargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
 		pexecname: 'curthread->t_procp->p_parent->' +
-		    'p_user.u_comm'
+		    'p_user.u_comm',
+		subsecond: '$0'
 	    },
 	    aggregate: {
 		runtime: 'llquantize($0, 10, 3, 11, 100)',
@@ -74,16 +82,21 @@ var desc = {
 		psargs: 'count()',
 		default: 'count()',
 		ppsargs: 'count()',
-		pexecname: 'count()'
+		pexecname: 'count()',
+		subsecond: 'lquantize(($0 % 1000000000) / 1000000, 0, 1000, 10)'
 	    },
 	    verify: {
-		runtime: '$0'
-	    }
+		runtime: '$0',
+		subsecond: '$0'
+	    },
+	    predicate: 'curthread->t_pri != -1'
 	}, {
 	    probes: [ 'sched:::off-cpu' ],
 	    clean: {
-		runtime: '$0'
-	    }
+		runtime: '$0',
+		subsecond: '$0'
+	    },
+	    predicate: 'curthread->t_pri != -1'
 	} ]
     }
 };

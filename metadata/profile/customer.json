@@ -13,7 +13,8 @@
 		"stat": "thread_executions",
 		"fields": [
 		    "zonename", "pid", "execname", "psargs", "ppid",
-		    "pexecname", "ppsargs", "leavereason", "runtime"
+		    "pexecname", "ppsargs", "leavereason", "runtime",
+		    "subsecond"
 		]
 	}, {
 		"module": "cpu",

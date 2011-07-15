@@ -24,7 +24,8 @@
 		"stat": "thread_executions",
 		"fields": [
 		    "hostname", "zonename", "pid", "execname", "psargs",
-		    "ppid", "pexecname", "ppsargs", "leavereason", "runtime"
+		    "ppid", "pexecname", "ppsargs", "leavereason", "runtime",
+		    "subsecond"
 		]
 	}, {
 		"module": "cpu",

@@ -1257,16 +1257,21 @@ investigations.  For more detail, see the CPU thread executions metric.
 **Name:** cpu.thread_executions.  
 **Raw metric:** number of times any thread runs continuously on CPU.  
 **Decompositions:** hostname, zonename, pid, execname, psargs, ppid, pexecname,
-ppsargs, leavereason, runtime (heatmap).  
+ppsargs, leavereason, runtime (heatmap), subsecond (heatmap).  
 **Visibility:** operators and end users.  
 
-This raw metric counts the number of times any thread was taken off CPU.  This
-can be used to understand CPU usage at a very fine-grained level, since you can
-observe which applications are running, for how long they're running before
-being kicked off CPU, and why they're being kicked off CPU.  This in turn can
-help understand whether an application is actually using a lot of CPU directly
-(e.g., on CPU for long periods doing computation) vs. not (e.g., on CPU for
-many short bursts, then waiting for I/O).
+This raw metric counts the number of times any thread was taken off CPU (with
+the exception of the kernel idle theads).  This can be used to understand CPU
+usage at a very fine-grained level, since you can observe which applications
+are running, for how long they're running before being kicked off CPU, and why
+they're being kicked off CPU.  This in turn can help understand whether an
+application is actually using a lot of CPU directly (e.g., on CPU for long
+periods doing computation) vs. not (e.g., on CPU for many short bursts, then
+waiting for I/O).
+
+The "subsecond" heatmap shows the time offset within a second on the y-axis
+for when the thread began to execute.  It can be interpreted in the same way
+as the CPU thread samples subsecond heatmap.
 
 
 ### CPU: aggregated CPU usage

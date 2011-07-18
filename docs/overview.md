@@ -1451,13 +1451,20 @@ description under "filesystem-related metrics" above.
 
 **Name:** fs.logical_rwops.  
 **Raw metric:** number of logical filesystem read/write operations.  
-**Decompositions:** hostname, zonename, optype.  
+**Decompositions:** hostname, zonename, pid, execname, psargs, ppid, pexecname,
+ppsargs, fstype, optype, size (heatmap), offset (hetamap), latency (heatmap).  
 **Visibility:** operators and end users.  
 
 This raw metric measures the total number of read/write operations.  Unlike the
 "logical filesystem operations" metric, this metric *only* counts reads and
 writes, not the various metadata operations like create, fsync, ioctl, and
 others.
+
+The "size" heatmap shows the requested size in bytes of each I/O, and the
+"offset" heatmap shows the byte location in the file that is being read or
+written.  Both of these can be used to characterize the workload applied to
+the file system by applications, and compared to the resulting workload at
+the disk level.
 
 
 ### Filesystem: logical bytes read/written

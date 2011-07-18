@@ -97,7 +97,11 @@
 	}, {
 		"module": "fs",
 		"stat": "logical_rwbytes",
-		"fields": [ "zonename", "optype" ]
+		"fields": [
+		    "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "fstype", "optype", "size",
+		    "offset", "latency"	
+		]
 	}, {
 		"module": "node",
 		"stat": "gc_ops",

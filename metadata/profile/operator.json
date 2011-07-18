@@ -93,7 +93,11 @@
 	}, {
 		"module": "fs",
 		"stat": "logical_rwops",
-		"fields": [ "hostname", "zonename", "optype" ]
+		"fields": [
+		    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "fstype", "optype", "size",
+		    "offset", "latency"
+		]
 	}, {
 		"module": "fs",
 		"stat": "logical_rwbytes",

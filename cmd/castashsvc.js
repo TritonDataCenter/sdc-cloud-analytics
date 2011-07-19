@@ -12,7 +12,10 @@ function main()
 	mod_dbg.caEnablePanicOnCrash();
 	cs_svc = new mod_stash.caStashService(process.argv.slice(2));
 	caDbg.set('service', cs_svc);
-	cs_svc.start();
+	cs_svc.start(function (err) {
+		if (err)
+			throw (err);
+	});
 }
 
 main();

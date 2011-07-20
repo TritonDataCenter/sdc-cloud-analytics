@@ -21,7 +21,7 @@ if [[ $( echo $BRANCH | grep release) && -z $PUBLISH_LOCATION ]]; then
     releasedate=$(echo $BRANCH | cut -d '-' -f2)
     RELEASEDIR=${releasedate:0:4}-${releasedate:4:2}-${releasedate:6:2}
     ASSETS_LOCATION=/rpool/data/coal/releases/${RELEASEDIR}/deps/
-    PUBLISH_LOCATION=${ASSETS_LOCATION}/${NAME}/${BRANCH}/
+    PUBLISH_LOCATION=${ASSETS_LOCATION}/agents/${NAME}/${BRANCH}/
 fi
 
 if [[ -z $PUBLISH_LOCATION ]]; then

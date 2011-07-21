@@ -7,7 +7,7 @@ var desc = {
     module: 'syscall',
     stat: 'syscalls',
     fields: [ 'hostname', 'zonename', 'pid', 'execname', 'psargs', 'ppid',
-	'pexecname', 'ppsargs', 'syscall', 'latency', 'cputime' ],
+	'pexecname', 'ppsargs', 'syscall', 'subsecond', 'latency', 'cputime' ],
     metad: {
 	probedesc: [
 	    {
@@ -19,6 +19,10 @@ var desc = {
 			},
 			cputime: {
 				gather: 'vtimestamp',
+				store: 'thread'
+			},
+			subsecond: {
+				gather: 'timestamp',
 				store: 'thread'
 			}
 		}
@@ -37,7 +41,9 @@ var desc = {
 			latency: 'llquantize($0, 10, 3, 11, 100)',
 			ppsargs: 'count()',
 			pexecname: 'count()',
-			cputime: 'llquantize($0, 10, 3, 11, 100)'
+			cputime: 'llquantize($0, 10, 3, 11, 100)',
+			subsecond: 'lquantize(($0 % 1000000000) / 1000000, ' +
+			    '0, 1000, 10)'
 		},
 		transforms: {
 			hostname:
@@ -53,18 +59,21 @@ var desc = {
 			    'curthread->t_procp->p_parent->p_user.u_psargs',
 			pexecname: 'curthread->t_procp->p_parent->' +
 			    'p_user.u_comm',
-			cputime: 'vtimestamp - $0'
+			cputime: 'vtimestamp - $0',
+			subsecond: '$0'
 		},
 		verify: {
 			latency: '$0',
-			cputime: '$0'
+			cputime: '$0',
+			subsecond: '$0'
 		}
 	    },
 	    {
 		probes: [ 'syscall:::return' ],
 		clean: {
 			latency: '$0',
-			cputime: '$0'
+			cputime: '$0',
+			subsecond: '$0'
 		}
 	    }
 	]

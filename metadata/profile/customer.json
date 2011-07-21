@@ -81,7 +81,8 @@
 		"stat": "syscalls",
 		"fields": [
 		    "zonename", "pid", "execname", "psargs", "ppid",
-		    "pexecname", "ppsargs", "syscall", "latency", "cputime"
+		    "pexecname", "ppsargs", "syscall", "subsecond", "latency",
+		    "cputime"
 		]
 	}, {
 		"module": "fs",

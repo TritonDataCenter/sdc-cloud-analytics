@@ -1855,7 +1855,7 @@ inadequate flow control.
 **Name:** syscall.syscalls.  
 **Raw metric:** number of system calls completed.  
 **Decompositions:** hostname, zonename, pid, execname, psargs, ppid, pexecname,
-ppsargs, syscall, latency (heatmap), cputime (heatmap).  
+ppsargs, syscall, subsecond (heatmap), latency (heatmap), cputime (heatmap).  
 **Visibility:** operators and end users.  
 
 This raw metric reports the total number of system calls (syscalls), which
@@ -1868,6 +1868,13 @@ This metric allows users to examine syscall latency (how long the system call
 took) using a heatmap decomposed by host, zone, application, or syscall.  The
 "cputime" heatmap presents a similar visualization based on the actual CPU time
 used by the syscall rather than elapsed wall clock time.
+
+The "subsecond" heatmap traces the time a syscall was called, showing the time
+within a second on the y-axis.  A timed activity that occured once per second
+at the same time would appear as a single horizontal line.  One that crept over
+time by performing work and then sleeping for a full second would appear as a
+diagonal line.  These details can help characterize the syscall workload
+performed by application threads.
 
 
 ## TCP-related metrics

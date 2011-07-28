@@ -213,6 +213,20 @@ deps/node-install:
 	mkdir -p deps/node-install
 
 #
+# The "publish" target copies the build bits to the given BITS_DIR.
+# This is typically called by an external driver (e.g. CI).
+#
+publish: $(RELEASE_TARBALL)
+	@if [[ -z "$(BITS_DIR)" ]]; then \
+		echo "error: 'BITS_DIR' must be set for 'publish' target"; \
+		exit 1; \
+	fi
+	mkdir -p $(BITS_DIR)/ca
+	cp $(RELEASE_TARBALL) $(BITS_DIR)/ca
+	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/ca/cabase-$(CA_VERSION).tar.gz
+	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/ca/cainstsvc-$(CA_VERSION).tar.gz
+
+#
 # The "release" target creates a ca-pkg.tar.bz2 suitable for release to the
 # head-node. To formally release this, it should be copied to the build server
 # as follows:

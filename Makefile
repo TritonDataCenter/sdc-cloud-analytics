@@ -9,6 +9,13 @@ CA_VERSION	:= $(shell git symbolic-ref HEAD | \
 	nawk -F / '{print $$3}')-$(shell git describe --dirty)
 SRC		:= $(shell pwd)
 NODEENV		:= $(shell tools/npath)
+# As per mountain-gorilla "Package Versioning".
+ifeq ($(TIMESTAMP),)
+	TIMESTAMP=$(shell TZ=UTC date "+%Y%m%dT%H%M%SZ")
+endif
+CA_PUBLISH_VERSION := $(shell git symbolic-ref HEAD | \
+	awk -F / '{print $$3}')-$(TIMESTAMP)-$(shell \
+	git describe --all --long --dirty | cut -d- -f3,4)
 
 #
 # Directories
@@ -222,9 +229,9 @@ publish: $(RELEASE_TARBALL)
 		exit 1; \
 	fi
 	mkdir -p $(BITS_DIR)/cloud_analytics
-	cp $(RELEASE_TARBALL) $(BITS_DIR)/cloud_analytics/
-	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/cloud_analytics/cabase-$(CA_VERSION).tar.gz
-	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/cloud_analytics/cainstsvc-$(CA_VERSION).tar.gz
+	cp $(RELEASE_TARBALL) $(BITS_DIR)/cloud_analytics/ca-pkg-$(CA_PUBLISH_VERSION).tar.bz2
+	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/cloud_analytics/cabase-$(CA_PUBLISH_VERSION).tar.gz
+	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/cloud_analytics/cainstsvc-$(CA_PUBLISH_VERSION).tar.gz
 
 #
 # The "release" target creates a ca-pkg.tar.bz2 suitable for release to the

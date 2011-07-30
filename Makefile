@@ -228,8 +228,9 @@ publish: $(RELEASE_TARBALL)
 		echo "error: 'BITS_DIR' must be set for 'publish' target"; \
 		exit 1; \
 	fi
+	mkdir -p $(BITS_DIR)/assets
+	cp $(RELEASE_TARBALL) $(BITS_DIR)/assets/ca-pkg-$(CA_PUBLISH_VERSION).tar.bz2
 	mkdir -p $(BITS_DIR)/cloud_analytics
-	cp $(RELEASE_TARBALL) $(BITS_DIR)/cloud_analytics/ca-pkg-$(CA_PUBLISH_VERSION).tar.bz2
 	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/cloud_analytics/cabase-$(CA_PUBLISH_VERSION).tar.gz
 	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/cloud_analytics/cainstsvc-$(CA_PUBLISH_VERSION).tar.gz
 

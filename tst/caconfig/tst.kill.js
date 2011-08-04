@@ -224,8 +224,6 @@ function create_one()
 {
 	requester.sendEmpty('POST', url_create, true,
 	    function (err, response, rv) {
-		var suffix, num;
-
 		if (!stash) {
 			mod_assert.equal(response.statusCode, HTTP.ESRVUNAVAIL);
 			mod_tl.ctStdout.info(
@@ -236,7 +234,6 @@ function create_one()
 
 		mod_assert.equal(response.statusCode, HTTP.CREATED);
 
-		suffix = rv['uri'].substring(rv['uri'].lastIndexOf('/') + 1);
 		ntotal++;
 
 		instns.push(rv['uri']);

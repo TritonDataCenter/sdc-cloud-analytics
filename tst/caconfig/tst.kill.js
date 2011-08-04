@@ -59,7 +59,7 @@ var url_create = '/ca/instrumentations?profile=none&module=test_module&' +
 var svcs, aggr, instr, requester;
 var stash = true;
 var capcount = 0;
-var lastnum = 0;
+var ntotal = 0;
 var instns = [];
 
 mod_tl.ctSetTimeout(90 * 1000);
@@ -237,9 +237,7 @@ function create_one()
 		mod_assert.equal(response.statusCode, HTTP.CREATED);
 
 		suffix = rv['uri'].substring(rv['uri'].lastIndexOf('/') + 1);
-		num = parseInt(suffix, 10);
-		mod_assert.ok(num > lastnum);
-		lastnum = num;
+		ntotal++;
 
 		instns.push(rv['uri']);
 		mod_tl.ctStdout.info('created instn "%s"', rv['uri']);
@@ -354,17 +352,44 @@ function check_list()
 	    });
 }
 
+var aggr_enabled_prev;
+var instr_enabled_prev;
+var instr_disabled_prev;
+
 /*
  * Verify the instrumenter and aggregator state before the first teardown.  This
  * is required so that the postbringup check is valid.
  */
 function check_preteardown()
 {
-	mod_tl.ctStdout.info('check aggr/instr state at teardown');
-	mod_assert.equal(aggr.nenabled(), 2);
-	mod_assert.equal(instr.nenabled(), 2);
-	mod_assert.equal(instr.ndisabled(), 1);
-	mod_tl.advance();
+	mod_tl.ctTimedCheck(function (callback) {
+		mod_tl.ctStdout.info('check aggr/instr state at teardown');
+
+		/*
+		 * We should ultimately see 3 or 4 enablings on the aggregator:
+		 * one for each of the instrumentations when it gets created,
+		 * and one when the "nsources" property gets updated because an
+		 * instrumenter has been created.  We may see a fourth if the
+		 * instrumentation we deleted also got propagated to an
+		 * instrumenter.
+		 */
+		aggr_enabled_prev = aggr.nenabled();
+		mod_assert.ok(aggr_enabled_prev == 3 || aggr_enabled_prev == 4);
+
+		/*
+		 * We should see 1 or 2 enablings of the instrumenter: one for
+		 * the instrumentation that stuck around, and maybe another for
+		 * the one we deleted.
+		 */
+		instr_enabled_prev = instr.nenabled();
+		mod_assert.ok(instr_enabled_prev == 1 ||
+		    instr_enabled_prev == 2);
+
+		instr_disabled_prev = instr.ndisabled();
+		mod_assert.ok(instr_disabled_prev === 0 ||
+		    instr_disabled_prev == 1);
+		callback();
+	}, mod_tl.advance, 10, 500);
 }
 
 /*
@@ -375,9 +400,9 @@ function check_postbringup()
 {
 	mod_tl.ctTimedCheck(function (callback) {
 		mod_tl.ctStdout.info('check aggr/instr were reenabled');
-		mod_assert.equal(aggr.nenabled(), 3, 'aggr not reenabled');
-		mod_assert.equal(instr.nenabled(), 3, 'instr not reenabled');
-		mod_assert.equal(instr.ndisabled(), 1);
+		mod_assert.equal(aggr.nenabled(), aggr_enabled_prev + 2);
+		mod_assert.equal(instr.nenabled(), instr_enabled_prev + 1);
+		mod_assert.equal(instr.ndisabled(), instr_disabled_prev);
 		callback();
 	}, mod_tl.advance, 10, 500);
 }
@@ -389,7 +414,7 @@ function check_postbringup()
 function check_final()
 {
 	mod_assert.equal(instns.length, 0);
-	mod_assert.equal(9, lastnum);
+	mod_assert.equal(8, ntotal);
 	mod_tl.advance();
 }
 

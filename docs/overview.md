@@ -892,7 +892,7 @@ All of these can be combined to form complex filters for drilling down.  For
 example, this predicate:
 
 	{
-		and: {
+		and: [
 			{ eq: [ "execname", "mysqld" ] }
 			{ gt: [ "latency", 100000000 ] },
 			{ or: [
@@ -900,7 +900,7 @@ example, this predicate:
 				{ eq: [ "hostname", "host2" ] },
 				{ eq: [ "hostname", "host3" ] }
 			] },
-		}
+		]
 	}
 
 This predicate could be used with the "logical filesystem operations" metric to

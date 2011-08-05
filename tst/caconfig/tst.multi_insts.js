@@ -114,11 +114,7 @@ mod_tl.ctPushFunc(setup);
  */
 function check_common()
 {
-	enable_metric(metric_common, function (instrs) {
-	    ASSERT(instrs.length == 2);
-	    mod_assert.deepEqual(instrs.sort(), [ 'instr1', 'instr2' ]);
-	    mod_tl.advance();
-	});
+	enable_metric(metric_common, [ 'instr1', 'instr2' ], mod_tl.advance);
 }
 
 mod_tl.ctPushFunc(check_common);
@@ -128,11 +124,7 @@ mod_tl.ctPushFunc(check_common);
  */
 function check_instr1()
 {
-	enable_metric(metric_instr1, function (instrs) {
-	    ASSERT(instrs.length == 1);
-	    mod_assert.deepEqual(instrs.sort(), [ 'instr1' ]);
-	    mod_tl.advance();
-	});
+	enable_metric(metric_instr1, [ 'instr1' ], mod_tl.advance);
 }
 
 mod_tl.ctPushFunc(check_instr1);
@@ -142,11 +134,7 @@ mod_tl.ctPushFunc(check_instr1);
  */
 function check_instr2_fields()
 {
-	enable_metric(metric_instr2[0], function (instrs) {
-	    ASSERT(instrs.length == 1);
-	    mod_assert.deepEqual(instrs.sort(), [ 'instr2' ]);
-	    mod_tl.advance();
-	});
+	enable_metric(metric_instr2[0], [ 'instr2' ], mod_tl.advance);
 }
 
 mod_tl.ctPushFunc(check_instr2_fields);
@@ -157,11 +145,7 @@ mod_tl.ctPushFunc(check_instr2_fields);
  */
 function check_instr2_module()
 {
-	enable_metric(metric_instr2[1], function (instrs) {
-	    ASSERT(instrs.length == 1);
-	    mod_assert.deepEqual(instrs.sort(), [ 'instr2' ]);
-	    mod_tl.advance();
-	});
+	enable_metric(metric_instr2[1], [ 'instr2' ], mod_tl.advance);
 }
 
 mod_tl.ctPushFunc(check_instr2_module);
@@ -173,25 +157,28 @@ mod_tl.ctPushFunc(check_instr2_module);
 mod_tl.ctPushFunc(check_common);
 
 /*
- * Given a particular "metric", create an instrumentation for it.  When
- * complete, invoke "callback" with an array of the instrumenters on which the
- * instrumentation was activated.
+ * Given a particular "metric", create an instrumentation for it and check that
+ * the expected instrumenters are enabled.  Invokes "callback" on completion.
  */
-function enable_metric(metric, callback)
+function enable_metric(metric, expected_instrs, callback)
 {
 	var enabled1 = instr1.nenabled();
 	var enabled2 = instr2.nenabled();
-	var ret = [];
 
 	http.sendAsJson('POST', url_create, metric, true,
 	    function (err, response, rv) {
 		ASSERT(!err);
 		mod_assert.equal(response.statusCode, HTTP.CREATED);
-		if (instr1.nenabled() > enabled1)
-			ret.push('instr1');
-		if (instr2.nenabled() > enabled2)
-			ret.push('instr2');
-		callback(ret);
+
+		mod_tl.ctTimedCheck(function (subcallback) {
+			var ret = [];
+			if (instr1.nenabled() > enabled1)
+				ret.push('instr1');
+			if (instr2.nenabled() > enabled2)
+				ret.push('instr2');
+			mod_assert.deepEqual(ret, expected_instrs.sort());
+			subcallback();
+		}, callback, 20, 250);
 	    });
 }
 

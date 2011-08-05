@@ -88,7 +88,6 @@ function check_instrumentation(test, code, response, rv)
 	ASSERT.ok(rv['uris'].filter(function (elt) {
 		return (elt['name'] == 'value_raw');
 	}).length == 1);
-	ASSERT.ok(rv['nsources'] === 1);
 
 	ASSERT.ok(rv['crtime'] >= start);
 	ASSERT.ok(rv['crtime'] <= new Date().getTime());

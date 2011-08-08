@@ -60,6 +60,7 @@ var svcs, aggr, instr, requester;
 var stash = true;
 var capcount = 0;
 var ntotal = 0;
+var nexpected = 8; /* test creates 8 instrumentations */
 var instns = [];
 
 mod_tl.ctSetTimeout(90 * 1000);
@@ -411,7 +412,7 @@ function check_postbringup()
 function check_final()
 {
 	mod_assert.equal(instns.length, 0);
-	mod_assert.equal(8, ntotal);
+	mod_assert.equal(nexpected, ntotal);
 	mod_tl.advance();
 }
 

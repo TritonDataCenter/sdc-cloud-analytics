@@ -1920,6 +1920,75 @@ as long as the configured TCP retransmit timeout (typically multiple seconds).
 This metric reports the total number of TCP segments (packets) sent and received
 and can be used to observe network activity over TCP.
 
+## VM-related metrics:
+
+The VM metrics report information that is specific to Virtual Machines and not
+applicable to SmartMachines. Note that several of the metrics that we have do
+apply to both kinds of machines.
+
+### VM: exits
+
+**Name:** vm.exits.
+**Raw metric:** number of times the Virtual Machine exits back to the host.
+**Decomposition:** hostname, zonename, vleavereason, vcpuid.
+**Visibility:** operators only.
+
+This metric measures the number of times a virutal machine must stop running the
+guest and handle some operation. Exits can be caused because of disk and network
+I/O or by activities external to the guest such as receiving an interrupt on the
+same processor. A large number of exits may be symptomatic of poorer
+performance.
+
+### VM: interrupt requests
+
+**Name:** vm.irqs.
+**Raw Metric:** number of interrupt requests made by Virtual Machines.
+**Decomposition:** hostname, subsecond, zonename, irqvector.
+**Visibility:** operators and end users.
+
+This metric measures the raw number of interrupt requests that are being made to
+the guest. An interrupt request occurs because of an emulated hardware device
+such as a timer, networking interface, or disk drive. This is useful for
+understanding how the guest is using its virtualized hardware resources.
+
+### VM: disk I/O operations
+
+**Name:** vm.physio_ops
+**Raw Metric:** number of Virtual Machine disk I/O operations completed.  
+**Decompositions:** hostname, zonename, optype, latency, size, offset, errno
+**Visibility:** operators and end users.
+
+This metric gives visibility into the I/O Virtual Machines are doing to their
+virtual disks. This is the primary metric for understanding Virtual Machine disk
+performance.
+
+### VM: disk bytes read and written
+
+**Name:** vm.physio_bytes
+**Raw Metric:** number of bytes read or written to Virtual Machine disks.
+**Decompositions:** hostname, zonename, optype.
+**Visibility:** operators and end users.
+
+This metric measures the raw number of bytes read and/or written to virtual
+disks provided to Virtual Machines. This allows operators and end users to see
+if the virtual disks are being driven to maximum throughput.
+
+### VM: thread samples
+
+**Name:** vm.thread_samples.
+**Raw Metric:** number of samples a thread was running on-CPU
+**Decompositions:** hostname, zonename, subsecond, vmmuctx
+**Visibility:** operators and end users.  
+
+This raw metric counts the number of times a vCPU was sampled on-CPU. The
+sampling is performed at 99 Hertz (samples per second) per CPU, not 100 Hertz,
+to avoid sampling in lockstep with timed activity.
+
+This can be used to understand guest CPU usage at a coarse-grained level. The
+vmmuctx decomposition can be used to see what MMU context is active at the time
+of sampling. The subsecond heatmap provides the same insights as that in CPU:
+thread samples.
+
 
 ## ZFS-related metrics:
 
@@ -2055,6 +2124,7 @@ individual values, a vector rather than a scalar):
 * **disk**: disk identifier
 * **direction**: direction of bytes transferred, either "sent" or "received"
 * **execname**: application name
+* **errno**: error code
 * **errtype**: TCP error description
 * **fstype**: filesystem name (e.g., "zfs")
 * **gctype**: type of garbage collection (e.g., "scavenge")
@@ -2064,6 +2134,7 @@ individual values, a vector rather than a scalar):
   "X-Forwarded-For" header
 * **http_path**: HTTP request URL path (URL without query parameters)
 * **http_url**: HTTP request URL
+* **irqvector**: IRQ vector
 * **leavereason**: description of why a process came off-CPU
 * **nic**: network interface identifier (e.g., "e1000g0")
 * **optype**: operation type, often "read" or "write" but can be any operation
@@ -2079,6 +2150,9 @@ individual values, a vector rather than a scalar):
 * **syscall**: name of a system call
 * **table**: database table name
 * **user**: client username
+* **vcpuid**: vCPU identifier
+* **vleavereason*: reason leaving vCPU
+* **vmmuctx*: VM MMU context
 * **zdataset**: ZFS dataset name
 * **zonename**: Zone (or SmartMachine or Virtual Machine) name
 * **zpool**: ZFS pool name

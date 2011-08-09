@@ -191,6 +191,33 @@
 		"stat": "errors",
 		"fields": [ "hostname", "tcpstack", "errtype" ]
 	}, {
+		"module": "vm",
+		"stat":	"thread_samples",
+		"fields": [
+		    "hostname", "zonename", "subsecond", "vmmmuctx"
+		]
+	}, {
+		"module": "vm",
+		"stat": "irqs",
+		"fields": [
+		    "hostname", "zonename", "subsecond", "irqvector"
+		]	
+	}, {
+		"module": "vm",
+		"stat": "physio_ops",
+		"fields": [
+		    "hostname", "zonename", "optype", "latency", "size",
+		    "offset", "errno"
+		]
+	}, {
+		"module": "vm",
+		"stat":	 "physio_bytes",
+		"fields": [ "hostname", "zonename", "optype" ]
+	}, {
+		"module": "vm",
+		"stat": "exits",
+		"fields": [ "hostname", "zonename", "vleavereason", "vcpuid" ]
+	}, {
 		"module": "zfs",
 		"stat": "dataset_unused_quota",
 		"fields": [ "hostname", "zdataset" ]

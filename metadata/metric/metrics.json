@@ -9,6 +9,7 @@
 	"node":		{ "label": "Node.js 0.4.x"		},
 	"syscall":	{ "label": "System calls"		},
 	"tcp": 		{ "label": "TCP"			},
+	"vm":		{ "label": "Virtual Machine"		},
 	"zfs": 		{ "label": "ZFS"			}
     },
 
@@ -60,6 +61,7 @@
 	"disk":		{ "label": "device name" },
 	"direction":	{ "label": "sent/received" },
 	"execname":	{ "label": "application name" },
+	"errno":	{ "label": "error code","type": "string" },
 	"errtype":	{ "label": "error type" },
 	"fstype":	{ "label": "filesystem type" },
 	"gctype":	{ "label": "GC type" },
@@ -71,6 +73,7 @@
 	"iops":		{ "label": "I/O operations", "type": "number" },
 	"iops_read":	{ "label": "read I/O operations", "type": "number" },
 	"iops_write":	{ "label": "write I/O operations", "type": "number" },
+	"irqvector":	{ "label": "IRQ vector", "type": "string"},
 	"latency":	{ "label": "latency", "type": "time" },
 	"leavereason":	{ "label": "reason leaving CPU" },
 	"nic":		{ "label": "NIC name" },
@@ -101,6 +104,9 @@
 	"tcpstack":	{ "label": "TCP instance" },
 	"user":		{ "label": "client username" },
 	"utilization":	{ "label": "utilization", "type": "percent" },
+	"vcpuid":	{ "label": "vCPU identifier", "type": "string" },
+	"vleavereason":	{ "label": "reason leaving vCPU", "type": "string" },
+	"vmmmuctx":	{ "label": "VM MMU context", "type": "string" },
 	"zdataset":	{ "label": "ZFS dataset" },
 	"zonename":	{ "label": "zone name" },
 	"zpool":	{ "label": "ZFS pool" }
@@ -378,6 +384,41 @@
 	"label":	"segments",
 	"unit":		"segments",
 	"fields":	[ "hostname", "tcpstack", "direction" ]
+    }, {
+	"module":	"vm",
+	"stat":		"thread_samples",
+	"label":	"thread samples",
+	"unit":		"samples",
+	"fields":	[
+	    "hostname", "zonename", "subsecond", "vmmmuctx"
+	]
+    }, {
+	"module":	"vm",
+	"stat":		"irqs",
+	"label":	"interrupt requests",
+	"unit":		"requests",
+	"fields":	[ "hostname", "subsecond", "zonename", "irqvector" ]
+    }, {
+	"module":	"vm",
+	"stat":		"physio_ops",
+	"label":	"disk I/O operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "optype", "latency", "size", "offset",
+	    "errno"
+	]
+    }, {
+	"module":	"vm",
+	"stat":		"exits",
+	"label":	"exits",
+	"unit":		"exits",
+	"fields":	[ "hostname", "zonename", "vleavereason", "vcpuid" ]
+    }, {
+	"module":	"vm",
+	"stat":		"physio_bytes",
+	"label":	"disk bytes read and written",
+	"type":		"size",
+	"fields":	[ "hostname", "zonename", "optype" ]
     }, {
 	"module":	"zfs",
 	"stat":		"dataset_unused_quota",

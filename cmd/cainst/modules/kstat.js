@@ -665,6 +665,30 @@ var inskMetrics = [ {
 			}
 		}
 	}
+}, {
+	module: 'vm',
+	stat: 'exits',
+	kstat: { module: 'kvm', class: 'misc' },
+	filter: inskVMExitFilter,
+	extract: inskVMExitExtract,
+	fields: {
+		zonename: {
+			values: function (kstat) {
+				return ([ kstat['data']['zonename'] ]);
+			}
+		},
+		vleavereason: {
+			values: function (kstat) {
+				return ([ 'haltx', 'irqx', 'irqwx', 'iox',
+				    'mmiox', 'other']);
+			}
+		},
+		vcpuid: {
+			values: function (kstat) {
+				return ([ kstat['name'] ]);
+			}
+		}
+	}
 } ];
 
 function inskNicFilter(kstat)
@@ -691,6 +715,64 @@ function inskVnicFilter(kstat)
 function inskDiskFilter(kstat)
 {
 	return (kstat['module'] == 'cmdk' || kstat['module'] == 'sd');
+}
+
+/*
+ * The kvm driver currently uses the name field to distinguish between the
+ * different vcpus. Because the kstat api doesn't let us use a wildcard i.e.
+ * vcpu-* we instead look at that broader kvm module and misc class. However,
+ * this would also match all of the kstats for each vm. We use this to filter
+ * those out. They all have the same name, but different instances.
+ */
+function inskVMExitFilter(kstat)
+{
+	return (kstat['name'] !== 'vm');
+}
+
+function inskVMExitExtract(fields, kstat, klast)
+{
+	var value, oldval;
+	var exit = fields['vleavereason'];
+
+	switch (exit) {
+	case 'haltx':
+		value = kstat['data']['halt-exits'] -
+		    klast['data']['halt-exits'];
+		break;
+	case 'irqx':
+		value = kstat['data']['irq-exits'] -
+		    klast['data']['irq-exits'];
+		break;
+	case 'irqwx':
+		value = kstat['data']['irq-window-exits'] -
+		    klast['data']['irq-window-exits'];
+		break;
+	case 'iox':
+		value = kstat['data']['io-exits'] -
+		    klast['data']['io-exits'];
+		break;
+	case 'mmiox':
+		value = kstat['data']['mmio-exits'] -
+		    klast['data']['mmio-exits'];
+		break;
+	case 'other':
+		value = kstat['data']['exits'] - kstat['data']['halt-exits'] -
+		    kstat['data']['irq-exits'] -
+		    kstat['data']['irq-window-exits'] -
+		    kstat['data']['io-exits'] - kstat['data']['mmio-exits'];
+		oldval = klast['data']['exits'] - klast['data']['halt-exits'] -
+		    klast['data']['irq-exits'] -
+		    klast['data']['irq-window-exits'] -
+		    klast['data']['io-exits'] - klast['data']['mmio-exits'];
+		value -= oldval;
+		break;
+	default:
+		mod_assert.ok(false, caSprintf('invalid exit type: %s\n' +
+		    'Fields: %j, kstat: %j, klast: %j', exit, fields, kstat,
+		    klast));
+		break;
+	}
+	return (value);
 }
 
 function inskIoExtractOps(fields, kstat, kprev)

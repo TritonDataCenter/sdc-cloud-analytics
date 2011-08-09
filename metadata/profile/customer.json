@@ -143,6 +143,20 @@
 		"stat": "vnic_packets",
 		"fields": [ "zonename", "direction" ]
 	}, {
+		"module": "vm",
+		"stat":	"thread_samples",
+		"fields": [ "zonename", "subsecond", "vmmmuctx" ]
+	}, {
+		"module": "vm",
+		"stat": "physio_ops",
+		"fields": [
+		    "zonename", "optype", "latency", "size", "offset", "errno"
+		]
+	}, {
+		"module": "vm",
+		"stat":	 "physio_bytes",
+		"fields": [ "zonename", "optype" ]
+	}, {
 		"module": "zfs",
 		"stat": "dataset_unused_quota",
 		"fields": [ "zdataset" ]

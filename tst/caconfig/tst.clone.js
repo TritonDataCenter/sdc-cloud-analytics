@@ -48,7 +48,6 @@ var instn_initial = {
 	'value-arity': 'discrete-decomposition',
 	'value-scope': 'interval',
 	enabled: true,
-	nsources: 1,
 	transformations: []
     }
 };
@@ -80,7 +79,6 @@ var instn_clones = [ {
 	'value-arity': 'numeric-decomposition',
 	'value-scope': 'interval',
 	enabled: true,
-	nsources: 1,
 	transformations: []
     }
 }, {
@@ -108,7 +106,6 @@ var instn_clones = [ {
 	'value-arity': 'numeric-decomposition',
 	'value-scope': 'interval',
 	enabled: true,
-	nsources: 1,
 	transformations: []
     }
 } ];
@@ -136,15 +133,13 @@ function create_instn(url, input, expected, callback)
 		ASSERT.ok(val['crtime'] <= after);
 		delete (val['crtime']);
 
-		ASSERT.deepEqual(rv['warnings'], []);
-		delete (val['warnings']);
-
 		delete (val['uri']);
 		delete (val['uris']);
 		delete (val['id']);
+		delete (val['nsources']);
 
 		ASSERT.deepEqual(expected, val);
-		delete (rv['warnings']);
+		delete (rv['nsources']);
 		instns[rv['uri']] = rv;
 		callback(rv);
 	    });
@@ -172,6 +167,9 @@ function check_instns()
 			    caSprintf('unexpected uri "%s" in instn list',
 			    rv[ii]['uri']));
 
+			delete (rv[ii]['nsources']);
+			console.error(rv[ii]);
+			console.error(instns[rv[ii]['uri']]);
 			ASSERT.deepEqual(rv[ii], instns[rv[ii]['uri']]);
 		}
 

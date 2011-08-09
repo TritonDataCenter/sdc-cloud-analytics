@@ -48,10 +48,10 @@ function main()
 	caDbg.set('services', ii_svcs);
 
 	for (ii = 0; ii < ninstrs; ii++) {
+		instrhost = caSprintf('%s%04d', host, ii);
 		out = mod_fs.createWriteStream(
 		    mod_path.join(logdir, instrhost + '.out'));
 
-		instrhost = caSprintf('%s%04d', host, ii);
 		process.env['HOST'] = instrhost;
 		ii_svcs[instrhost] = new mod_instrsvc.caInstrService(
 		    [ './metadata' ], out, [ 'fake' ]);

@@ -1,0 +1,35 @@
+#!/usr/sbin/dtrace -s
+
+/*
+ * nhttpsnoop: traces node HTTP server requests
+ */
+
+#pragma D option quiet
+
+BEGIN
+{
+	printf("tracing HTTP requests\n");
+	printf("%-6s %-16s %-6s   %-7s %s\n", "PID", "REMOTE", "TIME", 
+	    "METHOD", "URL");
+}
+
+node*:::http-server-request
+{
+	addrs[args[1]->fd] = args[1]->remoteAddress;
+	methods[args[1]->fd] = args[0]->method;
+	urls[args[1]->fd] = args[0]->url;
+	starts[args[1]->fd] = timestamp;
+}
+
+node*:::http-server-response
+/addrs[args[0]->fd] != NULL/
+{
+	printf("%-6d %-16s %6dus %-7s %s\n", pid, addrs[args[0]->fd],
+	    (timestamp - starts[args[0]->fd]) / 1000,
+	    methods[args[0]->fd], urls[args[0]->fd]);
+
+	addrs[args[0]->fd] = 0;
+	methods[args[0]->fd] = 0;
+	urls[args[0]->fd] = 0;
+	starts[args[0]->fd] = 0;
+}

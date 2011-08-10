@@ -130,7 +130,8 @@ PKGFILES_cabase = \
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
 	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(PKGROOT)/cabase/lib/ca/errno.js		\
-	$(PKGROOT)/cabase/lib/node.d
+	$(PKGROOT)/cabase/lib/node.d			\
+	$(PKGROOT)/cabase/tools/nhttpsnoop
 
 DEPS_cabase = \
 	amqp		\

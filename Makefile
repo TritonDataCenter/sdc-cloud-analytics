@@ -41,7 +41,7 @@ MKERRNO		 = $(TOOLSDIR)/mkerrno
 NODE		:= $(NODEDIR)/node
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= PATH=$(NODEDIR):$$PATH npm
-RESTDOWN	 = restdown
+RESTDOWN	 = python2.6 $(SRC)/deps/restdown/bin/restdown
 RMTREE		 = rm -rf
 TAR		 = tar
 XMLLINT		 = xmllint --noout

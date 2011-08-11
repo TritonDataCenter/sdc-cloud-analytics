@@ -25,3 +25,6 @@
 [submodule "deps/node-libGeoIP"]
 	path = deps/node-libGeoIP
 	url = git://github.com/bcantrill/node-libGeoIP.git
+[submodule "deps/restdown"]
+	path = deps/restdown
+	url = git://github.com/trentm/restdown.git

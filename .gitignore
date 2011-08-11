@@ -10,4 +10,5 @@ lib/ca/errno.js
 tools/webrev_support/bin/codereview
 webrev
 cacore.*
-docs/overview.htm
+docs/index.html
+docs/index.json

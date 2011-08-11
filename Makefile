@@ -37,11 +37,11 @@ CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
 JSONCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/jsonchk.js
-MARKDOWN	 = $(TOOLSDIR)/markdown
 MKERRNO		 = $(TOOLSDIR)/mkerrno
 NODE		:= $(NODEDIR)/node
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= PATH=$(NODEDIR):$$PATH npm
+RESTDOWN	 = restdown
 RMTREE		 = rm -rf
 TAR		 = tar
 XMLLINT		 = xmllint --noout
@@ -190,7 +190,7 @@ NATIVE_DEPS = \
 	deps/node-libGeoIP/build/default/libGeoIP.node
 
 DOC_FILES = \
-	docs/overview.htm
+	docs/index.html
 
 #
 # Targets
@@ -375,14 +375,12 @@ cscope.files:
 .PHONY: cscope.files
 
 #
-# The "doc" target builds docs HTML from markdown.
+# The "doc" target builds docs HTML from restdown.
 #
 doc: $(DOC_FILES)
 
-docs/%.htm: docs/%.md docs/header.htm docs/footer.htm
-	cat docs/header.htm > $@
-	$(MARKDOWN) $< >> $@
-	cat docs/footer.htm >> $@
+docs/%.html: docs/%.restdown
+	$(RESTDOWN) $<
 
 #
 # The "clean" target removes created files -- we currently have none

@@ -466,7 +466,7 @@ versions.
 See [Appendix A: Version History](#appendix-a-version-history) for a version history.
 
 
-## DescribeAnalytics (GET /ca)
+## Describe Metrics (GET /ca)
 
 The root resource for the CA service returns a payload describing the modules,
 metrics, fields, and types currently supported by the service.  Here's an
@@ -762,7 +762,7 @@ several related parameters.  They can be listed, retrieved, created, edited,
 deleted, and cloned.  For more information, see "Instrumentations" under
 "Cloud Analytics" above.
 
-## ListInstrumentations (GET /ca/instrumentations)
+## List Instrumentations (GET /ca/instrumentations)
 
 ### Inputs
 
@@ -807,17 +807,17 @@ scope (usually a user). Here's an example instrumentation list:
 This list contains exactly one instrumentation.  The details are described
 below.
 
-## CreateInstrumentation (POST /ca/instrumentations)
+## Create Instrumentation (POST /ca/instrumentations)
 
 ### Inputs
-||module||String||XXX||
-||stat||String||XXX||
-||predicate|| xxx ||default: none||
-||decomposition|| xxx ||default: `[]`||
-||granularity|| xxx ||default: 1|||
-||retention-time|| xxx ||default: unspecified||
-||persist-data|| xxx ||default: false||
-||idle-max|| xxx ||default: unspecified||
+||module||String||required||
+||stat||String||required||
+||predicate|| Object (see Predicates) ||default: none||
+||decomposition|| Array of strings ||default: `[]`||
+||granularity|| Number ||default: 1||
+||retention-time|| Number of seconds ||default: 600 (10 minutes)||
+||persist-data|| Boolean ||default: false||
+||idle-max|| Number of seconds ||default: 10 minutes||
 
 
 Creates a new instrumentation with the specified properties.  Properties may be
@@ -1881,7 +1881,7 @@ as long as the configured TCP retransmit timeout (typically multiple seconds).
 This metric reports the total number of TCP segments (packets) sent and received
 and can be used to observe network activity over TCP.
 
-## VM-related metrics:
+## VM-related metrics
 
 The VM metrics report information that is specific to Virtual Machines and not
 applicable to SmartMachines. Note that several of the metrics that we have do
@@ -1951,7 +1951,7 @@ of sampling. The subsecond heatmap provides the same insights as that in CPU:
 thread samples.
 
 
-## ZFS-related metrics:
+## ZFS-related metrics
 
 The ZFS metrics report how disk space is used by ZFS pools and their
 filesystems.  Typically, an individual server will have one or more storage

@@ -629,6 +629,8 @@ aggInstn.prototype.update = function (newinst, datakey)
 	}
 
 	this.agi_instrumentation = newinst;
+	this.agi_dataset.updateSources(newinst['nsources']);
+
 	if (newinst['persist-data'] && this.agi_load == 'non-persistent') {
 		this.agi_load = 'idle';
 		this.load();

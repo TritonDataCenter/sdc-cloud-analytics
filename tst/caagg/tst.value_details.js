@@ -86,12 +86,12 @@ request.ca_params['x'] = 125;
 request.ca_params['y'] = 163;
 value1 = getval(mod_atl.dataset_both, 12345, 3, xform, request);
 mod_assert.equal(value1['bucket_ymin'], 0);
-mod_assert.equal(value1['bucket_ymax'], 9);
+mod_assert.equal(value1['bucket_ymax'], 10);
 mod_assert.deepEqual(value1['present'], { 'selma': 7 });
 
 /* now simulate a click on the bucket just above that one. */
 request.ca_params['y'] = 161;
 value1 = getval(mod_atl.dataset_both, 12345, 3, xform, request);
 mod_assert.equal(value1['bucket_ymin'], 10);
-mod_assert.equal(value1['bucket_ymax'], 19);
+mod_assert.equal(value1['bucket_ymax'], 20);
 mod_assert.deepEqual(value1['present'], { 'selma': 2, 'patty': 100 });

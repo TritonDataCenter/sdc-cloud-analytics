@@ -340,6 +340,134 @@ function check_invalid()
 	caRunStages(funcs, null, mod_tl.advance);
 }
 
+/*
+ * The following bunch of stages check the cases where the aggregator fakes up
+ * "zero" data based on instrumentation properties defined in request headers.
+ */
+function check_noexist_default()
+{
+	http.sendRaw('GET', '/ca/instrumentations/17/value/raw', null,
+	    {}, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.ENOTFOUND);
+		mod_tl.advance();
+	    });
+}
+
+function check_noexist_scalar_raw()
+{
+	var headers = {
+	    'x-ca-instn-arity': 'scalar',
+	    'x-ca-instn-granularity': 1
+	};
+
+	http.sendRaw('GET', '/ca/instrumentations/17/value/raw', null,
+	    headers, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.OK);
+		mod_assert.equal(rv['value'], 0);
+		mod_assert.equal(rv['nsources'], 0);
+		mod_assert.equal(rv['minreporting'], 0);
+		mod_tl.advance();
+	    });
+}
+
+function check_noexist_scalar_heatmap()
+{
+	var headers = {
+	    'x-ca-instn-arity': 'scalar',
+	    'x-ca-instn-granularity': 1
+	};
+
+	http.sendRaw('GET', '/ca/instrumentations/17/value/heatmap/image', null,
+	    headers, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.ENOTFOUND);
+		mod_tl.advance();
+	    });
+}
+
+function check_noexist_scalar_gran()
+{
+	var body = JSON.stringify({ start_time: 12345 });
+
+	var headers = {
+	    'content-type': 'application/json',
+	    'content-length': body.length,
+	    'x-ca-instn-arity': 'scalar',
+	    'x-ca-instn-granularity': 10
+	};
+
+	http.sendRaw('GET', '/ca/instrumentations/17/value/raw', body,
+	    headers, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.OK);
+		mod_assert.equal(rv['value'], 0);
+		mod_assert.equal(rv['nsources'], 0);
+		mod_assert.equal(rv['minreporting'], 0);
+		mod_assert.equal(rv['requested_start_time'], 12345);
+		mod_assert.equal(rv['start_time'], 12340);
+		mod_tl.advance();
+	    });
+}
+
+function check_noexist_nd_raw()
+{
+	var headers = {
+	    'x-ca-instn-arity': 'numeric-decomposition',
+	    'x-ca-instn-granularity': 1
+	};
+
+	http.sendRaw('GET', '/ca/instrumentations/17/value/raw', null,
+	    headers, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.OK);
+		mod_assert.deepEqual(rv['value'], []);
+		mod_tl.advance();
+	    });
+}
+
+function check_noexist_nd_heatmap()
+{
+	var headers = {
+	    'x-ca-instn-arity': 'numeric-decomposition',
+	    'x-ca-instn-granularity': 1
+	};
+
+	http.sendRaw('GET', '/ca/instrumentations/17/value/heatmap/image', null,
+	    headers, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.OK);
+		mod_assert.ok('image' in rv);
+		mod_assert.ok(typeof (rv['image']) == 'string');
+		mod_assert.ok(rv['image'].length > 0);
+		mod_tl.advance();
+	    });
+}
+
+function check_noexist_dd_raw()
+{
+	var headers = {
+	    'x-ca-instn-arity': 'discrete-decomposition',
+	    'x-ca-instn-granularity': 1
+	};
+
+	http.sendRaw('GET', '/ca/instrumentations/17/value/raw', null,
+	    headers, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.OK);
+		mod_assert.deepEqual(rv['value'], {});
+		mod_tl.advance();
+	    });
+}
+
+function check_noexist_dd_heatmap()
+{
+	var headers = {
+	    'x-ca-instn-arity': 'discrete-decomposition',
+	    'x-ca-instn-granularity': 1
+	};
+
+	http.sendRaw('GET', '/ca/instrumentations/17/value/heatmap/image', null,
+	    headers, true, function (err, response, rv) {
+		mod_assert.equal(response.statusCode, HTTP.ENOTFOUND);
+		mod_tl.advance();
+	    });
+}
+
 mod_tl.ctPushFunc(setup_svcs);
 mod_tl.ctPushFunc(setup_instn);
 mod_tl.ctPushFunc(check_static_value);
@@ -350,5 +478,13 @@ mod_tl.ctPushFunc(check_future_fail);
 mod_tl.ctPushFunc(check_future_ok);
 mod_tl.ctPushFunc(check_xforms);
 mod_tl.ctPushFunc(check_invalid);
+mod_tl.ctPushFunc(check_noexist_default);
+mod_tl.ctPushFunc(check_noexist_scalar_raw);
+mod_tl.ctPushFunc(check_noexist_scalar_heatmap);
+mod_tl.ctPushFunc(check_noexist_scalar_gran);
+mod_tl.ctPushFunc(check_noexist_nd_raw);
+mod_tl.ctPushFunc(check_noexist_nd_heatmap);
+mod_tl.ctPushFunc(check_noexist_dd_raw);
+mod_tl.ctPushFunc(check_noexist_dd_heatmap);
 mod_tl.ctPushFunc(mod_tl.ctDoExitSuccess);
 mod_tl.advance();

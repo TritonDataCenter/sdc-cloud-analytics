@@ -702,18 +702,50 @@ function aggHttpRouter(server)
 function aggHttpInstn(request, response)
 {
 	var custid, instid, fqid;
+	var iarity, igran, dataset, instn;
 
 	custid = request.params['custid'];
 	instid = request.params['instid'];
 	fqid = mod_ca.caQualifiedId(custid, instid);
 
-	if (!(fqid in agg_insts)) {
+	if (fqid in agg_insts)
+		return (agg_insts[fqid]);
+
+	iarity = request.headers['x-ca-instn-arity'];
+	igran = parseInt(request.headers['x-ca-instn-granularity'], 10);
+
+	if (!iarity || !igran) {
 		response.send(HTTP.ENOTFOUND);
 		return (undefined);
 	}
 
-	ASSERT.ok(agg_insts[fqid]);
-	return (agg_insts[fqid]);
+	/*
+	 * If we found no corresponding instrumentation but we have enough
+	 * information to fake one up, we do so.  This is provided so that we
+	 * can service requests for instrumentations we don't yet know about
+	 * (presumably because they're still being initialized) but can still
+	 * report basic information about.
+	 */
+	agg_log.info('creating synthetic instn for %s', fqid);
+
+	dataset = mod_caagg.caDatasetForInstrumentation({
+	    'nsources': 0,
+	    'granularity': igran,
+	    'value-dimension': iarity == mod_ca.ca_arity_scalar ? 1 : 2,
+	    'value-arity': iarity
+	});
+
+	instn = {
+	    'agi_synthetic': true,
+	    'agi_dataset': dataset,
+	    'agi_instrumentation': {
+		'granularity': igran,
+		'transformations': [],
+		'value-arity': iarity
+	    }
+	};
+
+	return (instn);
 }
 
 /*
@@ -923,6 +955,11 @@ caAggrValueRequest.prototype.start = function ()
 	    aggExpected(dataset, this.avr_latest_end - this.avr_gran))
 		return (this.complete());
 
+	/*
+	 * Only synthetic instrumentations have no "agi_requests" field, but
+	 * aggExpected() for such instns should have been zero.
+	 */
+	ASSERT.ok(this.avr_instn.agi_requests);
 	this.avr_instn.agi_requests.push(this);
 	return (undefined);
 };

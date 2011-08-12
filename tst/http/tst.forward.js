@@ -39,7 +39,8 @@ function setup()
 function proxyGotRequest(request, response)
 {
 	log.dbg('proxy got request; forwarding it on to server 2');
-	mod_cahttp.caHttpForward(request, response, '127.0.0.1', srv2port);
+	mod_cahttp.caHttpForward(request, response, '127.0.0.1', srv2port,
+	    { 'x-extra-header': 'x-extra-value' }, mod_tl.ctStdout);
 }
 
 function endGotRequest(request, response)
@@ -51,6 +52,7 @@ function endGotRequest(request, response)
 	ASSERT.equal(request.url, uri);
 	ASSERT.equal(request.method, method);
 	ASSERT.equal(request.headers['x-ca-test'], '215');
+	ASSERT.equal(request.headers['x-extra-header'], 'x-extra-value');
 
 	request.on('data', function (chunk) { body += chunk; });
 	request.on('end', function () {

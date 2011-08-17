@@ -18,7 +18,7 @@ function main()
 	args = process.argv.slice(2);
 	args.unshift('./metadata');
 	ii_svc = new mod_instrsvc.caInstrService(args, process.stdout,
-	    [ 'kstat', 'dtrace', 'zfs' ]);
+	    [ 'kstat', 'dtrace', 'zfs', 'cainstr' ]);
 	caDbg.set('service', ii_svc);
 
 	ii_svc.start(function (err) {

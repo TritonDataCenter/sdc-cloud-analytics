@@ -107,9 +107,6 @@ function inszInitMetrics(instr)
 	fields['pool'] = [ 'hostname', 'zpool' ];
 
 	inszMetrics.forEach(function (def) {
-		inszLog.dbg('loading zfs metric %s.%s', def['module'],
-		    def['stat']);
-
 		mod_assert.ok(def['scope'] in fields);
 		mod_assert.ok(def['scope'] in inszDataCache);
 

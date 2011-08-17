@@ -241,5 +241,29 @@
 		"module": "zfs",
 		"stat": "pool_total",
 		"fields": [ "hostname", "zpool" ]
+	}, {
+		"module": "ca",
+		"stat": "instr_enablings",
+		"fields": [
+		    "hostname", "cabackend", "cainstnid", "cametric", "latency"
+		]
+	}, {
+		"module": "ca",
+		"stat": "instr_disablings",
+		"fields": [
+		    "hostname", "cabackend", "cainstnid", "cametric",
+		    "latency"
+		]
+	}, {
+		"module": "ca",
+		"stat": "instr_beops",
+		"fields": [
+		    "hostname", "cabackend", "cainstnid", "cametric",
+		    "latency", "subsecond"
+		]
+	}, {
+		"module": "ca",
+		"stat": "instr_ticks",
+		"fields": [ "hostname", "latency", "subsecond" ]
 	} ]
 }

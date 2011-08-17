@@ -2064,6 +2064,44 @@ can be decomposed by hostname and ZFS dataset.
 In raw form, this metric reports the sum of all space for all ZFS pools.  This
 can be decomposed by hostname and ZFS dataset.
 
+## Cloud Analytics-related metrics
+
+These metrics provide visibility into the Cloud Analytics service itself.
+
+### CA: instrumenter ticks
+
+||**Name**|| ca.instr_ticks ||
+||**Raw metric**|| total number of instrumenter ticks||
+||**Decompositions**|| hostname, latency (heatmap), subsecond (heatmap)||
+||**Visibility**|| operators only||
+
+This metric counts the number of ticks by all instrumenters in the CA service.
+Each instrumenter normally ticks once per second to gather data.  The latency
+of each tick measures how long it took the instrumenter to gather data for each
+of its instrumentations.  The subsecond offset measures what time within each
+second the tick began.  Together, these heatmaps allow administrators to
+understand how much time each instrumenter is spending gathering and reporting
+data and whether data is being reported on time.
+
+### CA: instrumenter backend operations
+
+||**Name**|| ca.instr_beops ||
+||**Raw metric**|| total number of instrumenter backend operations||
+||**Decompositions**|| hostname, cabackend, cainstnid, cametric, latency (heatmap), subsecond (heatmap)||
+||**Visibility**|| operators only||
+
+This metric counts the number of data requests to instrumenter backends.
+During each instrumenter tick (see above), the instrumenter requests data from
+some backend for each active instrumentation.  This metric provides visibility
+into which instrumenters, backends, instrumentations, and metrics are doing a
+lot of work or taking a long time to gather data.  The latency and subsecond
+heatmaps work similarly to their counterparts for the "instrumenter ticks"
+metric above.
+
+This metric is essentially a more fine-grained view on instrumenter ticks.
+It's primarily useful when that metric has already demonstrated that
+instrumenters are taking a long time to gather data and you now need to
+understand which backends are responsible for that time.
 
 # Fields
 
@@ -2076,6 +2114,9 @@ The values of the following fields are strings. Decomposing by one of these fiel
 could yield a stacked line graph rather than a single line graph (or, for
 individual values, a vector rather than a scalar).
 
+|| **cabackend** || backend module ||
+|| **cainstnid** || instrumentation identifier ||
+|| **cametric** || metric name ||
 || **client** || client hostname ||
 || **conntype** || type of TCP connection, either "active" (client) or "passive"  (server) ||
 || **cpu** || CPU identifier (e.g., "cpu0") ||

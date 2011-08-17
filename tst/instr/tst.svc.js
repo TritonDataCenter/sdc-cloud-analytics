@@ -87,6 +87,8 @@ function enable_mod1(instnid, instnkey, expect_increment)
 	if (expect_increment) {
 		expected_mod1++;
 		expected_metrics.push({
+			is_backend: '../../../tst/instr/testmod1',
+			is_fqid: instnid,
 			is_granularity: 1,
 			is_module: props['module'],
 			is_stat: props['stat'],
@@ -98,6 +100,8 @@ function enable_mod1(instnid, instnkey, expect_increment)
 
 	cap.cmdEnableInst(svc.routekey(), instnid, instnkey, props, zones,
 	    250, function (err) {
+		if (err)
+			console.error('error: %s (%j)', err.message, err);
 		mod_assert.ok(!err);
 
 		mod_assert.equal(mod1.ninstns, expected_mod1);
@@ -134,6 +138,8 @@ function enable_mod2(instnid, instnkey, expected_increment)
 function do_disable(instnid)
 {
 	cap.cmdDisableInst(svc.routekey(), instnid, 250, function (err) {
+		if (err)
+			console.error('error: %s (%j)', err.message, err);
 		mod_assert.ok(!err);
 		mod_assert.equal(mod1.ninstns, expected_mod1);
 		mod_assert.equal(mod2.ninstns, expected_mod2);
@@ -177,11 +183,13 @@ function check_data()
 		mod_assert.ok(time <= after);
 
 		if (ptime !== undefined) {
-			/* the times should be pretty precise */
-			mod_assert.ok(time - ptime >= 950);
-			mod_assert.ok(time - ptime < 1050);
+			/* These times should be pretty precise. */
+			console.error('ptime = %s', ptime);
+			console.error('time = %s', time);
+			mod_assert.ok(time - ptime >= 975);
+			mod_assert.ok(time - ptime < 1025);
 
-			/* the difference in truncated-seconds must be 1 */
+			/* The difference in truncated-seconds must be 1. */
 			mod_assert.equal(Math.floor(time / 1000) -
 			    Math.floor(ptime / 1000), 1);
 		}

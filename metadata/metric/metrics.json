@@ -1,5 +1,6 @@
 {
     "modules": {
+	"ca":		{ "label": "CA"				},
 	"cpu":		{ "label": "CPU"			},
 	"disk":		{ "label": "Disk"			},
 	"fs":		{ "label": "Filesystem"			},
@@ -51,6 +52,9 @@
 	"bytes_read":	{ "label": "bytes read", "type": "size" },
 	"bytes_write":	{ "label": "bytes written", "type": "size" },
 	"buffered":	{ "label": "bytes buffered on socket", "type": "size" },
+	"cabackend":	{ "label": "backend module" },
+	"cainstnid":	{ "label": "instrumentation identifier" },
+	"cametric":	{ "label": "metric name" },
 	"conntype":	{ "label": "connection type" },
 	"command":	{ "label": "command" },
 	"client":	{ "label": "client hostname" },
@@ -461,5 +465,17 @@
 	"type":		"size",
 	"interval":	"point",
 	"fields":	[ "hostname", "zpool" ]
+    }, {
+	"module":	"ca",
+	"stat":		"instr_beops",
+	"label":	"instrumenter backend requests",
+	"unit":		"requests",
+	"fields":	[ "hostname", "cabackend", "cainstnid", "cametric", "latency", "subsecond" ]
+    }, {
+	"module":	"ca",
+	"stat":		"instr_ticks",
+	"label":	"instrumenter ticks",
+	"unit":		"ticks",
+	"fields":	[ "hostname", "latency", "subsecond" ]
     } ]
 }

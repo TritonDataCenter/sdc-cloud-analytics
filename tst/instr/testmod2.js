@@ -49,5 +49,7 @@ tmMetricImpl.prototype.deinstrument = function (callback)
 
 tmMetricImpl.prototype.value = function (callback)
 {
+	console.error('2 sending value at %s ',
+	    mod_ca.caFormatDate(new Date()));
 	callback(++exports.value);
 };

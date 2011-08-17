@@ -40,8 +40,6 @@ function inskInitAutoMetrics(instr)
 	};
 
 	for (ii = 0; ii < inskMetrics.length; ii++) {
-		inskLog.dbg('loading kstat metric ' + (ii + 1));
-
 		inskMetrics[ii]['fields']['hostname'] = {
 			values: function () { return ([ inskHostname ]); }
 		};

@@ -477,5 +477,21 @@
 	"label":	"instrumenter ticks",
 	"unit":		"ticks",
 	"fields":	[ "hostname", "latency", "subsecond" ]
+    }, {
+	"module":	"ca",
+	"stat":		"instr_enables",
+	"label":	"instrumenter enable operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "cabackend", "cainstnid", "cametric", "latency"
+	]
+    }, {
+	"module":	"ca",
+	"stat":		"instr_disables",
+	"label":	"instrumenter disable operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "cabackend", "cainstnid", "cametric", "latency"
+	]
     } ]
 }

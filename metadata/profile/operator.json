@@ -243,16 +243,15 @@
 		"fields": [ "hostname", "zpool" ]
 	}, {
 		"module": "ca",
-		"stat": "instr_enablings",
+		"stat": "instr_enables",
 		"fields": [
 		    "hostname", "cabackend", "cainstnid", "cametric", "latency"
 		]
 	}, {
 		"module": "ca",
-		"stat": "instr_disablings",
+		"stat": "instr_disables",
 		"fields": [
-		    "hostname", "cabackend", "cainstnid", "cametric",
-		    "latency"
+		    "hostname", "cabackend", "cainstnid", "cametric", "latency"
 		]
 	}, {
 		"module": "ca",

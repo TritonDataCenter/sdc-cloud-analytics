@@ -46,6 +46,28 @@ exports.insinit = function (instr, log)
 		    'instr_backend_op', instn, instr));
 	    }
 	});
+
+	instr.registerMetric({
+	    module: 'ca',
+	    stat: 'instr_enables',
+	    fields: [ 'hostname', 'cabackend', 'cainstnid',
+		'cametric', 'latency' ],
+	    impl: function (instn) {
+		return (new inrMetricImpl(hostname, instr.metadata(),
+		    'instr_backend_enable', instn, instr));
+	    }
+	});
+
+	instr.registerMetric({
+	    module: 'ca',
+	    stat: 'instr_disables',
+	    fields: [ 'hostname', 'cabackend', 'cainstnid',
+		'cametric', 'latency' ],
+	    impl: function (instn) {
+		return (new inrMetricImpl(hostname, instr.metadata(),
+		    'instr_backend_disable', instn, instr));
+	    }
+	});
 };
 
 function inrMetricImpl(hostname, metadata, evtname, instn, instr)

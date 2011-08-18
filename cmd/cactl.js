@@ -2,11 +2,14 @@
  * cactl: poke and prod components of a Cloud Analytics instance
  */
 
+var mod_assert = require('assert');
+var mod_sys = require('sys');
+
 var mod_ca = require('../lib/ca/ca-common');
 var mod_cap = require('../lib/ca/ca-amqp-cap');
+var mod_capred = require('../lib/ca/ca-pred');
 var mod_log = require('../lib/ca/ca-log');
 var mod_metric = require('../lib/ca/ca-metric');
-var mod_sys = require('sys');
 
 var cc_timeout_msec = 3 * 1000;		/* timeout after 3s */
 var cc_argv;				/* arguments */
@@ -21,23 +24,60 @@ var cc_start;				/* time cmd was sent */
 var cc_list;				/* command was "stash list" */
 var cc_arg0 = process.argv[1];
 var cc_help = [
-    'usage: cactl [-d] <hostname> <command> [...]',
-    'Poke a cloud analytics instance via AMQP.',
-    '    <hostname> is a routing key identifying a single system',
-    '    	hint: try "ca.config" for the config server\n',
-    '    <command> is one of:',
-    '        abort              panic remote service (use with caution)',
-    '        ping               check connectivity',
-    '        status [-v]        get detailed status info',
-    '                           with -v, print additional unstructured info',
-    '        log <msg>          report log message',
-    '        stash list         show list of stash buckets',
-    '        stash del <bucket> delete stash bucket "bucket"',
-    '        stash get <bucket> retrieve contents of stash bucket "bucket"',
+    'usage: cactl [-d] <subcommand> [...]',
+    '',
+    '    Examine and manipulate the Cloud Analytics service.',
+    '',
+    '    SUBCOMMANDS',
+    '',
+    '        abort <routekey>',
+    '            Panic remote service (use with caution)',
+    '',
+    '        log <routekey> <msg>',
+    '            Insert message into remote service log',
+    '',
+    '        ping <routekey>',
+    '            Check connectivity with remote service',
+    '',
+    '        stash del <bucket>',
+    '            Delete stash bucket "bucket"',
+    '',
+    '        stash get <bucket>',
+    '            Retrieve contents of stash bucket "bucket"',
+    '',
+    '        stash list',
+    '            Show list of all stash buckets',
+    '',
     '        stash put <bucket> <contents> [<metadata>]',
-    '                           save contents into stash bucket "bucket"\n',
-    '    Global Options:',
-    '        -d	print AMQP debug messages'
+    '            Save contents into stash bucket "bucket"',
+    '',
+    '        status <routekey>',
+    '            Retrieve details about a remote service',
+    '',
+    '        summary',
+    '            Summarize all service status',
+    '',
+    '    ARGUMENTS',
+    '',
+    '        The above commands take one or more of these arguments:',
+    '',
+    '        <bucket>                 stash bucket identifier',
+    '',
+    '        <contents>, <metadata>   desired stash bucket contents, metadata',
+    '',
+    '        <msg>                    message to insert into remote log',
+    '',
+    '        <routekey>               routing key for exactly one service',
+    '',
+    '    Commands that infer routing keys (like "stash" and "summary") ',
+    '    respect the value of CA_AMQP_PREFIX in the environment.  Production ',
+    '    deployments generally leave this value unset, but dev environments ',
+    '    frequently use this to maintain separate CA service deployments.',
+    '',
+    '    OPTIONS',
+    '',
+    '        -d                       dump sent/received AMQP traffic',
+    '                                 (deprecated; use amqpsnoop)'
 ].join('\n');
 
 function printf()
@@ -61,7 +101,7 @@ function main()
 		loglevel = mod_log.caLog.INFO;
 	}
 
-	if (cc_argv.length - cc_optind < 2)
+	if (cc_argv.length - cc_optind < 1)
 		usage();
 
 	sysinfo = mod_ca.caSysinfo('cactl', '0.1');
@@ -82,7 +122,6 @@ function main()
 	cc_cap = new mod_cap.capAmqpCap(capconf);
 	cc_cap.on('msg-ack-abort', ccAckAbort);
 	cc_cap.on('msg-ack-ping', ccAckPing);
-	cc_cap.on('msg-ack-status', ccAckStatus);
 	cc_cap.on('msg-ack-data_get', ccAckDataGet);
 	cc_cap.on('msg-ack-data_put', ccAckDataPut);
 	cc_cap.on('msg-ack-data_delete', ccAckDataDel);
@@ -118,64 +157,59 @@ function ccTimeout()
 
 function ccRunCmd()
 {
-	var destkey, msg;
-
-	destkey = cc_argv[cc_optind++];
 	cc_cmd = cc_argv[cc_optind++];
 
-	if (cc_argv.length > cc_optind &&
-	    cc_argv[cc_optind] == '-v') {
-		cc_verbose = true;
-		cc_optind++;
-	} else {
-		cc_verbose = false;
-	}
+	cc_verbose = false;
+	cc_argv.forEach(function (arg) {
+		if (arg == '-v')
+			cc_verbose = true;
+	});
 
 	if (!(cc_cmd in cc_cmdswitch))
 		usage('unrecognized command: ' + cc_cmd);
 
-	msg = cc_cmdswitch[cc_cmd](cc_cmd);
 	cc_start = new Date();
-	cc_cap.send(destkey, msg);
-
-	if (msg.ca_type == 'cmd')
-		cc_toid = setTimeout(ccTimeout, cc_timeout_msec);
-	else
-		shutdown();
+	cc_cmdswitch[cc_cmd](cc_cmd);
 }
 
 function ccRunCmdCmd(cmd)
 {
-	var msg = {};
+	var destkey, msg;
 
+	if (cc_argv.length <= cc_optind)
+		usage('missing routing key');
+
+	destkey = cc_argv[cc_optind++];
+
+	msg = {};
 	msg.ca_type = 'cmd';
 	msg.ca_subtype = cmd;
 	msg.ca_id = 1;
-
-	return (msg);
+	cc_cap.send(destkey, msg);
+	cc_toid = setTimeout(ccTimeout, cc_timeout_msec);
 }
 
-cc_cmdswitch['abort'] = ccRunCmdCmd;
-cc_cmdswitch['ping'] = ccRunCmdCmd;
-cc_cmdswitch['status'] = ccRunCmdCmd;
-
-function ccRunLogCmd()
+function ccRunCmdLog()
 {
-	var msg = {};
+	var destkey, msg;
+
+	if (cc_argv.length <= cc_optind)
+		usage('missing routing key');
+
+	destkey = cc_argv[cc_optind++];
 
 	if (cc_argv.length <= cc_optind)
 		usage('missing log message');
 
+	msg = {};
 	msg.ca_type = 'notify';
 	msg.ca_subtype = 'log';
 	msg.l_message = cc_argv[cc_optind++];
-
-	return (msg);
+	cc_cap.send(destkey, msg);
+	shutdown();
 }
 
-cc_cmdswitch['log'] = ccRunLogCmd;
-
-function ccRunStashCmd()
+function ccRunCmdStash()
 {
 	var msg, subcmd, bucket;
 
@@ -221,7 +255,9 @@ function ccRunStashCmd()
 
 	if (subcmd != 'put') {
 		msg.p_requests = [ { bucket: bucket } ];
-		return (msg);
+		cc_cap.send(mod_cap.ca_amqp_key_stash, msg);
+		cc_toid = setTimeout(ccTimeout, cc_timeout_msec);
+		return;
 	}
 
 	if (cc_argv.length <= cc_optind)
@@ -234,10 +270,9 @@ function ccRunStashCmd()
 	        JSON.parse(cc_argv[cc_optind++]) : {}
 	} ];
 
-	return (msg);
+	cc_cap.send(mod_cap.ca_amqp_key_stash, msg);
+	cc_toid = setTimeout(ccTimeout, cc_timeout_msec);
 }
-
-cc_cmdswitch['stash'] = ccRunStashCmd;
 
 function ccCheckMsg(msg, hidelatency)
 {
@@ -252,6 +287,7 @@ function ccCheckMsg(msg, hidelatency)
 
 	if (!hidelatency)
 		printf('%-12s %d ms\n', 'Latency:', millis);
+
 	clearTimeout(cc_toid);
 }
 
@@ -277,97 +313,6 @@ function ccAckPing(msg)
 	    msg.ca_agent_version);
 	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
 	    msg.ca_os_release, msg.ca_os_revision);
-	shutdown();
-}
-
-function ccAckStatus(msg)
-{
-	var elts, ii;
-	var metric, decomp, metadata;
-
-	ccCheckMsg(msg);
-	printf('%-12s %s\n', 'Hostname:', msg.ca_hostname);
-	printf('%-12s %s\n', 'Route key:', msg.ca_source);
-	printf('%-12s %s/%s\n', 'Agent:', msg.ca_agent_name,
-	    msg.ca_agent_version);
-	printf('%-12s %s %s %s\n', 'OS:', msg.ca_os_name,
-	    msg.ca_os_release, msg.ca_os_revision);
-	printf('%-12s %s\n', 'Component:', msg.s_component);
-
-	switch (msg.s_component) {
-	case 'config':
-		elts = msg.s_aggregators;
-		printf('%-28s    %-7s\n', 'AGGREGATORS', 'ACTIVE');
-		for (ii = 0; ii < elts.length; ii++)
-			printf('  %3d.  %-20s    %6d\n', ii + 1,
-			    elts[ii].sia_hostname, elts[ii].sia_ninsts);
-
-		elts = msg.s_instrumenters;
-		printf('%-28s    %-7s\n', 'INSTRUMENTERS', 'ACTIVE');
-		for (ii = 0; ii < elts.length; ii++)
-			printf('  %3d.  %-20s    %6d\n', ii + 1,
-			    elts[ii].sii_hostname, elts[ii].sii_ninsts);
-		break;
-
-	case 'instrumenter':
-		elts = msg.s_instrumentations;
-		if (elts.length > 0) {
-			printf('\nActive Instrumentations:\n');
-			printf('    %-15s  %-20s  %-5s  %s\n', 'INSTN',
-			    'METRIC', 'PRED?', 'DECOMP');
-		}
-
-		for (ii = 0; ii < elts.length; ii++) {
-			metric = mod_ca.caSprintf('%s.%s',
-			    elts[ii].s_module, elts[ii].s_stat);
-			decomp = elts[ii].s_decomposition.join(', ');
-			if (!decomp)
-				decomp = 'None';
-			printf('    %-15s  %-20s  %-5s  %s\n',
-			    elts[ii].s_inst_id, metric,
-			    elts[ii].s_predicate.length > 0 ?  'Yes' : 'No',
-			    decomp);
-		}
-
-		printf('\nAvailable metrics:\n');
-		metadata = new mod_metric.caMetricMetadata();
-		metadata.addFromHost(msg.s_metadata, 'remote host');
-		metadata.report(process.stdout, true);
-		break;
-
-	case 'aggregator':
-		elts = msg.s_instrumentations;
-		if (elts.length > 0) {
-			printf('Active instrumentations:   (%d total)\n',
-			    elts.length);
-			printf('    %-6s  %-8s  %-27s  %-27s\n', 'INSTID',
-			    'NSOURCES', 'SINCE', 'LAST');
-		}
-
-		for (ii = 0; ii < elts.length; ii++) {
-			printf('    %6s  %8d  %27s  %27s\n',
-			    elts[ii].s_inst_id, elts[ii].s_nsources,
-			    mod_ca.caFormatDate(new Date(
-			    Date.parse(elts[ii].s_since))),
-			    mod_ca.caFormatDate(
-			    new Date(elts[ii].s_last * 1000)));
-		}
-
-		break;
-
-	case 'stash':
-		break;
-
-	default:
-		printf('unknown component type\n');
-		break;
-	}
-
-	if (msg.s_status && cc_verbose) {
-		printf('additional unstructured status information:\n');
-		printf('%j\n', msg.s_status);
-	}
-
 	shutdown();
 }
 
@@ -462,5 +407,362 @@ function ccAckDataGet(msg)
 
 	shutdown();
 }
+
+/*
+ * The rest of this file deals with the general commands that fetch and process
+ * service status messages.  For each of these commands, the first step is to
+ * invoke ccFetchStatus to retrieve the status of everything in the system, then
+ * we invoke ccSumSummarize() to print the results.
+ */
+function ccRunCmdStatus()
+{
+	var destkey;
+
+	if (cc_argv.length <= cc_optind)
+		usage('missing routing key');
+
+	destkey = cc_argv[cc_optind++];
+	cc_verbose = true;
+	ccFetchStatus([ destkey ], false, ccSumSummarize);
+}
+
+function ccRunCmdSummarize()
+{
+	ccFetchStatus([ mod_cap.ca_amqp_key_all ], true, ccSumSummarize);
+}
+
+/*
+ * Send a status request to each of the specified routing keys and invoke
+ * "callback" when all of the requests have completed.  In general, it's hard to
+ * know when we've actually received all the responses we're going to get
+ * because we don't know how many services will match a given routing key.  We
+ * provide two modes: if "wait" is false, we invoke "callback" as soon as we
+ * receive the first response.  If "wait" is true, we invoke "callback" only
+ * after we've received a response from a configuration service, a stash
+ * service, *and* all of the services that the config service knows about.  In
+ * both cases, we may return with partial results after a timeout has elapsed.
+ */
+function ccFetchStatus(routekeys, wait, callback)
+{
+	var svcs, start, timed_out, checkdone, sendmsg, pending;
+	var havestash = false;
+
+	start = new Date().getTime();
+	timed_out = false;
+	svcs = {};
+
+	cc_cap.on('msg-ack-status', function (msg) {
+		var rkey = msg.ca_source;
+		var key;
+
+		if (timed_out) {
+			printf('warning: ignoring status from %s after ' +
+			    'timeout\n', rkey);
+			return;
+		}
+
+		if (rkey in svcs) {
+			printf('warning: ignoring dup status from %s\n', rkey);
+			return;
+		}
+
+		svcs[rkey] = {
+		    status: msg,
+		    latency: new Date().getTime() - start
+		};
+
+		if (msg.s_component == 'stash')
+			havestash = true;
+
+		if (msg.s_component != 'config') {
+			if (pending !== undefined)
+				delete (pending[rkey]);
+
+			checkdone();
+			return;
+		}
+
+		pending = {};
+
+		for (key in msg.s_status.cfg_instrumenters) {
+			rkey = msg.s_status.cfg_instrumenters[key].routekey;
+			if (rkey in svcs)
+				continue;
+			pending[rkey] = true;
+		}
+
+		for (key in msg.s_status.cfg_aggregators) {
+			rkey = msg.s_status.cfg_aggregators[key].routekey;
+			if (rkey in svcs)
+				continue;
+			pending[rkey] = true;
+		}
+
+		checkdone();
+		return;
+	});
+
+	checkdone = function () {
+		if (wait && pending === undefined) {
+			if (timed_out)
+				return (callback(new caError(ECA_TIMEDOUT,
+				    null, 'timed out waiting for configsvc'),
+				    svcs));
+
+			return (undefined);
+		}
+
+		if (!wait || (caIsEmpty(pending) && havestash)) {
+			clearTimeout(cc_toid);
+			timed_out = true;
+			return (callback(null, svcs));
+		}
+
+		if (timed_out)
+			return (callback(new caError(ECA_TIMEDOUT,
+			    null, 'timed out waiting for known services: %s',
+			    Object.keys(pending).join(', ')),
+			    svcs));
+
+		return (undefined);
+	};
+
+	cc_toid = setTimeout(function () {
+		mod_assert.ok(!timed_out);
+		timed_out = true;
+		checkdone();
+	}, cc_timeout_msec);
+
+	sendmsg = {};
+	sendmsg.ca_type = 'cmd';
+	sendmsg.ca_subtype = 'status';
+	sendmsg.ca_id = 1;
+
+	routekeys.forEach(function (key) { cc_cap.send(key, sendmsg); });
+}
+
+/*
+ * Given an object mapping routing key -> (status, latency) tuple (as provided
+ * by ccFetchStatus), inspect each entry's component type and return an object
+ * mapping each of the four main CA component types (aggregator, config,
+ * instrumenter, stash) to an array of the routing keys having that type.
+ */
+function ccExtractComponents(svcs)
+{
+	var types, host, msg, type;
+
+	types = {
+	    'aggregator': [],
+	    'config': [],
+	    'instrumenter': [],
+	    'stash': []
+	};
+
+	for (host in svcs) {
+		msg = svcs[host];
+		type = msg.status.s_component;
+		mod_assert.ok(type in types,
+		    caSprintf('%s not in %j', type, types));
+		types[type].push(host);
+	}
+
+	for (type in types)
+		types[type].sort();
+
+	return (types);
+}
+
+/*
+ * Print a one-line summary of a CA service.
+ */
+function ccSumSvcSummary(svcs, rkey)
+{
+	var svc, msg;
+
+	if (!rkey) {
+		printf('%-12s  %-40s  %-6s  %s\n', 'SERVICE', 'ROUTEKEY',
+		    'PING', 'UPTIME');
+		return;
+	}
+
+	svc = svcs[rkey];
+	msg = svc.status;
+	printf('%-12s  %-40s  %4dms  %s\n',
+	    msg.s_component.toUpperCase(), msg.ca_source, svc.latency,
+	    msg.s_status && msg.s_status.uptime ?
+	    mod_ca.caFormatDuration(msg.s_status.uptime) : 'unknown');
+}
+
+/*
+ * Print a summary of an aggregator's state.
+ */
+function ccSumSvcAggr(svcs, verbose, rkey)
+{
+	var msg, fqid, instn;
+
+	if (!rkey) {
+		printf('    %-49s  %-7s  %8s\n', 'ROUTEKEY', 'PORT',
+		    'R#INSTNS');
+		return;
+	}
+
+	msg = svcs[rkey].status;
+	printf('    %-49s  %7d  %8d\n', msg.ca_source,
+	    msg.s_status.agg_http_port, msg.s_status.agg_ninsts);
+
+	if (!verbose)
+		return;
+
+	if (caIsEmpty(msg.s_status.agg_insts))
+		return;
+
+	printf('        %-45s  %-6s  %-3s  %-5s  %-3s\n',
+	    'INSTNID', 'RETAIN', 'PST', 'GRAN', 'DIM');
+	for (fqid in msg.s_status.agg_insts) {
+		instn = msg.s_status.agg_insts[fqid];
+		printf('        %-45s  %5ds  %3s  %4ds  %3d\n',
+		    fqid, instn['inst']['retention-time'],
+		    instn['inst']['persist-data'] ? 'Y' : 'N',
+		    instn['inst']['granularity'],
+		    instn['inst']['value-dimension']);
+	}
+}
+
+/*
+ * Print a summary of an instrumenter's state.
+ */
+function ccSumSvcInstr(svcs, verbose, rkey)
+{
+	var msg, ii, metadata;
+
+	msg = svcs[rkey].status;
+	printf('    %-49s  %-7s  %8s\n', 'ROUTEKEY', 'METRICS', 'R#INSTNS');
+	printf('    %-49s  %7d  %8d\n', msg.ca_source,
+	    msg.s_metadata['metrics'].length,
+	    msg.s_status.instrumentations.length);
+
+	if (!verbose)
+		return;
+
+	for (ii = 0; ii < msg.s_status.instrumentations.length; ii++)
+		printf('        %-45s\n',
+		    msg.s_status.instrumentations[ii].s_inst_id);
+
+	if (cc_cmd == 'status') {
+		printf('\nMETRICS\n');
+		metadata = new mod_metric.caMetricMetadata();
+		metadata.addFromHost(msg.s_metadata, 'remote host');
+		metadata.report(process.stdout, true);
+	}
+}
+
+/*
+ * Print a summary of the configsvc's instrumentations.
+ */
+function ccSumCfgInstns(svcs, verbose, rkey)
+{
+	var instns, entries, instn, arity, idx, ii;
+
+	printf('\nINSTRUMENTATIONS FOR %s\n', rkey);
+	printf('    %-45s  %-20s  %-10s\n', 'INSTNID',
+	    'MOD.STAT', 'DIM/ARITY');
+
+	instns = svcs[rkey].status.s_status.cfg_insts;
+	entries = Object.keys(instns).sort();
+	for (ii = 0; ii < entries.length; ii++) {
+		instn = instns[entries[ii]];
+
+		arity = instn['value-arity'];
+		if ((idx = arity.indexOf('-decomposition')) != -1)
+			arity = arity.substring(0, idx);
+
+		printf('    %-45s  %-20s  %d/%s\n', entries[ii],
+		    instn['module'] + '.' + instn['stat'],
+		    instn['value-dimension'], arity);
+
+		if (!verbose)
+			continue;
+
+		printf('            %-11s %s\n', 'aggregator:',
+		    instn['aggregator']);
+
+		if (!caIsEmpty(instn['predicate']))
+			printf('            %-11s %s\n', 'predicate:',
+			    mod_capred.caPredPrint(instn['predicate']));
+
+		if (instn['decomposition'].length !== 0)
+			printf('            %-11s %j\n', 'decomps:',
+			    instn['decomposition']);
+	}
+}
+
+function ccSumSummarize(err, svcs)
+{
+	var bytype, msg;
+
+	if (err) {
+		if (err.code() != ECA_TIMEDOUT)
+			die(err.toString());
+
+		printf('%s\n', err);
+	}
+
+	bytype = ccExtractComponents(svcs);
+	if (bytype['config'].length > 1)
+		printf('warning: expected 1 config service, but found %d\n',
+		    bytype['config'].length);
+
+	if (bytype['stash'].length > 1)
+		printf('warning: expected 1 stash, but found %d\n',
+		    bytype['stash'].length);
+
+	ccSumSvcSummary(svcs);
+	bytype['config'].forEach(ccSumSvcSummary.bind(null, svcs));
+	bytype['stash'].forEach(ccSumSvcSummary.bind(null, svcs));
+	bytype['aggregator'].forEach(ccSumSvcSummary.bind(null, svcs));
+	bytype['instrumenter'].forEach(ccSumSvcSummary.bind(null, svcs));
+
+	bytype['config'].forEach(function (host) {
+		msg = svcs[host].status;
+
+		printf('\nCONFIG %s\n', host);
+		printf('    %-9s %dms\n', 'response:',
+		    msg.s_status['request_latency']);
+		printf('    %-9s %d\n', '# aggrs:',
+		    Object.keys(msg.s_status.cfg_aggregators).length);
+		printf('    %-9s %d\n', '# instrs:',
+		    Object.keys(msg.s_status.cfg_instrumenters).length);
+		printf('    %-9s %d\n', '# instns:',
+		    Object.keys(msg.s_status.cfg_insts).length);
+		printf('    %-9s %d\n', '# scopes:',
+		    Object.keys(msg.s_status['instn-scopes']).length);
+	});
+
+	if (bytype['aggregator'].length > 0) {
+		if (bytype['aggregator'].length > 1)
+			printf('\nAGGREGATORS\n');
+		ccSumSvcAggr(svcs, false);
+		bytype['aggregator'].forEach(
+		    ccSumSvcAggr.bind(null, svcs, cc_verbose));
+	}
+
+	if (bytype['instrumenter'].length > 0) {
+		if (bytype['instrumenter'].length > 1)
+			printf('\nINSTRUMENTERS\n');
+		bytype['instrumenter'].forEach(ccSumSvcInstr.bind(null, svcs,
+		    cc_verbose));
+	}
+
+	bytype['config'].forEach(ccSumCfgInstns.bind(null, svcs, cc_verbose));
+
+	shutdown();
+}
+
+cc_cmdswitch['abort'] = ccRunCmdCmd;
+cc_cmdswitch['ping'] = ccRunCmdCmd;
+cc_cmdswitch['status'] = ccRunCmdStatus;
+cc_cmdswitch['log'] = ccRunCmdLog;
+cc_cmdswitch['stash'] = ccRunCmdStash;
+cc_cmdswitch['summary'] = ccRunCmdSummarize;
 
 main();

@@ -2103,6 +2103,39 @@ It's primarily useful when that metric has already demonstrated that
 instrumenters are taking a long time to gather data and you now need to
 understand which backends are responsible for that time.
 
+### CA: instrumenter enable operations
+
+||**Name**|| ca.instr_enables ||
+||**Raw metric**|| total number of instrumenter enable operations||
+||**Decompositions**|| hostname, cabackend, cainstnid, cametric, latency (heatmap)||
+||**Visibility**|| operators only||
+
+This metric counts the number of times an instrumenter enables a Cloud
+Analytics instrumentation.  Such events are usually triggered when a user
+creates an instrumentation for the first time, but they can also occur if an
+instrumenter restarts, if a new compute node is deployed, or if a customer
+provisions a new machine.  Using the latency heatmap, operators can monitor the
+time required to enable an instrumentation on each instrumenter.
+
+This metric is intended for use in supporting Cloud Analytics.  It is not
+useful for understanding general system performance.
+
+### CA: instrumenter disable operations
+
+||**Name**|| ca.instr_disables ||
+||**Raw metric**|| total number of instrumenter disable operations||
+||**Decompositions**|| hostname, cabackend, cainstnid, cametric, latency (heatmap)||
+||**Visibility**|| operators only||
+
+This metric counts the number of times an instrumenter disables an
+instrumentation.  Such events are usually triggered when a user deletes an
+instrumentation.  Using the latency heatmap, operators can monitor the time
+required to disable an instrumentation on each instrumenter.
+
+This metric is intended for use in supporting Cloud Analytics.  It is not
+useful for understanding general system performance.
+
+
 # Fields
 
 Fields are used for decomposition and creating predicates.  To see which fields are

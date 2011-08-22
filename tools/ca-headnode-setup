@@ -18,6 +18,7 @@ sh_dataset_name=smartos
 sh_head_hostname=headnode
 
 sh_dataset_version=
+sh_cust=
 sh_custuri=
 sh_conturi=
 sh_zonename=
@@ -48,7 +49,8 @@ function sh_extract_header
 
 function sh_loadcust
 {
-	sh_custuri=/customers/$(sh_curl $sh_capi/customers | json 0.uuid)
+	sh_cust=$(sh_curl $sh_capi/customers | json 0.uuid)
+	sh_custuri=/customers/$sh_cust
 }
 
 function sh_load_dataset
@@ -80,12 +82,13 @@ function sh_enable_provision
 
 function sh_provision
 {
-        local custuri=$1 dataset=$2
+        local cust=$1 dataset=$2
 	local out turi
 
         out=$($sh_curlcmd -s -i -X POST -d dataset=$dataset \
 	    -d package="regular_256" -d networks="admin" \
-	    --url "$sh_urlbase$custuri/zones" 2>&1)
+	    -d customer_uuid=$cust \
+	    --url "$sh_urlbase/zones" 2>&1)
 
         [[ $? -eq 0 ]] || fail "failed to create zone: $out"
 	turi=$(echo "$out" | sh_extract_header X-Joyent-Transition-URI)
@@ -147,7 +150,7 @@ sh_enable_provision || fail "failed"
 echo "done."
 
 echo "Provisioning $sh_dataset_name-$sh_dataset_version zone ... \c"
-sh_provision $sh_custuri "$sh_dataset_name-$sh_dataset_version" || fail "failed"
+sh_provision $sh_cust "$sh_dataset_name-$sh_dataset_version" || fail "failed"
 echo "$sh_zonename ($sh_zoneip)"
 
 #

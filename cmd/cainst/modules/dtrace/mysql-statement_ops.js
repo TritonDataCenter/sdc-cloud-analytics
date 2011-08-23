@@ -72,9 +72,6 @@ var desc = {
 	    {
 		probes: returnprobes,
 		clean: {
-			statement: '$0',
-			rowsmatched: '$0',
-			rowschanged: '$0',
 			latency: '$0',
 			cputime: '$0'
 		}

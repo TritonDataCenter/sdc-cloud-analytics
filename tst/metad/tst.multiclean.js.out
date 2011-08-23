@@ -1,0 +1,70 @@
+syscall:::return
+{
+	@ = count();
+}
+
+----
+
+syscall:::entry
+{
+	self->celes0 = vtimestamp;
+}
+
+syscall:::return
+/((((((self->celes0) != NULL)))))/{
+	@ = quantize((timestamp - self->celes0));
+}
+
+syscall:::return
+{
+	(self->celes0) = 0;
+}
+
+----
+
+syscall:::entry
+{
+	self->terra0 = timestamp;
+}
+
+syscall:::return
+/((((((self->terra0) != NULL)))))/{
+	@ = quantize((timestamp - self->terra0));
+}
+
+syscall:::return
+{
+	(self->terra0) = 0;
+}
+
+syscall:::return
+{
+	(self->terra0) = 0;
+}
+
+----
+
+syscall:::entry
+{
+	self->terra0 = timestamp;
+	self->celes0 = vtimestamp;
+}
+
+syscall:::return
+/((((((self->terra0) != NULL)))) && (((((self->celes0) != NULL)))))/{
+	@ = quantize((timestamp - self->terra0));
+}
+
+syscall:::return
+{
+	(self->terra0) = 0;
+}
+
+syscall:::return
+{
+	(self->terra0) = 0;
+	(self->celes0) = 0;
+}
+
+----
+

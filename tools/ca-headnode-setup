@@ -9,20 +9,6 @@ shopt -s xpg_echo
 
 sh_arg0=$(basename $0)
 sh_tmpbase=/var/tmp/$sh_arg0.$$
-sh_urlbase="http://10.99.99.8:8080"
-sh_capi="http://10.99.99.11:8080"
-sh_user="$1"
-sh_curlcmd="curl -u admin:tot@ls3crit"
-sh_skip_setup=false
-sh_dataset_name=smartos
-sh_head_hostname=headnode
-
-sh_dataset_version=
-sh_cust=
-sh_custuri=
-sh_conturi=
-sh_zonename=
-sh_zoneip=
 
 function fail
 {
@@ -32,9 +18,37 @@ function fail
 	exit 1
 }
 
-function sh_curl
+[[ -f /lib/sdc/config.sh ]] || fail "Missing /lib/sdc/config.sh"
+
+. /lib/sdc/config.sh
+load_sdc_config
+
+sh_urlbase="${CONFIG_mapi_client_url}"
+sh_capi="${CONFIG_capi_client_url}"
+sh_user="$1"
+sh_mapicurlcmd="curl -u ${CONFIG_mapi_http_admin_user}"
+sh_mapicurlcmd="$sh_mapicurlcmd:${CONFIG_mapi_http_admin_pw}"
+sh_capicurlcmd="curl -u ${CONFIG_capi_http_admin_user}"
+sh_capicurlcmd="$sh_capicurlcmd:${CONFIG_capi_http_admin_pw}"
+sh_skip_setup=false
+sh_dataset_name=smartos
+sh_head_hostname=$(hostname)
+
+sh_dataset_version=
+sh_cust=
+sh_custuri=
+sh_conturi=
+sh_zonename=
+sh_zoneip=
+
+function sh_capicurl
 {
-	$sh_curlcmd -H 'Accept: application/json' -s --url $1
+	$sh_capicurlcmd -H 'Accept: application/json' -s --url $1
+}
+
+function sh_mapicurl
+{
+	$sh_mapicurlcmd -H 'Accept: application/json' -s --url $1
 }
 
 function sh_extract
@@ -49,13 +63,13 @@ function sh_extract_header
 
 function sh_loadcust
 {
-	sh_cust=$(sh_curl $sh_capi/customers | json 0.uuid)
+	sh_cust=$(sh_capicurl $sh_capi/customers | json 0.uuid)
 	sh_custuri=/customers/$sh_cust
 }
 
 function sh_load_dataset
 {
-	sh_dataset_version=$($sh_curlcmd -s \
+	sh_dataset_version=$($sh_mapicurlcmd -s \
 	    --url $sh_urlbase/search/datasets?name=$sh_dataset_name | \
 	    json 0.version)
 }
@@ -63,7 +77,7 @@ function sh_load_dataset
 function sh_enable_provision
 {
 	local servers length ii entry
-	servers=$($sh_curlcmd -s --url $sh_urlbase/servers)
+	servers=$($sh_mapicurlcmd -s --url $sh_urlbase/servers)
 	[[ $? -eq 0 ]] || fail "failed to list servers"
 	length=$(echo $servers | json length)
 	entry=""
@@ -75,7 +89,7 @@ function sh_enable_provision
 		fi	
 	}
 	[[ -z $entry ]] && fail "couldn't find $sh_head_hostname entry"
-	$sh_curlcmd -s -X PUT -F "api_provisionable=true" \
+	$sh_mapicurlcmd -s -X PUT -F "api_provisionable=true" \
 	    --url $sh_urlbase/admin$entry >/dev/null
 	[[ $? -eq 0 ]] || fail "failed to make $sh_head_hostname provisionable"
 }
@@ -85,7 +99,7 @@ function sh_provision
         local cust=$1 dataset=$2
 	local out turi
 
-        out=$($sh_curlcmd -s -i -X POST -d dataset=$dataset \
+        out=$($sh_mapicurlcmd -s -i -X POST -d dataset=$dataset \
 	    -d package="regular_256" -d networks="admin" \
 	    -d customer_uuid=$cust \
 	    --url "$sh_urlbase/zones" 2>&1)
@@ -96,13 +110,13 @@ function sh_provision
 
 	while [[ -z $sh_conturi ]]; do
 		sleep 1
-		out=$($sh_curlcmd -s -i --url $sh_urlbase$turi 2>&1)
+		out=$($sh_mapicurlcmd -s -i --url $sh_urlbase$turi 2>&1)
         	[[ $? -eq 0 ]] || fail "failed to get transition: $out"
 		sh_conturi=$(echo "$out" | sh_extract_header Location)
 		echo ".\c"
 	done
 
-	out=$(sh_curl $sh_urlbase$sh_conturi)
+	out=$(sh_mapicurl $sh_urlbase$sh_conturi)
 	sh_zonename=$(echo "$out" | json name)
 	[[ -n $sh_zonename ]] || fail "no zone name: $out"
 	sh_zoneip=$(echo "$out" | json ips.0.address)
@@ -114,7 +128,7 @@ function sh_upload_keys
 	local nkeys
 
 	echo "Checking for existing authorized keys ... \c"
-	nkeys=$($sh_curlcmd -H "Accept: application/json" -s \
+	nkeys=$($sh_capicurlcmd -H "Accept: application/json" -s \
 	    --url $sh_capi$sh_custuri/keys | json length) || \
 	    fail "failed to list existing keys"
 	[[ $nkeys -gt 0 ]] && echo "keys present already" && return
@@ -124,7 +138,7 @@ function sh_upload_keys
 	while read key; do
 		knum=$(( knum + 1 ))
 		echo "Uploading key $knum ... \c"
-		$sh_curlcmd -f -s -i --url $sh_capi$sh_custuri/keys \
+		$sh_capicurlcmd -f -s -i --url $sh_capi$sh_custuri/keys \
 		    -F "name=key$knum" -F "key=$key" > /dev/null || \
 		    fail "failed"
 		echo "done."

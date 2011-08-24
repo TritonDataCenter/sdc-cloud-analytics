@@ -9,6 +9,13 @@ CA_VERSION	:= $(shell git symbolic-ref HEAD | \
 	nawk -F / '{print $$3}')-$(shell git describe --dirty)
 SRC		:= $(shell pwd)
 NODEENV		:= $(shell tools/npath)
+# As per mountain-gorilla "Package Versioning".
+ifeq ($(TIMESTAMP),)
+	TIMESTAMP=$(shell TZ=UTC date "+%Y%m%dT%H%M%SZ")
+endif
+CA_PUBLISH_VERSION := $(shell git symbolic-ref HEAD | \
+	awk -F / '{print $$3}')-$(TIMESTAMP)-$(shell \
+	git describe --all --long --dirty | cut -d- -f3,4)
 
 #
 # Directories
@@ -212,6 +219,21 @@ deps/node/build/default/node: | deps/node/.git deps/node-install
 
 deps/node-install:
 	mkdir -p deps/node-install
+
+#
+# The "publish" target copies the build bits to the given BITS_DIR.
+# This is typically called by an external driver (e.g. CI).
+#
+publish: $(RELEASE_TARBALL)
+	@if [[ -z "$(BITS_DIR)" ]]; then \
+		echo "error: 'BITS_DIR' must be set for 'publish' target"; \
+		exit 1; \
+	fi
+	mkdir -p $(BITS_DIR)/assets
+	cp $(RELEASE_TARBALL) $(BITS_DIR)/assets/ca-pkg-$(CA_PUBLISH_VERSION).tar.bz2
+	mkdir -p $(BITS_DIR)/cloud_analytics
+	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/cloud_analytics/cabase-$(CA_PUBLISH_VERSION).tar.gz
+	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/cloud_analytics/cainstsvc-$(CA_PUBLISH_VERSION).tar.gz
 
 #
 # The "release" target creates a ca-pkg.tar.bz2 suitable for release to the

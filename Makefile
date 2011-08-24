@@ -14,7 +14,7 @@ ifeq ($(TIMESTAMP),)
 	TIMESTAMP=$(shell TZ=UTC date "+%Y%m%dT%H%M%SZ")
 endif
 CA_PUBLISH_VERSION := $(shell git symbolic-ref HEAD | \
-	awk -F / '{print $$3}')-$(TIMESTAMP)-$(shell \
+	nawk -F / '{print $$3}')-$(TIMESTAMP)-$(shell \
 	git describe --all --long --dirty | cut -d- -f3,4)
 
 #

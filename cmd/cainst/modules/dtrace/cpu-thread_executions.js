@@ -12,8 +12,7 @@ var desc = {
 	'pexecname', 'ppsargs', 'leavereason', 'runtime', 'subsecond' ],
     metad: {
 	locals: [
-	    { state: 'int' },
-	    { stype: 'int' }
+	    { state: 'int' }
 	],
 	probedesc: [ {
 	    probes: [ 'sched:::on-cpu' ],
@@ -31,10 +30,7 @@ var desc = {
 	}, {
 	    probes: [ 'sched:::off-cpu' ],
 	    local: [
-	        { state: 'curlwpsinfo->pr_state' },
-		{ stype: '(this->ops = curthread->t_sobj_ops) != NULL ? ' +
-		    'this->ops->sobj_type : 0' }
-
+	        { state: 'curlwpsinfo->pr_state' }
 	    ],
 	    transforms: {
 		runtime: 'timestamp - $0',
@@ -51,20 +47,8 @@ var desc = {
 		    'this->state == SONPROC ? "on-cpu" : ' +
 		    'this->state == SWAIT ? "waiting to be ' +
 		    'runnable" :' +
-		    'this->stype == SOBJ_NONE ? "sleeping" : ' +
-		    'this->stype == SOBJ_MUTEX ? "kernel mutex" : ' +
-		    'this->stype == SOBJ_RWLOCK ? "kernel ' +
-		    'read/write lock" : ' +
-		    'this->stype == SOBJ_CV ? "kernel condition ' +
-		    'variable" : ' +
-		    'this->stype == SOBJ_SEMA ? "kernel ' +
-		    'semaphore" : ' +
-		    'this->stype == SOBJ_USER ? "user synch ' +
-		    'object" : ' +
-		    'this->stype == SOBJ_USER_PI ? ' +
-		    '"user sync object with priority inheritence" : ' +
-		    'this->stype == SOBJ_SHUTTLE ? "shuttle synchronization ' +
-		    'object" : "unknown")',
+		    'this->state == SSLEEP ? "sleeping" : ' +
+		    '"unknown")',
 		psargs: 'curpsinfo->pr_psargs',
 		ppsargs: 'curthread->t_procp->p_parent->p_user.u_psargs',
 		pexecname: 'curthread->t_procp->p_parent->' +

@@ -89,7 +89,7 @@ function sh_enable_provision
 		fi	
 	}
 	[[ -z $entry ]] && fail "couldn't find $sh_head_hostname entry"
-	$sh_mapicurlcmd -s -X PUT -F "api_provisionable=true" \
+	$sh_mapicurlcmd -s -X PUT -F "reserved=false" \
 	    --url $sh_urlbase/admin$entry >/dev/null
 	[[ $? -eq 0 ]] || fail "failed to make $sh_head_hostname provisionable"
 }

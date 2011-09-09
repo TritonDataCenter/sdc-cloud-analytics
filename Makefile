@@ -11,11 +11,11 @@ SRC		:= $(shell pwd)
 NODEENV		:= $(shell tools/npath)
 # As per mountain-gorilla "Package Versioning".
 ifeq ($(TIMESTAMP),)
-	TIMESTAMP=$(shell TZ=UTC date "+%Y%m%dT%H%M%SZ")
+	TIMESTAMP=$(shell date -u "+%Y%m%dT%H%M%SZ")
 endif
 CA_PUBLISH_VERSION := $(shell git symbolic-ref HEAD | \
-	nawk -F / '{print $$3}')-$(TIMESTAMP)-$(shell \
-	git describe --all --long --dirty | cut -d- -f3,4)
+	nawk -F / '{print $$3}')-$(TIMESTAMP)-g$(shell \
+	git describe --all --long --dirty | nawk -F '-g' '{print $$NF}')
 
 #
 # Directories

@@ -13,9 +13,13 @@ NODEENV		:= $(shell tools/npath)
 ifeq ($(TIMESTAMP),)
 	TIMESTAMP=$(shell date -u "+%Y%m%dT%H%M%SZ")
 endif
+DIRTY_ARG=--dirty
+ifeq ($(IGNORE_DIRTY), 1)
+	DIRTY_ARG=
+endif
 CA_PUBLISH_VERSION := $(shell git symbolic-ref HEAD | \
 	nawk -F / '{print $$3}')-$(TIMESTAMP)-g$(shell \
-	git describe --all --long --dirty | nawk -F '-g' '{print $$NF}')
+	git describe --all --long $(DIRTY_ARG) | nawk -F '-g' '{print $$NF}')
 
 #
 # Directories

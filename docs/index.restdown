@@ -1844,17 +1844,32 @@ performed by application threads.
 The TCP metrics provide visibility into TCP activity and errors.
 
 
-### TCP: connections
+### TCP: accepts
 
-||**Name**|| tcp.connections||
-||**Raw metric**|| number of TCP connections opened, including both server and client connections||
-||**Decompositions**|| hostname, conntype||
-||**Visibility**|| operators only||
+||**Name**|| tcp.accepts||
+||**Raw metric**|| number of TCP connections accepted||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, rport, raddr||
+||**Visibility**|| operators and customers||
 
-This metric reports the number of TCP connections opened as both clients and
-servers.  Applications opening many connections to the same remote host might
-consider using a single persistent connection to avoid the overhead of TCP
-connection setup and teardown.
+This metric reports the number of TCP connections accepted.  For
+connection-oriented applications, this metric is useful for understanding new
+client activity.  Applications seeing many connections from the same remote
+host might consider using a single persistent connection to avoid the overhead
+of TCP connection setup and teardown.
+
+
+### TCP: connects
+
+||**Name**|| tcp.connects||
+||**Raw metric**|| number of outbound TCP connections completed||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, rport, raddr||
+||**Visibility**|| operators and customers||
+
+This metric reports the number of outbound TCP connections completed.  For
+connection-oriented applications, this metric is useful for understanding new
+client activity.  Applications seeing many connections to the same remote
+host might consider using a single persistent connection to avoid the overhead
+of TCP connection setup and teardown.
 
 
 ### TCP: errors

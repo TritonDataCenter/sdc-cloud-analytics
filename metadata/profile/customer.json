@@ -157,6 +157,11 @@
 		"stat":	 "physio_bytes",
 		"fields": [ "zonename", "optype" ]
 	}, {
+		"module": "tcp",
+		"stat": "accepts",
+		"fields": [ "zonename", "pid", "execname", "psargs", "ppid",
+		    "pexecname", "ppsargs", "rport", "raddr" ]
+	}, {
 		"module": "zfs",
 		"stat": "dataset_unused_quota",
 		"fields": [ "zdataset" ]

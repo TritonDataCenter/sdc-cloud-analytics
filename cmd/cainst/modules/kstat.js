@@ -501,23 +501,6 @@ var inskMetrics = [ {
 	}
 }, {
 	module: 'tcp',
-	stat: 'connections',
-	kstat: { module: 'tcp', class: 'mib2' },
-	extract: inskTcpConnectionsExtract,
-	fields: {
-		tcpstack: {
-			values: function (kstat) {
-				return ([ 'tcp' + kstat['instance'] ]);
-			}
-		},
-		conntype: {
-			values: function () {
-				return ([ 'active', 'passive' ]);
-			}
-		}
-	}
-}, {
-	module: 'tcp',
 	stat: 'segments',
 	kstat: { module: 'tcp', class: 'mib2' },
 	extract: inskTcpSegmentsExtract,
@@ -792,15 +775,6 @@ function inskIoExtractBytes(fields, kstat, klast)
 function inskResourceExtract()
 {
 	return (1);
-}
-
-function inskTcpConnectionsExtract(fields, kstat, kprev)
-{
-	var conntype, kstatkey;
-
-	conntype = fields['conntype'];
-	kstatkey = conntype + 'Opens';
-	return (kstat['data'][kstatkey] - kprev['data'][kstatkey]);
 }
 
 function inskTcpSegmentsExtract(fields, kstat, kprev)

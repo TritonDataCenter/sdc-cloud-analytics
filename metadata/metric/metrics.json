@@ -55,7 +55,6 @@
 	"cabackend":	{ "label": "backend module" },
 	"cainstnid":	{ "label": "instrumentation identifier" },
 	"cametric":	{ "label": "metric name" },
-	"conntype":	{ "label": "connection type" },
 	"command":	{ "label": "command" },
 	"client":	{ "label": "client hostname" },
 	"cpu":		{ "label": "CPU identifier" },
@@ -372,10 +371,22 @@
 	]
     }, {
 	"module":	"tcp",
-	"stat":		"connections",
-	"label":	"connections",
-	"unit":		"connections",
-	"fields":	[ "hostname", "tcpstack", "conntype" ]
+	"stat":		"accepts",
+	"label":	"accepts",
+	"unit":		"accepts",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "rport", "raddr"
+	]
+    }, {
+	"module":	"tcp",
+	"stat":		"connects",
+	"label":	"connects",
+	"unit":		"connects",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "rport", "raddr"
+	]
     }, {
 	"module":	"tcp",
 	"stat":		"errors",

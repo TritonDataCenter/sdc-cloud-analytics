@@ -23,7 +23,8 @@ var insd_metrics = [ 'syscall-ops', 'node-gc_ops', 'node-httpd_ops',
     'cpu-thread_executions', 'fs-logical_ops', 'mysql-query_ops',
     'mysql-connect_ops', 'mysql-filesort_ops', 'mysql-command_ops',
     'mysql-statement_ops', 'cpu-thread_samples', 'fs-rw_ops',
-    'vm-thread_samples', 'vm-irqs', 'vm-physio_ops', 'vm-physio_bytes' ];
+    'vm-thread_samples', 'vm-irqs', 'vm-physio_ops', 'vm-physio_bytes',
+    'tcp-accepts', 'tcp-connects' ];
 
 if (process.env['DTRACE_LIBPATH']) {
 	insd_dt_libpath = process.env['DTRACE_LIBPATH'].split(':');

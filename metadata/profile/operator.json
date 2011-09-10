@@ -184,8 +184,9 @@
 		"fields": [ "hostname", "zonename", "direction" ]
 	}, {
 		"module": "tcp",
-		"stat": "connections",
-		"fields": [ "hostname", "tcpstack", "conntype" ]
+		"stat": "accepts",
+		"fields": [ "hostname", "zonename", "pid", "execname",
+		    "psargs", "ppid", "pexecname", "ppsargs", "rport", "raddr" ]
 	}, {
 		"module": "tcp",
 		"stat": "errors",

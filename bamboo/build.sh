@@ -20,7 +20,7 @@ CA_PKG=ca-pkg-${BRANCH}-${DESCRIBE}*.tar.bz2
 if [[ $( echo $BRANCH | grep release) && -z $PUBLISH_LOCATION ]]; then
     releasedate=$(echo $BRANCH | cut -d '-' -f2)
     RELEASEDIR=${releasedate:0:4}-${releasedate:4:2}-${releasedate:6:2}
-    ASSETS_LOCATION=/rpool/data/coal/releases/${RELEASEDIR}/deps/
+    ASSETS_LOCATION=/rpool/data/coal/releases/${RELEASEDIR}/deps/assets
     PUBLISH_LOCATION=${ASSETS_LOCATION}/agents/${NAME}/${BRANCH}/
 fi
 

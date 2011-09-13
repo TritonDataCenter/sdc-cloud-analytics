@@ -154,6 +154,9 @@ var infTypeDists = {
 		/* Return a random size between 0 and 10 MB. */
 		return (new mod_dist.caDistrMemory(0, 10 * 1024 * 1024));
 	},
+	subsecond: function () {
+		return (new mod_dist.caDistrMemory(0, 100));
+	},
 	time: function () {
 		/*
 		 * This default "time" distribution return a random time between
@@ -255,7 +258,8 @@ function infGenFieldValue(conf, metadata, field)
 		return (infTypeDists[type]());
 
 	mod_assert.equal(metadata.fieldArity(field),
-	    mod_ca.ca_field_arity_discrete);
+	    mod_ca.ca_field_arity_discrete,
+	    'field ' + field + ' is not discrete');
 	return (new infStemGenerator(field, conf.inf_max_field_values));
 }
 

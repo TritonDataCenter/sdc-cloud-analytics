@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#
+# cainstrfleet.js: launch simulated instrumenters for the CA mock cloud
+#
+
+function fail
+{
+	echo "$*" 2>&1
+	exit 1
+}
+
+function usage
+{
+	cat >&2 <<-EOF
+	usage: $0 <ninstrs> [<start_id>]
+
+	Launches <ninstrs> instrumenters named according to the HOST environment
+	variable appended with increasing numbers starting at <start_id>.  The
+	default value of <start_id> is 0.  The instrumenter log files are
+	placed in a temporary directory printed out by $(basename $0).
+
+	For example:
+
+	\$ HOST=devel $0 5
+	logging to /var/tmp/cainstrfleet.6747
+	starting instrumenter devel0
+	starting instrumenter devel1
+	starting instrumenter devel2
+	starting instrumenter devel3
+	starting instrumenter devel4
+
+	The above invocation launches 5 instrumenters named devel0 through
+	devel5.  The log files for all instrumenters are placed in
+	/var/tmp/cainstrfleet.6747.
+
+	This tool is used to test Cloud Analytics by simulating complex
+	configurations including hundreds of compute nodes (instrumenters),
+	hundreds of values for other fields, or randomized data.  These
+	instrumenters use two backends: the 'cainstr' backend for providing
+	real data about about the instrumenters themslves, and the 'fake'
+	backend which simulates various types of fake data for every other
+	metric available.
+EOF
+	fail
+}
+
+function launch_instr
+{
+	echo "starting instrumenter $1"
+	HOST=$1 node cmd/cainstsvc.js > $cr_tmpdir/$1.out 2>&1 &
+}
+
+[[ -n $1 ]] || usage
+
+cr_tmpdir=/var/tmp/$(basename $0).$$
+cr_hostbase=$HOST
+cr_nhosts=$1
+cr_start=$2
+
+[[ -z $cr_start ]] && cr_start=0
+
+echo "logging to $cr_tmpdir"
+mkdir -p $cr_tmpdir || fail "failed to create temp dir"
+
+for (( ii = $cr_start; ii < $cr_nhosts + $cr_start; ii++ )) {
+	launch_instr $cr_hostbase$ii || fail "failed to launch instr $ii"
+}

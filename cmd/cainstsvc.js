@@ -11,14 +11,36 @@ var ii_svc;
 
 function main()
 {
-	var args;
+	var args, backends, ii;
 
 	mod_dbg.caEnablePanicOnCrash();
 
 	args = process.argv.slice(2);
+	backends = [ 'kstat', 'dtrace', 'zfs', 'cainstr' ];
+	for (ii = 0; ii < args.length; ii++) {
+		if (args[ii] == '-b') {
+			/* "-b backend1,backend2,..." form */
+			if (ii == args.length - 1)
+				backends = [];
+			else
+				backends = args[ii + 1].split(',');
+
+			args = args.slice(ii + 2);
+			break;
+		}
+
+		if (caStartsWith(args[ii], '-b')) {
+			/* "-bbackend1,backend2,..." form */
+			backends = args[ii].substr(2).split(',');
+			args = args.slice(ii + 1);
+			break;
+		}
+	}
+
+	console.log('using backends %s', backends);
 	args.unshift('./metadata');
 	ii_svc = new mod_instrsvc.caInstrService(args, process.stdout,
-	    [ 'kstat', 'dtrace', 'zfs', 'cainstr' ]);
+	    backends);
 	caDbg.set('service', ii_svc);
 
 	ii_svc.start(function (err) {

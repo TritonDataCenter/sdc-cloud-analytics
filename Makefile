@@ -96,6 +96,7 @@ SH_SCRIPTS = \
 	tools/cabranch			\
 	tools/cadeploy			\
 	tools/cadepsvcs			\
+	tools/cainstrfleet		\
 	tools/caupagent			\
 	tools/caupsvcs			\
 	tools/catest			\

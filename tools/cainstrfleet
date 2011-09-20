@@ -48,7 +48,8 @@ EOF
 function launch_instr
 {
 	echo "starting instrumenter $1"
-	HOST=$1 node cmd/cainstsvc.js > $cr_tmpdir/$1.out 2>&1 &
+	HOST=$1 node cmd/cainstsvc.js -bcainstr,fake \
+	    > $cr_tmpdir/$1.out 2>&1 &
 }
 
 [[ -n $1 ]] || usage

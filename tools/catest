@@ -161,6 +161,7 @@ function setup
 	popd >/dev/null
 	pushd $base >/dev/null
 	export $(./npath)
+	export PATH=$(pwd)/../deps/ctf2json:$PATH
 	popd >/dev/null
 	if [[ ! -f $BASH_EXEC || ! -x $BASH_EXEC ]]; then
 		fail "Missing bash executable at $BASH"

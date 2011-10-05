@@ -28,3 +28,9 @@
 [submodule "deps/restdown"]
 	path = deps/restdown
 	url = git://github.com/trentm/restdown.git
+[submodule "deps/ctf2json"]
+	path = deps/ctf2json
+	url = git://github.com/rmustacc/ctf2json
+[submodule "deps/node-ctype"]
+	path = deps/node-ctype
+	url = git://github.com/rmustacc/node-ctype

@@ -135,6 +135,7 @@ PKGFILES_cabase = \
 	$(PKGROOT)/cabase/.npmignore			\
 	$(PKGROOT)/cabase/cmd/node			\
 	$(PKGROOT)/cabase/cmd/cactl.js			\
+	$(PKGROOT)/cabase/cmd/ctf2json			\
 	$(DEMO_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(DOC_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
@@ -210,7 +211,7 @@ DOC_FILES = \
 all: tools release
 
 # XXX don't think we need codereview at all
-tools: $(WEBREV)/bin/codereview $(NODEDIR)/node $(NATIVE_DEPS)
+tools: $(WEBREV)/bin/codereview $(NODEDIR)/node $(NATIVE_DEPS) deps/ctf2json/ctf2json
 .PHONY: tools
 
 $(WEBREV)/bin/codereview:
@@ -224,6 +225,9 @@ deps/node/build/default/node: | deps/node/.git deps/node-install
 
 deps/node-install:
 	mkdir -p deps/node-install
+
+deps/ctf2json/ctf2json:
+	(cd deps/ctf2json && gmake)
 
 #
 # The "publish" target copies the build bits to the given BITS_DIR.
@@ -329,6 +333,10 @@ $(PKGROOT)/%/package.json: pkg/%-package.json FORCE
 $(PKGROOT)/%/.npmignore: pkg/npm-ignore
 	grep -v ^# $^ > $@
 
+
+$(PKGROOT)/cabase/cmd/ctf2json: deps/ctf2json/ctf2json
+	cp $^ $@
+
 .SECONDEXPANSION:
 %.node: | deps/node-$$(*F)/.git
 	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
@@ -427,6 +435,7 @@ dist-clean: clean
 	-(cd deps/node-uname && $(NODE_WAF) distclean)
 	-(cd deps/node-libGeoIP && $(NODE_WAF) distclean)
 	-(cd deps/node && $(MAKE) distclean)
+	-(cd deps/ctf2json && $(MAKE) clean)
 	-$(RMTREE) $(BUILD) deps/node-install
 
 #

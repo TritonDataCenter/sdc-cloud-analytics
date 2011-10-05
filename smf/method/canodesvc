@@ -99,6 +99,15 @@ function run_realtime
 	[[ $? != 0 ]] && echo "Failed to move process into the RT class"
 }
 
+#
+# We always want to put root/cmd in our path for things we rely upon like
+# ctf2json
+#
+function load_path
+{
+	export PATH=$ns_root/cmd:$PATH
+}
+
 ns_arg0=$(basename $0)
 ns_tmpfile=/var/tmp/$ns_arg0.$$
 ns_amqpconfig=/opt/smartdc/agents/bin/amqp-config
@@ -152,6 +161,7 @@ ns_exec=cmd/$ns_name.js
 
 load_amqp || fail "failed to load amqp config"
 load_nodepath || fail "failed to load node path"
+load_path || fail "failed to load path"
 env | sort | egrep '^(AMQP_|MAPI_|NODE_PATH)' | grep -v PASSWORD
 
 #

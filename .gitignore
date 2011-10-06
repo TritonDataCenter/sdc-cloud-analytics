@@ -12,3 +12,4 @@ webrev
 cacore.*
 docs/index.html
 docs/index.json
+.lock-wscript

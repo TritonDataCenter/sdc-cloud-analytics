@@ -148,6 +148,7 @@ PKGFILES_cabase = \
 
 DEPS_cabase = \
 	amqp		\
+	ca-native	\
 	connect		\
 	heatmap		\
 	kstat		\
@@ -196,6 +197,7 @@ PKG_DIRS := \
 
 NATIVE_DEPS = \
 	deps/node/build/default/node				\
+	deps/ca-native/build/default/ca-native.node		\
 	deps/node-kstat/build/default/kstat.node		\
 	deps/node-libdtrace/build/default/libdtrace.node	\
 	deps/node-png/build/default/png.node			\
@@ -341,6 +343,9 @@ $(PKGROOT)/cabase/cmd/ctf2json: deps/ctf2json/ctf2json
 %.node: | deps/node-$$(*F)/.git
 	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
 
+deps/ca-native/build/default/ca-native.node:
+	cd deps/ca-native && $(NODE_WAF) configure && $(NODE_WAF) build
+
 lib/ca/errno.js: /usr/include/sys/errno.h
 	$(MKERRNO) $^ > $@
 
@@ -436,6 +441,7 @@ dist-clean: clean
 	-(cd deps/node-libGeoIP && $(NODE_WAF) distclean)
 	-(cd deps/node && $(MAKE) distclean)
 	-(cd deps/ctf2json && $(MAKE) clean)
+	-(cd deps/ca-native && $(NODE_WAF) distclean)
 	-$(RMTREE) $(BUILD) deps/node-install
 
 #

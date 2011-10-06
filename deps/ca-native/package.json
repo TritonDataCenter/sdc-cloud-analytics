@@ -1,0 +1,10 @@
+{
+	"name":		"ca-native",
+	"version":	"0.0.1",
+	"description":	"Cloud Analytics Native Utilties",
+	"engines":	{ "node": "*" },
+	"main":		"./build/default/ca-native",
+	"scripts": {
+		"install": "node-waf configure build"
+	}
+}

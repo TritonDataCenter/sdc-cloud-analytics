@@ -34,6 +34,7 @@ sh_skip_setup=false
 sh_dataset_name=smartos
 sh_head_hostname=$(hostname)
 
+sh_cazone=
 sh_dataset_version=
 sh_cust=
 sh_custuri=
@@ -65,6 +66,13 @@ function sh_loadcust
 {
 	sh_cust=$(sh_capicurl $sh_capi/customers | json 0.uuid)
 	sh_custuri=/customers/$sh_cust
+}
+
+function sh_loadcazone
+{
+	sh_cazone=$(sdc-setup -l | grep '\<ca\>' | awk '{print $1}')
+	[[ -n $sh_cazone ]] || \
+	    fail "ca zone not found.  have you run sdc-setup -A?"
 }
 
 function sh_load_dataset
@@ -154,6 +162,10 @@ echo "$sh_custuri"
 
 sh_upload_keys || fail "failed"
 
+echo "Finding CA zone ... \c"
+sh_loadcazone || fail "failed"
+echo "done."
+
 echo "Finding version of dataset "$sh_dataset_name" ... \c"
 sh_load_dataset || fail "failed"
 [[ -n $sh_dataset_version ]] || fail "no version found"
@@ -189,7 +201,7 @@ while ! zlogin $sh_zonename ping 8.8.8.8 > /dev/null 2>&1; do
 done
 echo " done."
 
-cat > /zones/ca/root/root/setup_zone.sh <<EOF
+cat > /zones/$sh_cazone/root/root/setup_zone.sh <<EOF
 #!/bin/bash
 shopt -s xpg_echo
 
@@ -208,8 +220,8 @@ svcadm enable -s ssh || fail "failed to enable service"
 echo "done."
 EOF
 
-chmod +x /zones/ca/root/root/setup_zone.sh
-zlogin ca /root/setup_zone.sh || fail
+chmod +x /zones/$sh_cazone/root/root/setup_zone.sh
+zlogin $sh_cazone /root/setup_zone.sh || fail
 
 cat > /zones/${sh_zonename}/root/root/setup_zone.sh <<EOF
 #!/bin/bash

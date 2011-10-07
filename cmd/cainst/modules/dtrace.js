@@ -42,7 +42,7 @@ function insdGenerateMetricFunc(desc, metadata)
 	});
 }
 
-exports.insinit = function (ins, log)
+exports.insinit = function (ins, log, callback)
 {
 	var ii, metric, mod;
 
@@ -57,6 +57,8 @@ exports.insinit = function (ins, log)
 		    ins.metadata());
 		ins.registerMetric(mod);
 	}
+
+	callback();
 };
 
 function insdStatus()

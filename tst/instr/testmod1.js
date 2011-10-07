@@ -7,7 +7,7 @@ var mod_assert = require('assert');
 var mod_ca = require('../../lib/ca/ca-common');
 var mod_instr = require('../../lib/ca/ca-instr');
 
-exports.insinit = function (instr, log)
+exports.insinit = function (instr, log, callback)
 {
 	var metadata, set, metrics, metric;
 
@@ -24,6 +24,7 @@ exports.insinit = function (instr, log)
 	    fields: [],
 	    impl: function (mm) { return (new tmMetricImpl(mm)); }
 	});
+	callback();
 };
 
 exports.metrics = [];

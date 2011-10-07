@@ -15,7 +15,7 @@ var inszDataCache;
 /*
  * Invoked by the instrumenter service to initialize the ZFS-based metrics.
  */
-exports.insinit = function (instr, log)
+exports.insinit = function (instr, log, callback)
 {
 	inszLog = log;
 	inszHostname = mod_ca.caSysinfo().ca_hostname;
@@ -28,6 +28,7 @@ exports.insinit = function (instr, log)
 	};
 
 	inszInitMetrics(instr);
+	callback();
 };
 
 /*

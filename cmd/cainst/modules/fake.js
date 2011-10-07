@@ -17,7 +17,7 @@ var mod_instr = require('../../../lib/ca/ca-instr');
 /*
  * Invoked by the instrumenter service to initialize the fake metrics.
  */
-exports.insinit = function (instr, log)
+exports.insinit = function (instr, log, callback)
 {
 	var metadata, set, metrics, conf;
 
@@ -64,6 +64,8 @@ exports.insinit = function (instr, log)
 		    }
 		});
 	});
+
+	callback();
 };
 
 /*

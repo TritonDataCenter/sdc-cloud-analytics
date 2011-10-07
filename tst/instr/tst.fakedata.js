@@ -44,87 +44,93 @@ instrbei.registerMetric = function (metr)
 	impls[name] = metr;
 };
 
-fakebe.insinit(instrbei, mod_tl.ctStdout);
-mod_assert.deepEqual(Object.keys(impls).sort(), [ 'sfe.itas', 'sfe.students' ]);
-mod_assert.deepEqual(impls['sfe.itas']['fields'].sort(), ['room', 'student']);
-mod_assert.deepEqual(impls['sfe.students']['fields'].sort(), ['grade', 'room']);
+fakebe.insinit(instrbei, mod_tl.ctStdout, test);
 
-var metric, instn, value, keys, instd;
+function test() {
+	mod_assert.deepEqual(Object.keys(impls).sort(), [ 'sfe.itas',
+	    'sfe.students' ]);
+	mod_assert.deepEqual(impls['sfe.itas']['fields'].sort(), ['room',
+	    'student']);
+	mod_assert.deepEqual(impls['sfe.students']['fields'].sort(), ['grade',
+	    'room']);
 
-/* Can generate scalars. */
-metric = {
-	is_module: 'sfe',
-	is_stat: 'itas',
-	is_predicate: {},
-	is_decomposition: [],
-	is_granularity: 1
-};
+	var metric, instn, value, keys, instd;
 
-instn = impls['sfe.itas']['impl'](metric);
-instd = false;
-instn.instrument(function () { instd = true; });
-mod_assert.ok(instd);
-instn.value(function (val) { value = val; });
-mod_assert.ok(typeof (value) == 'number');
-instn.deinstrument(function () { instd = false; });
-mod_assert.ok(!instd);
+	/* Can generate scalars. */
+	metric = {
+		is_module: 'sfe',
+		is_stat: 'itas',
+		is_predicate: {},
+		is_decomposition: [],
+		is_granularity: 1
+	};
 
-/* Can generate discrete objects */
-metric['is_decomposition'] = [ 'room' ];
+	instn = impls['sfe.itas']['impl'](metric);
+	instd = false;
+	instn.instrument(function () { instd = true; });
+	mod_assert.ok(instd);
+	instn.value(function (val) { value = val; });
+	mod_assert.ok(typeof (value) == 'number');
+	instn.deinstrument(function () { instd = false; });
+	mod_assert.ok(!instd);
 
-instn = impls['sfe.itas']['impl'](metric);
-instd = false;
-instn.instrument(function () { instd = true; });
-mod_assert.ok(instd);
-instn.value(function (val) { value = val; });
-mod_assert.ok(typeof (value) == 'object');
-keys = Object.keys(value);
-keys.forEach(function (key) {
-	mod_assert.ok(caStartsWith(key, 'room'));
-	mod_assert.ok(typeof (value[key]) == 'number');
-});
-instn.deinstrument(function () { instd = false; });
-mod_assert.ok(!instd);
+	/* Can generate discrete objects */
+	metric['is_decomposition'] = [ 'room' ];
 
-/* Can generate distributions */
-metric['stat'] = 'students';
-metric['is_decomposition'] = [ 'grade' ];
+	instn = impls['sfe.itas']['impl'](metric);
+	instd = false;
+	instn.instrument(function () { instd = true; });
+	mod_assert.ok(instd);
+	instn.value(function (val) { value = val; });
+	mod_assert.ok(typeof (value) == 'object');
+	keys = Object.keys(value);
+	keys.forEach(function (key) {
+		mod_assert.ok(caStartsWith(key, 'room'));
+		mod_assert.ok(typeof (value[key]) == 'number');
+	});
+	instn.deinstrument(function () { instd = false; });
+	mod_assert.ok(!instd);
 
-instn = impls['sfe.students']['impl'](metric);
-instd = false;
-instn.instrument(function () { instd = true; });
-mod_assert.ok(instd);
-instn.value(function (val) { value = val; });
-mod_assert.ok(Array.isArray(value));
-mod_assert.ok(value.length > 0);
-value.forEach(function (bucket) {
-	mod_assert.ok(Array.isArray(bucket[0]));
-	mod_assert.equal(bucket[0].length, 2);
-	mod_assert.ok(typeof (bucket[1]) == 'number');
-});
-instn.deinstrument(function () { instd = false; });
-mod_assert.ok(!instd);
+	/* Can generate distributions */
+	metric['stat'] = 'students';
+	metric['is_decomposition'] = [ 'grade' ];
 
-/* Can generate discrete-decomposed distributions */
-metric['stat'] = 'students';
-metric['is_decomposition'] = [ 'room', 'grade' ];
-
-instn = impls['sfe.students']['impl'](metric);
-instd = false;
-instn.instrument(function () { instd = true; });
-mod_assert.ok(instd);
-instn.value(function (val) { value = val; });
-mod_assert.ok(typeof (value) == 'object');
-keys = Object.keys(value);
-keys.forEach(function (key) {
-	mod_assert.ok(caStartsWith(key, 'room'));
-	mod_assert.ok(Array.isArray(value[key]));
-	mod_assert.ok(value[key].length > 0);
-	value[key].forEach(function (bucket) {
+	instn = impls['sfe.students']['impl'](metric);
+	instd = false;
+	instn.instrument(function () { instd = true; });
+	mod_assert.ok(instd);
+	instn.value(function (val) { value = val; });
+	mod_assert.ok(Array.isArray(value));
+	mod_assert.ok(value.length > 0);
+	value.forEach(function (bucket) {
 		mod_assert.ok(Array.isArray(bucket[0]));
 		mod_assert.equal(bucket[0].length, 2);
 		mod_assert.ok(typeof (bucket[1]) == 'number');
 	});
-});
-instn.deinstrument(function () { instd = false; });
-mod_assert.ok(!instd);
+	instn.deinstrument(function () { instd = false; });
+	mod_assert.ok(!instd);
+
+	/* Can generate discrete-decomposed distributions */
+	metric['stat'] = 'students';
+	metric['is_decomposition'] = [ 'room', 'grade' ];
+
+	instn = impls['sfe.students']['impl'](metric);
+	instd = false;
+	instn.instrument(function () { instd = true; });
+	mod_assert.ok(instd);
+	instn.value(function (val) { value = val; });
+	mod_assert.ok(typeof (value) == 'object');
+	keys = Object.keys(value);
+	keys.forEach(function (key) {
+		mod_assert.ok(caStartsWith(key, 'room'));
+		mod_assert.ok(Array.isArray(value[key]));
+		mod_assert.ok(value[key].length > 0);
+		value[key].forEach(function (bucket) {
+			mod_assert.ok(Array.isArray(bucket[0]));
+			mod_assert.equal(bucket[0].length, 2);
+			mod_assert.ok(typeof (bucket[1]) == 'number');
+		});
+	});
+	instn.deinstrument(function () { instd = false; });
+	mod_assert.ok(!instd);
+}

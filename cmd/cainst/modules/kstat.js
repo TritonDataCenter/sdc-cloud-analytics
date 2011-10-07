@@ -18,11 +18,12 @@ var FSCALE = 256;	/* see sys/param.h */
 /*
  * Invoked by the instrumenter service to initialize the kstat-based metrics.
  */
-exports.insinit = function (instr, log)
+exports.insinit = function (instr, log, callback)
 {
 	inskLog = log;
 	inskHostname = mod_ca.caSysinfo().ca_hostname;
 	inskInitAutoMetrics(instr);
+	callback();
 };
 
 /*

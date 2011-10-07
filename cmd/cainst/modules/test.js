@@ -2,7 +2,7 @@
  * cmd/cainst/modules/test.js: test Instrumenter backend
  */
 
-exports.insinit = function (ins)
+exports.insinit = function (ins, log, callback)
 {
 	ins.registerModule({ name: 'test', label: 'Test Module' });
 	ins.registerMetric({
@@ -21,6 +21,7 @@ exports.insinit = function (ins)
 	    fields: [],
 	    metric: function () { return (new insTestMetricRandom()); }
 	});
+	callback();
 };
 
 function insTestMetricSeconds()

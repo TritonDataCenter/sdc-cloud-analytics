@@ -20,7 +20,7 @@ var inrBucketizers = {
 /*
  * Invoked by the instrumenter service to initialize the backend.
  */
-exports.insinit = function (instr, log)
+exports.insinit = function (instr, log, callback)
 {
 	var hostname;
 
@@ -68,6 +68,8 @@ exports.insinit = function (instr, log)
 		    'instr_backend_disable', instn, instr));
 	    }
 	});
+
+	callback();
 };
 
 function inrMetricImpl(hostname, metadata, evtname, instn, instr)

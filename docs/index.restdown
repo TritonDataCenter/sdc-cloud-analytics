@@ -1683,6 +1683,69 @@ different with "latency" much higher than "cputime", it can indicate that
 time is spent waiting on file system I/O (including disk I/O) rather than
 performing work on-CPU.
 
+## OS-related metrics
+
+These metrics report information about the state of processes, when they are
+created, and when they exit.
+
+### OS: process execs
+
+||**Name**|| unix.proc_execs ||
+||**Raw Metric**|| number of successful process exec operations ||
+||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
+||**Visibility**|| operators and customers||
+
+This metric reports each time a process has successfully finished an exec(2) or
+equivalent call. This is useful for understanding how often a new process is
+being started. Applications that frequently spawn many short lived processes may
+see poorer performance. Some applications have options that allow programs to
+spawn new threads instead of processes, which may improve performance.
+
+### OS: process exits
+
+||**Name**|| unix.proc_exits ||
+||**Raw Metric**|| number of processes exited ||
+||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond, walltime||
+||**Visibility**|| operators and customers||
+
+This metric reports each time a process finishes. This is useful for
+understanding when processes complete and how long they were running. The
+walltime breakdown provides a heatmap of exits based on process runtime. Having
+many short lived processes could be symptomatic of performance problems. Having
+a daemon (like apache, nginx, sendmail) exit frequently could be symptomatic of
+configuration and other errors.
+
+### OS: process forks
+
+||**Name**|| unix.proc_forks ||
+||**Raw Metric**|| number of processes forked ||
+||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, subsecond||
+||**Visibility**|| operators and customers||
+
+This metric reports each time a process forks. When a process forks it may
+either be for an exec(2) (see unix.proc_execs) or the child will be used for the
+application. If an application is seeing high fork rates, there may be
+performance problems. Note, the "ppid" decomposition will be the pid of the
+process that called fork(2). "pexecname" and "ppsargs" are not included because
+they are identical to "execname" and "psargs".
+
+### OS: thread creations
+||**Name**|| unix.thr_creates||
+||**Raw Metric**|| number of threads created||
+||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
+||**Visibility**|| operators and customers||
+
+This metric reports each time a thread is created. Several applications create
+threads on each request. If an application is regularly creating a high number
+of threads per second, that may negatively impact performance.
+
+## VM-related metrics
+
+The VM metrics report information that is specific to Virtual Machines and not
+applicable to SmartMachines. Note that several of the metrics that we have do
+apply to both kinds of machines.
+
+
 
 ## NIC-related metrics
 
@@ -1896,11 +1959,6 @@ as long as the configured TCP retransmit timeout (typically multiple seconds).
 This metric reports the total number of TCP segments (packets) sent and received
 and can be used to observe network activity over TCP.
 
-## VM-related metrics
-
-The VM metrics report information that is specific to Virtual Machines and not
-applicable to SmartMachines. Note that several of the metrics that we have do
-apply to both kinds of machines.
 
 ### VM: exits
 
@@ -2198,8 +2256,8 @@ individual values, a vector rather than a scalar).
 || **table** || database table name ||
 || **user** || client username ||
 || **vcpuid** || vCPU identifier ||
-|| **vleavereason* || reason leaving vCPU ||
-|| **vmmuctx* || VM MMU context ||
+|| **vleavereason** || reason leaving vCPU ||
+|| **vmmuctx** || VM MMU context ||
 || **zdataset** || ZFS dataset name ||
 || **zonename** || Zone (or SmartMachine or Virtual Machine) name ||
 || **zpool** || ZFS pool name ||
@@ -2227,6 +2285,7 @@ typically yields a heatmap rather than a scalar or vector.
 || **size** || size in bytes of a packet or operation ||
 || **subsecond** || time offset during a second for when the event occurred ||
 || **utilization** || percent of overall resource utilized (for CPUs, this is the same as percent of time busy) ||
+|| **walltime** || total time between program start and finish ||
 
 # Appendix A: Version History
 

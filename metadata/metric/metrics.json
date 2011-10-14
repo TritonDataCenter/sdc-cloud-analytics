@@ -10,6 +10,7 @@
 	"node":		{ "label": "Node.js 0.4.x"		},
 	"syscall":	{ "label": "System calls"		},
 	"tcp": 		{ "label": "TCP"			},
+	"unix":		{ "label": "OS"				},
 	"vm":		{ "label": "Virtual Machine"		},
 	"zfs": 		{ "label": "ZFS"			}
     },
@@ -110,6 +111,7 @@
 	"vcpuid":	{ "label": "vCPU identifier", "type": "string" },
 	"vleavereason":	{ "label": "reason leaving vCPU", "type": "string" },
 	"vmmmuctx":	{ "label": "VM MMU context", "type": "string" },
+	"walltime":	{ "label": "process runtime", "type": "time" },
 	"zdataset":	{ "label": "ZFS dataset" },
 	"zonename":	{ "label": "zone name" },
 	"zpool":	{ "label": "ZFS pool" }
@@ -503,6 +505,42 @@
 	"unit":		"operations",
 	"fields":	[
 	    "hostname", "cabackend", "cainstnid", "cametric", "latency"
+	]
+    }, {
+	"module":	"unix",
+	"stat":		"proc_execs",
+	"label":	"process execs",
+	"unit":		"processes",
+	"fields":	[
+	    "hostname", "zonename", "execname", "subsecond", "psargs", "ppid",
+	    "ppsargs", "pexecname", "pid"
+	]
+    }, {
+	"module":	"unix",
+	"stat":		"proc_forks",
+	"label":	"process forks",
+	"unit":		"processes",
+	"fields":	[
+	    "hostname", "zonename", "execname", "subsecond", "psargs", "ppid",
+	    "pid"
+	]
+    }, {
+	"module":	"unix",
+	"stat":		"proc_exits",
+	"label":	"process exits",
+	"unit":		"processes",
+	"fields":	[
+	    "hostname", "zonename", "execname", "subsecond", "psargs", "ppid",
+	    "ppsargs", "pexecname", "pid", "walltime"
+	]
+    }, {
+	"module":	"unix",
+	"stat":		"thr_creates",
+	"label":	"thread creations",
+	"unit":		"threads",
+	"fields":	[
+	    "hostname", "zonename", "execname", "subsecond", "psargs", "ppid",
+	    "ppsargs", "pexecname", "pid"
 	]
     } ]
 }

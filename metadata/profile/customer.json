@@ -173,5 +173,33 @@
 		"module": "zfs",
 		"stat": "dataset_quota",
 		"fields": [ "zdataset" ]
-	} ]
+	},  {
+		"module": "unix",
+		"stat":	 "proc_execs",
+		"fields": [
+		    "zonename", "execname", "subsecond", "psargs",
+		     "ppid", "ppsargs", "pexecname", "pid"
+		]
+       }, {
+		"module": "unix",
+		"stat":	 "proc_forks",
+		"fields": [
+		    "zonename", "execname", "subsecond", "psargs",
+		    "ppid", "pid"
+		]
+       }, {
+		"module": "unix",
+		"stat":	 "proc_exits",
+		"fields": [
+		    "zonename", "execname", "subsecond", "psargs",
+		    "ppsargs", "pexecname", "ppid", "pid", "walltime"
+		]
+	}, {
+		"module": "unix",
+		"stat":	 "thr_creates",
+		"fields": [
+		    "zonename", "execname", "subsecond", "psargs",
+		    "ppsargs", "pexecname", "ppid", "pid"
+		]
+       } ]
 }

@@ -265,5 +265,33 @@
 		"module": "ca",
 		"stat": "instr_ticks",
 		"fields": [ "hostname", "latency", "subsecond" ]
-	} ]
+	}, {
+		"module": "unix",
+		"stat":	 "proc_execs",
+		"fields": [
+		    "hostname", "zonename", "execname", "subsecond", "psargs",
+		     "ppid", "ppsargs", "pexecname", "pid"
+		]
+       }, {
+		"module": "unix",
+		"stat":	 "proc_forks",
+		"fields": [
+		    "hostname", "zonename", "execname", "subsecond", "psargs",
+		    "ppid", "pid"
+		]
+       }, {
+		"module": "unix",
+		"stat":	 "proc_exits",
+		"fields": [
+		    "hostname", "zonename", "execname", "subsecond", "psargs",
+		    "ppsargs", "pexecname", "ppid", "pid", "walltime"
+		]
+	}, {
+		"module": "unix",
+		"stat":	 "thr_creates",
+		"fields": [
+		    "hostname", "zonename", "execname", "subsecond", "psargs",
+		    "ppsargs", "pexecname", "ppid", "pid"
+		]
+       } ]
 }

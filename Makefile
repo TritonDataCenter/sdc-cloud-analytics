@@ -152,6 +152,7 @@ DEPS_cabase = \
 	amqp		\
 	ca-native	\
 	connect		\
+	ctype		\
 	heatmap		\
 	kstat		\
 	libdtrace	\

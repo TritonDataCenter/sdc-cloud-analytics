@@ -1692,7 +1692,7 @@ created, and when they exit.
 
 ||**Name**|| unix.proc_execs ||
 ||**Raw Metric**|| number of successful process exec operations ||
-||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
 ||**Visibility**|| operators and customers||
 
 This metric reports each time a process has successfully finished an exec(2) or
@@ -1705,7 +1705,7 @@ spawn new threads instead of processes, which may improve performance.
 
 ||**Name**|| unix.proc_exits ||
 ||**Raw Metric**|| number of processes exited ||
-||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond, walltime||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond, walltime||
 ||**Visibility**|| operators and customers||
 
 This metric reports each time a process finishes. This is useful for
@@ -1719,7 +1719,7 @@ configuration and other errors.
 
 ||**Name**|| unix.proc_forks ||
 ||**Raw Metric**|| number of processes forked ||
-||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, subsecond||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, subsecond||
 ||**Visibility**|| operators and customers||
 
 This metric reports each time a process forks. When a process forks it may
@@ -1732,12 +1732,26 @@ they are identical to "execname" and "psargs".
 ### OS: thread creations
 ||**Name**|| unix.thr_creates||
 ||**Raw Metric**|| number of threads created||
-||*Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
 ||**Visibility**|| operators and customers||
 
 This metric reports each time a thread is created. Several applications create
 threads on each request. If an application is regularly creating a high number
 of threads per second, that may negatively impact performance.
+
+### OS: processes
+||**Name**|| unix.processes||
+||**Raw Metric**|| number of process||
+||**Decompositions**|| hostname, zonename, execname, pid, ppid, rss, contract, psargs, pmodel, nthreads||
+
+This metric reports the total number of processes on the system. This is useful
+for understanding what is running and characteristics of that set.  Decomposing
+based upon 'rss' create a heatmap that shows the resident set sizes in use.
+This can be used to get an idea of the different amounts of memory use by
+different processes. Decomposing by 'execname' is useful for seeing which
+applications are most common. 'nthreads' is a heatmap based upon the number of
+threads that are in each process. 'pmodel' answers the question of which
+processes are 32-bit and which are 64-bit.
 
 ## VM-related metrics
 
@@ -2225,6 +2239,7 @@ individual values, a vector rather than a scalar).
 || **cametric** || metric name ||
 || **client** || client hostname ||
 || **conntype** || type of TCP connection, either "active" (client) or "passive"  (server) ||
+|| **contract** || contract identifier ||
 || **cpu** || CPU identifier (e.g., "cpu0") ||
 || **cpumode** || CPU mode, either "user" or "kernel" ||
 || **database** || database name ||
@@ -2246,6 +2261,7 @@ individual values, a vector rather than a scalar).
 || **optype** || operation type, often "read" or "write" but can be any operation depending on the  metric ||
 || **pexecname** || parent process application name ||
 || **pid** || process identifier ||
+|| **pmodel** || process model (e.g., 32-bit, 64-bit) ||
 || **ppid** || parent process identifier ||
 || **psargs** || process name and arguments ||
 || **ppsargs** || parent process name and arguments ||
@@ -2278,9 +2294,11 @@ typically yields a heatmap rather than a scalar or vector.
 || **iops_write** || write I/O operations ||
 || **latency** || how long an operation took ||
 || **offset** || byte offset within a file or block device ||
+|| **nthreads** || number of threads in a process ||
 || **packets** || number of packets sent or received ||
 || **packets_in** || number of packets received ||
 || **packets_out** || number of packets sent ||
+|| **rss** || process resident set size ||
 || **runtime** || time spent running continuously on CPU ||
 || **size** || size in bytes of a packet or operation ||
 || **subsecond** || time offset during a second for when the event occurred ||

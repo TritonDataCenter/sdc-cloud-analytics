@@ -168,6 +168,16 @@ function setup
 	fi
 }
 
+function check-amqp
+{
+	[[ -z "$AMQP_HOST" ]] && fail "AMQP_HOST not set"
+	unset MACHINE_THAT_GOES_PING
+	echo "Checking for AMQP_HOST... \c "
+	ping "$AMQP_HOST" 2 >/dev/null ||
+	    fail "couldn't reach AMQP_HOST: $AMQP_HOST"
+	echo "done"
+}
+
 function get-output-base
 {
 	pushd $1 >/dev/null
@@ -200,8 +210,6 @@ function welcome
 	printf "\tNode executable: $NODE_EXEC\n"
 	printf "\tKeep non-failure output: $OPT_KEEP_SUCCESS\n"
 	printf "\tFound %d test(s) to run\n" $NUM_TESTS
-	printf "\n"
-	printf "\n===================================================\n\n"
 }
 
 #
@@ -348,6 +356,8 @@ else
 fi
 
 welcome
+check-amqp
+printf "\n===================================================\n\n"
 setup-output
 
 for t in $(echo $TESTS | sort); do

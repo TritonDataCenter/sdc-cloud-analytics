@@ -16,7 +16,7 @@ function main()
 	mod_dbg.caEnablePanicOnCrash();
 
 	args = process.argv.slice(2);
-	backends = [ 'kstat', 'dtrace', 'zfs', 'cainstr' ];
+	backends = [ 'kstat', 'dtrace', 'zfs', 'cainstr', 'proc' ];
 	for (ii = 0; ii < args.length; ii++) {
 		if (args[ii] == '-b') {
 			/* "-b backend1,backend2,..." form */

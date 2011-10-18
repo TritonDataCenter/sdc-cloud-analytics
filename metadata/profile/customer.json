@@ -201,5 +201,12 @@
 		    "zonename", "execname", "subsecond", "psargs",
 		    "ppsargs", "pexecname", "ppid", "pid"
 		]
-       } ]
+       },  {
+		"module": "unix",
+		"stat": "processes",
+		"fields": [
+		    "zonename", "execname", "pid", "ppid", "rss",
+		    "contract", "psargs", "pmodel", "nthreads"
+		]
+	} ]
 }

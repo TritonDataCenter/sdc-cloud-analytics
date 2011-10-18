@@ -184,6 +184,8 @@ while ! zlogin $sh_zonename ping 8.8.8.8 > /dev/null 2>&1; do
 done
 echo " done."
 
+cp /root/.ssh/authorized_keys /zones/$sh_zonename/root/var/tmp || fail \
+    "failed to cp ssh key"
 cat > /zones/$sh_cazone/root/root/setup_zone.sh <<EOF
 #!/bin/bash
 shopt -s xpg_echo
@@ -260,6 +262,14 @@ export MANPATH=/opt/local/man:/opt/local/share/man:/usr/share/man:/usr/sfw/share
 PROFILE
 chown -R $sh_user:staff /home/$sh_user || fail "failed to chmod"
 
+echo "done."
+
+echo "Setting up user ssh keys... \c "
+cp /var/tmp/authorized_keys /home/$sh_user/.ssh/authorized_keys || fail \
+    "failed to set up ssh keys"
+chmod 600 /home/$sh_user/.ssh/authorized_keys || fail "failed to chmod"
+chown $sh_user /home/$sh_user/.ssh/authorized_keys || fail "failed to chown"
+rm -f /var/tmp/authorized_keys
 echo "done."
 fi
 

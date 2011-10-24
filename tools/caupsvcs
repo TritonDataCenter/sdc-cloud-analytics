@@ -66,7 +66,7 @@ cus_image=$1
 [[ -n $cus_image ]] || usage
 [[ -f $cus_image ]] || fail "no such file: $cus_image"
 
-[[ $(zonename) = "ca" ]] || forcefail "not in \"ca\" zone"
+svcs caconfigsvc > /dev/null || forcefail "no configsvc present already"
 [[ $# -eq 1 ]] || forcefail "expected one package"
 [[ $(basename $cus_image .tar.bz2) = $(basename $cus_image) ]] && \
     forcefail "expected tar.bz2 package"

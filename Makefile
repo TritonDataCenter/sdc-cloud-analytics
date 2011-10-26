@@ -86,8 +86,8 @@ SMF_MANIFESTS = \
 	smf/manifest/castashsvc.xml
 
 SVC_SCRIPTS = \
-	pkg/pkg-svc-postactivate.sh	\
-	pkg/pkg-svc-postdeactivate.sh
+	pkg/pkg-svc-postinstall.sh	\
+	pkg/pkg-svc-postuninstall.sh
 
 SH_SCRIPTS = \
 	pkg/pkg-postactivate.sh		\
@@ -300,9 +300,11 @@ $(PKG_DIRS):
 
 $(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/%/.git
 	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/deps/$*
+	cd $(PKGROOT)/cabase/node_modules/.npm/$*/active/package && (echo '!./build'; echo '!./node_modules') >> .npmignore
 
 $(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/node-%/.git
 	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/deps/node-$*
+	cd $(PKGROOT)/cabase/node_modules/.npm/$*/active/package && (echo '!./build'; echo '!./node_modules') >> .npmignore
 
 deps/%/.git: | deps/%
 	git submodule update --init

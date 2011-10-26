@@ -17,14 +17,14 @@
 	"engines": {
 		"node":	"*"
 	},
-	"dependencies": {
-		"amqp": 	"*",
-		"connect":	"*",
-		"heatmap":	"*",
-		"kstat":	"*",
-		"libdtrace":	"*",
-		"png":		"*",
-		"uname":	"*",
-		"libGeoIP":	"*"
+	"bundledDependencies": {
+		"amqp":         "*",
+		"connect":      "*",
+		"heatmap":      "*",
+		"kstat":        "*",
+		"libdtrace":    "*",
+		"png":          "*",
+		"uname":        "*",
+		"libGeoIP":     "*"
 	}
 }

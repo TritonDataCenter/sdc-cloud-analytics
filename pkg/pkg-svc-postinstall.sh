@@ -16,13 +16,13 @@ function fatal
 #
 svc=${npm_package_name}
 manifest=${svc}.xml
-pkg=${npm_config_root}/.npm/${npm_package_name}/${npm_package_version}
-cabase=`echo ${pkg}/dependson/cabase@*/package`
+pkg=${npm_config_prefix}/lib/node_modules/${npm_package_name}
+cabase=${npm_config_prefix}/lib/node_modules/cabase
 
 export CABASE_DIR=$cabase
-export BASE_DIR=$npm_config_agent_root
+export BASE_DIR=$npm_config_prefix
 
-if [[ -z $npm_config_agent_root ]]; then
+if [[ -z $npm_config_prefix ]]; then
 	#
 	# Because CA-based services can be installed as either agents or
 	# in the ca zone in the head-node, fall back to npm_config_smartdc_root

@@ -86,6 +86,8 @@ SMF_MANIFESTS = \
 	smf/manifest/castashsvc.xml
 
 SVC_SCRIPTS = \
+	pkg/pkg-svc-postactivate.sh	\
+	pkg/pkg-svc-postdeactivate.sh	\
 	pkg/pkg-svc-postinstall.sh	\
 	pkg/pkg-svc-postuninstall.sh
 

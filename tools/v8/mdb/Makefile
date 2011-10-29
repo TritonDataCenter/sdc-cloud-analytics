@@ -1,5 +1,5 @@
 CFLAGS = -Wall
-CPPFLAGS += -I/home/dap/node/deps/v8/src
+CPPFLAGS += -Iv8
 SOLDFLAGS = -shared -fPIC
 
 all: mdb_v8.so

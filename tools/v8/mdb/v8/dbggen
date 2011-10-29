@@ -11,8 +11,7 @@ var mod_path = require('path');
 var mod_sys = require('sys');
 
 var srcdir = mod_path.dirname(process.argv[1]);
-var fname_objects = mod_path.join(srcdir, 'objects.h');
-var fname_constants = mod_path.join(srcdir, 'heap-dbg-constants.h');
+var fname_objects, fname_constants;
 
 /*
  * The following regex extracts a class name and its parent class from
@@ -42,6 +41,7 @@ var code_header = [
 /*
  * Program state
  */
+var kname = {};		/* uppercase class name -> real class name */
 var pclass = {};	/* class name -> parent class name */
 var fields = {};	/* class -> field name -> offset */
 var klasses = [];	/* class names sorted by depth in hierarchy */
@@ -66,6 +66,7 @@ function load_hierarchy()
 			return;
 
 		pclass[match[1]] = match[3];
+		kname[match[1].toUpperCase()] = match[1];
 	});
 }
 
@@ -85,8 +86,11 @@ function load_constants()
 		if (!(match = line.match(const_regex)))
 			return;
 
-		klass = match[1];
-		field = match[2];
+		if (!(match[1] in kname))
+			return;
+
+		klass = kname[match[1]];
+		field = match[2].toLowerCase();
 		offset = parseInt(match[3]);
 
 		if (!(fields[klass]))
@@ -151,15 +155,12 @@ function emit_data()
 	klasses.forEach(function (klass) {
 		console.log('\t&v8_%s_class,', klass);
 	});
+	console.log('\tNULL');
 	console.log('};\n');
-
-	console.log('static const int v8_nclasses = sizeof (v8_classes) / ' +
-	    'sizeof (v8_classes[0]);\n');
 }
 
 function emit_class(klass)
 {
-	/* XXX this should really encode offsets, not assume contiguous fields */
 	var fieldnames;
 
 	if (klass in fields)
@@ -173,7 +174,7 @@ function emit_class(klass)
 	console.log('v8_field_t v8_%s_fields[] = {', klass);
 	fieldnames.forEach(function (fieldname) {
 		console.log('\t{ "%s", V8_OFF_%s_%s, sizeof (uintptr_t) },',
-		    fieldname, klass, fieldname);
+		    fieldname, klass.toUpperCase(), fieldname.toUpperCase());
 	});
 	console.log('\t{ NULL }');
 	console.log('};\n');
@@ -188,6 +189,15 @@ function emit_class(klass)
 
 function main()
 {
+	if (process.argv.length < 4) {
+		console.log('usage: node dbggen /path/to/objects.h ' +
+		    '/path/to/heap-dbg-constants.h');
+		process.exit(2);
+	}
+
+	fname_objects = process.argv[2];
+	fname_constants = process.argv[3];
+
 	load_hierarchy();
 	load_constants();
 	sort_classes();

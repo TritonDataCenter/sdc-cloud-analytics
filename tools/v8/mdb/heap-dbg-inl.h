@@ -80,7 +80,7 @@ v8_class_t v8_Smi_class = {
 
 /* HeapObject class */
 v8_field_t v8_HeapObject_fields[] = {
-	{ "map", V8_OFF_HeapObject_map, sizeof (uintptr_t) },
+	{ "map", V8_OFF_HEAPOBJECT_MAP, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -99,8 +99,8 @@ v8_class_t v8_HeapNumber_class = {
 
 /* JSObject class */
 v8_field_t v8_JSObject_fields[] = {
-	{ "properties", V8_OFF_JSObject_properties, sizeof (uintptr_t) },
-	{ "elements", V8_OFF_JSObject_elements, sizeof (uintptr_t) },
+	{ "properties", V8_OFF_JSOBJECT_PROPERTIES, sizeof (uintptr_t) },
+	{ "elements", V8_OFF_JSOBJECT_ELEMENTS, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -110,7 +110,8 @@ v8_class_t v8_JSObject_class = {
 
 /* FixedArray class */
 v8_field_t v8_FixedArray_fields[] = {
-	{ "length", V8_OFF_FixedArray_length, sizeof (uintptr_t) },
+	{ "length", V8_OFF_FIXEDARRAY_LENGTH, sizeof (uintptr_t) },
+	{ "data", V8_OFF_FIXEDARRAY_DATA, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -120,7 +121,7 @@ v8_class_t v8_FixedArray_class = {
 
 /* ByteArray class */
 v8_field_t v8_ByteArray_fields[] = {
-	{ "length", V8_OFF_ByteArray_length, sizeof (uintptr_t) },
+	{ "length", V8_OFF_BYTEARRAY_LENGTH, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -148,8 +149,8 @@ v8_class_t v8_ExternalArray_class = {
 
 /* Code class */
 v8_field_t v8_Code_fields[] = {
-	{ "relocation_info", V8_OFF_Code_relocation_info, sizeof (uintptr_t) },
-	{ "deoptimization_data", V8_OFF_Code_deoptimization_data, sizeof (uintptr_t) },
+	{ "relocation_info", V8_OFF_CODE_RELOCATION_INFO, sizeof (uintptr_t) },
+	{ "deoptimization_data", V8_OFF_CODE_DEOPTIMIZATION_DATA, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -159,9 +160,10 @@ v8_class_t v8_Code_class = {
 
 /* Map class */
 v8_field_t v8_Map_fields[] = {
-	{ "constructor", V8_OFF_Map_constructor, sizeof (uintptr_t) },
-	{ "instance_descriptors", V8_OFF_Map_instance_descriptors, sizeof (uintptr_t) },
-	{ "code_cache", V8_OFF_Map_code_cache, sizeof (uintptr_t) },
+	{ "instance_attributes", V8_OFF_MAP_INSTANCE_ATTRIBUTES, sizeof (uintptr_t) },
+	{ "constructor", V8_OFF_MAP_CONSTRUCTOR, sizeof (uintptr_t) },
+	{ "instance_descriptors", V8_OFF_MAP_INSTANCE_DESCRIPTORS, sizeof (uintptr_t) },
+	{ "code_cache", V8_OFF_MAP_CODE_CACHE, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -180,25 +182,25 @@ v8_class_t v8_Struct_class = {
 
 /* SharedFunctionInfo class */
 v8_field_t v8_SharedFunctionInfo_fields[] = {
-	{ "name", V8_OFF_SharedFunctionInfo_name, sizeof (uintptr_t) },
-	{ "construct_stub", V8_OFF_SharedFunctionInfo_construct_stub, sizeof (uintptr_t) },
-	{ "instance_class_name", V8_OFF_SharedFunctionInfo_instance_class_name, sizeof (uintptr_t) },
-	{ "function_data", V8_OFF_SharedFunctionInfo_function_data, sizeof (uintptr_t) },
-	{ "script", V8_OFF_SharedFunctionInfo_script, sizeof (uintptr_t) },
-	{ "debug_info", V8_OFF_SharedFunctionInfo_debug_info, sizeof (uintptr_t) },
-	{ "inferred_name", V8_OFF_SharedFunctionInfo_inferred_name, sizeof (uintptr_t) },
-	{ "initial_map", V8_OFF_SharedFunctionInfo_initial_map, sizeof (uintptr_t) },
-	{ "this_property_assignments", V8_OFF_SharedFunctionInfo_this_property_assignments, sizeof (uintptr_t) },
-	{ "length", V8_OFF_SharedFunctionInfo_length, sizeof (uintptr_t) },
-	{ "formal_parameter_count", V8_OFF_SharedFunctionInfo_formal_parameter_count, sizeof (uintptr_t) },
-	{ "expected_nof_properties", V8_OFF_SharedFunctionInfo_expected_nof_properties, sizeof (uintptr_t) },
-	{ "num_literals", V8_OFF_SharedFunctionInfo_num_literals, sizeof (uintptr_t) },
-	{ "start_position_and_type", V8_OFF_SharedFunctionInfo_start_position_and_type, sizeof (uintptr_t) },
-	{ "end_position", V8_OFF_SharedFunctionInfo_end_position, sizeof (uintptr_t) },
-	{ "function_token_position", V8_OFF_SharedFunctionInfo_function_token_position, sizeof (uintptr_t) },
-	{ "compiler_hints", V8_OFF_SharedFunctionInfo_compiler_hints, sizeof (uintptr_t) },
-	{ "this_property_assignments_count", V8_OFF_SharedFunctionInfo_this_property_assignments_count, sizeof (uintptr_t) },
-	{ "opt_count", V8_OFF_SharedFunctionInfo_opt_count, sizeof (uintptr_t) },
+	{ "name", V8_OFF_SHAREDFUNCTIONINFO_NAME, sizeof (uintptr_t) },
+	{ "construct_stub", V8_OFF_SHAREDFUNCTIONINFO_CONSTRUCT_STUB, sizeof (uintptr_t) },
+	{ "instance_class_name", V8_OFF_SHAREDFUNCTIONINFO_INSTANCE_CLASS_NAME, sizeof (uintptr_t) },
+	{ "function_data", V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_DATA, sizeof (uintptr_t) },
+	{ "script", V8_OFF_SHAREDFUNCTIONINFO_SCRIPT, sizeof (uintptr_t) },
+	{ "debug_info", V8_OFF_SHAREDFUNCTIONINFO_DEBUG_INFO, sizeof (uintptr_t) },
+	{ "inferred_name", V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME, sizeof (uintptr_t) },
+	{ "initial_map", V8_OFF_SHAREDFUNCTIONINFO_INITIAL_MAP, sizeof (uintptr_t) },
+	{ "this_property_assignments", V8_OFF_SHAREDFUNCTIONINFO_THIS_PROPERTY_ASSIGNMENTS, sizeof (uintptr_t) },
+	{ "length", V8_OFF_SHAREDFUNCTIONINFO_LENGTH, sizeof (uintptr_t) },
+	{ "formal_parameter_count", V8_OFF_SHAREDFUNCTIONINFO_FORMAL_PARAMETER_COUNT, sizeof (uintptr_t) },
+	{ "expected_nof_properties", V8_OFF_SHAREDFUNCTIONINFO_EXPECTED_NOF_PROPERTIES, sizeof (uintptr_t) },
+	{ "num_literals", V8_OFF_SHAREDFUNCTIONINFO_NUM_LITERALS, sizeof (uintptr_t) },
+	{ "start_position_and_type", V8_OFF_SHAREDFUNCTIONINFO_START_POSITION_AND_TYPE, sizeof (uintptr_t) },
+	{ "end_position", V8_OFF_SHAREDFUNCTIONINFO_END_POSITION, sizeof (uintptr_t) },
+	{ "function_token_position", V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION, sizeof (uintptr_t) },
+	{ "compiler_hints", V8_OFF_SHAREDFUNCTIONINFO_COMPILER_HINTS, sizeof (uintptr_t) },
+	{ "this_property_assignments_count", V8_OFF_SHAREDFUNCTIONINFO_THIS_PROPERTY_ASSIGNMENTS_COUNT, sizeof (uintptr_t) },
+	{ "opt_count", V8_OFF_SHAREDFUNCTIONINFO_OPT_COUNT, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -208,7 +210,7 @@ v8_class_t v8_SharedFunctionInfo_class = {
 
 /* String class */
 v8_field_t v8_String_fields[] = {
-	{ "length", V8_OFF_String_length, sizeof (uintptr_t) },
+	{ "length", V8_OFF_STRING_LENGTH, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -218,8 +220,8 @@ v8_class_t v8_String_class = {
 
 /* Oddball class */
 v8_field_t v8_Oddball_fields[] = {
-	{ "to_string", V8_OFF_Oddball_to_string, sizeof (uintptr_t) },
-	{ "to_number", V8_OFF_Oddball_to_number, sizeof (uintptr_t) },
+	{ "to_string", V8_OFF_ODDBALL_TO_STRING, sizeof (uintptr_t) },
+	{ "to_number", V8_OFF_ODDBALL_TO_NUMBER, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -364,19 +366,19 @@ v8_class_t v8_DeoptimizationOutputData_class = {
 
 /* Script class */
 v8_field_t v8_Script_fields[] = {
-	{ "source", V8_OFF_Script_source, sizeof (uintptr_t) },
-	{ "name", V8_OFF_Script_name, sizeof (uintptr_t) },
-	{ "line_offset", V8_OFF_Script_line_offset, sizeof (uintptr_t) },
-	{ "column_offset", V8_OFF_Script_column_offset, sizeof (uintptr_t) },
-	{ "data", V8_OFF_Script_data, sizeof (uintptr_t) },
-	{ "context_data", V8_OFF_Script_context_data, sizeof (uintptr_t) },
-	{ "wrapper", V8_OFF_Script_wrapper, sizeof (uintptr_t) },
-	{ "type", V8_OFF_Script_type, sizeof (uintptr_t) },
-	{ "compilation_type", V8_OFF_Script_compilation_type, sizeof (uintptr_t) },
-	{ "line_ends", V8_OFF_Script_line_ends, sizeof (uintptr_t) },
-	{ "id", V8_OFF_Script_id, sizeof (uintptr_t) },
-	{ "eval_from_shared", V8_OFF_Script_eval_from_shared, sizeof (uintptr_t) },
-	{ "eval_from_instructions_offset", V8_OFF_Script_eval_from_instructions_offset, sizeof (uintptr_t) },
+	{ "source", V8_OFF_SCRIPT_SOURCE, sizeof (uintptr_t) },
+	{ "name", V8_OFF_SCRIPT_NAME, sizeof (uintptr_t) },
+	{ "line_offset", V8_OFF_SCRIPT_LINE_OFFSET, sizeof (uintptr_t) },
+	{ "column_offset", V8_OFF_SCRIPT_COLUMN_OFFSET, sizeof (uintptr_t) },
+	{ "data", V8_OFF_SCRIPT_DATA, sizeof (uintptr_t) },
+	{ "context_data", V8_OFF_SCRIPT_CONTEXT_DATA, sizeof (uintptr_t) },
+	{ "wrapper", V8_OFF_SCRIPT_WRAPPER, sizeof (uintptr_t) },
+	{ "type", V8_OFF_SCRIPT_TYPE, sizeof (uintptr_t) },
+	{ "compilation_type", V8_OFF_SCRIPT_COMPILATION_TYPE, sizeof (uintptr_t) },
+	{ "line_ends", V8_OFF_SCRIPT_LINE_ENDS, sizeof (uintptr_t) },
+	{ "id", V8_OFF_SCRIPT_ID, sizeof (uintptr_t) },
+	{ "eval_from_shared", V8_OFF_SCRIPT_EVAL_FROM_SHARED, sizeof (uintptr_t) },
+	{ "eval_from_instructions_offset", V8_OFF_SCRIPT_EVAL_FROM_INSTRUCTIONS_OFFSET, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -386,10 +388,10 @@ v8_class_t v8_Script_class = {
 
 /* JSFunction class */
 v8_field_t v8_JSFunction_fields[] = {
-	{ "prototype_or_initial_map", V8_OFF_JSFunction_prototype_or_initial_map, sizeof (uintptr_t) },
-	{ "shared", V8_OFF_JSFunction_shared, sizeof (uintptr_t) },
-	{ "literals", V8_OFF_JSFunction_literals, sizeof (uintptr_t) },
-	{ "next_function_link", V8_OFF_JSFunction_next_function_link, sizeof (uintptr_t) },
+	{ "prototype_or_initial_map", V8_OFF_JSFUNCTION_PROTOTYPE_OR_INITIAL_MAP, sizeof (uintptr_t) },
+	{ "shared", V8_OFF_JSFUNCTION_SHARED, sizeof (uintptr_t) },
+	{ "literals", V8_OFF_JSFUNCTION_LITERALS, sizeof (uintptr_t) },
+	{ "next_function_link", V8_OFF_JSFUNCTION_NEXT_FUNCTION_LINK, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -399,7 +401,7 @@ v8_class_t v8_JSFunction_class = {
 
 /* JSGlobalProxy class */
 v8_field_t v8_JSGlobalProxy_fields[] = {
-	{ "context", V8_OFF_JSGlobalProxy_context, sizeof (uintptr_t) },
+	{ "context", V8_OFF_JSGLOBALPROXY_CONTEXT, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -409,9 +411,9 @@ v8_class_t v8_JSGlobalProxy_class = {
 
 /* GlobalObject class */
 v8_field_t v8_GlobalObject_fields[] = {
-	{ "builtins", V8_OFF_GlobalObject_builtins, sizeof (uintptr_t) },
-	{ "global_context", V8_OFF_GlobalObject_global_context, sizeof (uintptr_t) },
-	{ "global_receiver", V8_OFF_GlobalObject_global_receiver, sizeof (uintptr_t) },
+	{ "builtins", V8_OFF_GLOBALOBJECT_BUILTINS, sizeof (uintptr_t) },
+	{ "global_context", V8_OFF_GLOBALOBJECT_GLOBAL_CONTEXT, sizeof (uintptr_t) },
+	{ "global_receiver", V8_OFF_GLOBALOBJECT_GLOBAL_RECEIVER, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -421,7 +423,7 @@ v8_class_t v8_GlobalObject_class = {
 
 /* JSValue class */
 v8_field_t v8_JSValue_fields[] = {
-	{ "value", V8_OFF_JSValue_value, sizeof (uintptr_t) },
+	{ "value", V8_OFF_JSVALUE_VALUE, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -431,13 +433,13 @@ v8_class_t v8_JSValue_class = {
 
 /* JSMessageObject class */
 v8_field_t v8_JSMessageObject_fields[] = {
-	{ "type", V8_OFF_JSMessageObject_type, sizeof (uintptr_t) },
-	{ "arguments", V8_OFF_JSMessageObject_arguments, sizeof (uintptr_t) },
-	{ "script", V8_OFF_JSMessageObject_script, sizeof (uintptr_t) },
-	{ "stack_trace", V8_OFF_JSMessageObject_stack_trace, sizeof (uintptr_t) },
-	{ "stack_frames", V8_OFF_JSMessageObject_stack_frames, sizeof (uintptr_t) },
-	{ "start_position", V8_OFF_JSMessageObject_start_position, sizeof (uintptr_t) },
-	{ "end_position", V8_OFF_JSMessageObject_end_position, sizeof (uintptr_t) },
+	{ "type", V8_OFF_JSMESSAGEOBJECT_TYPE, sizeof (uintptr_t) },
+	{ "arguments", V8_OFF_JSMESSAGEOBJECT_ARGUMENTS, sizeof (uintptr_t) },
+	{ "script", V8_OFF_JSMESSAGEOBJECT_SCRIPT, sizeof (uintptr_t) },
+	{ "stack_trace", V8_OFF_JSMESSAGEOBJECT_STACK_TRACE, sizeof (uintptr_t) },
+	{ "stack_frames", V8_OFF_JSMESSAGEOBJECT_STACK_FRAMES, sizeof (uintptr_t) },
+	{ "start_position", V8_OFF_JSMESSAGEOBJECT_START_POSITION, sizeof (uintptr_t) },
+	{ "end_position", V8_OFF_JSMESSAGEOBJECT_END_POSITION, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -447,7 +449,7 @@ v8_class_t v8_JSMessageObject_class = {
 
 /* JSRegExp class */
 v8_field_t v8_JSRegExp_fields[] = {
-	{ "data", V8_OFF_JSRegExp_data, sizeof (uintptr_t) },
+	{ "data", V8_OFF_JSREGEXP_DATA, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -457,8 +459,8 @@ v8_class_t v8_JSRegExp_class = {
 
 /* CodeCache class */
 v8_field_t v8_CodeCache_fields[] = {
-	{ "default_cache", V8_OFF_CodeCache_default_cache, sizeof (uintptr_t) },
-	{ "normal_type_cache", V8_OFF_CodeCache_normal_type_cache, sizeof (uintptr_t) },
+	{ "default_cache", V8_OFF_CODECACHE_DEFAULT_CACHE, sizeof (uintptr_t) },
+	{ "normal_type_cache", V8_OFF_CODECACHE_NORMAL_TYPE_CACHE, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -477,6 +479,8 @@ v8_class_t v8_SeqString_class = {
 
 /* ConsString class */
 v8_field_t v8_ConsString_fields[] = {
+	{ "first", V8_OFF_CONSSTRING_FIRST, sizeof (uintptr_t) },
+	{ "second", V8_OFF_CONSSTRING_SECOND, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -486,6 +490,7 @@ v8_class_t v8_ConsString_class = {
 
 /* ExternalString class */
 v8_field_t v8_ExternalString_fields[] = {
+	{ "resource", V8_OFF_EXTERNALSTRING_RESOURCE, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -495,7 +500,7 @@ v8_class_t v8_ExternalString_class = {
 
 /* JSArray class */
 v8_field_t v8_JSArray_fields[] = {
-	{ "length", V8_OFF_JSArray_length, sizeof (uintptr_t) },
+	{ "length", V8_OFF_JSARRAY_LENGTH, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -505,11 +510,11 @@ v8_class_t v8_JSArray_class = {
 
 /* AccessorInfo class */
 v8_field_t v8_AccessorInfo_fields[] = {
-	{ "getter", V8_OFF_AccessorInfo_getter, sizeof (uintptr_t) },
-	{ "setter", V8_OFF_AccessorInfo_setter, sizeof (uintptr_t) },
-	{ "data", V8_OFF_AccessorInfo_data, sizeof (uintptr_t) },
-	{ "name", V8_OFF_AccessorInfo_name, sizeof (uintptr_t) },
-	{ "flag", V8_OFF_AccessorInfo_flag, sizeof (uintptr_t) },
+	{ "getter", V8_OFF_ACCESSORINFO_GETTER, sizeof (uintptr_t) },
+	{ "setter", V8_OFF_ACCESSORINFO_SETTER, sizeof (uintptr_t) },
+	{ "data", V8_OFF_ACCESSORINFO_DATA, sizeof (uintptr_t) },
+	{ "name", V8_OFF_ACCESSORINFO_NAME, sizeof (uintptr_t) },
+	{ "flag", V8_OFF_ACCESSORINFO_FLAG, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -519,9 +524,9 @@ v8_class_t v8_AccessorInfo_class = {
 
 /* AccessCheckInfo class */
 v8_field_t v8_AccessCheckInfo_fields[] = {
-	{ "named_callback", V8_OFF_AccessCheckInfo_named_callback, sizeof (uintptr_t) },
-	{ "indexed_callback", V8_OFF_AccessCheckInfo_indexed_callback, sizeof (uintptr_t) },
-	{ "data", V8_OFF_AccessCheckInfo_data, sizeof (uintptr_t) },
+	{ "named_callback", V8_OFF_ACCESSCHECKINFO_NAMED_CALLBACK, sizeof (uintptr_t) },
+	{ "indexed_callback", V8_OFF_ACCESSCHECKINFO_INDEXED_CALLBACK, sizeof (uintptr_t) },
+	{ "data", V8_OFF_ACCESSCHECKINFO_DATA, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -531,12 +536,12 @@ v8_class_t v8_AccessCheckInfo_class = {
 
 /* InterceptorInfo class */
 v8_field_t v8_InterceptorInfo_fields[] = {
-	{ "getter", V8_OFF_InterceptorInfo_getter, sizeof (uintptr_t) },
-	{ "setter", V8_OFF_InterceptorInfo_setter, sizeof (uintptr_t) },
-	{ "query", V8_OFF_InterceptorInfo_query, sizeof (uintptr_t) },
-	{ "deleter", V8_OFF_InterceptorInfo_deleter, sizeof (uintptr_t) },
-	{ "enumerator", V8_OFF_InterceptorInfo_enumerator, sizeof (uintptr_t) },
-	{ "data", V8_OFF_InterceptorInfo_data, sizeof (uintptr_t) },
+	{ "getter", V8_OFF_INTERCEPTORINFO_GETTER, sizeof (uintptr_t) },
+	{ "setter", V8_OFF_INTERCEPTORINFO_SETTER, sizeof (uintptr_t) },
+	{ "query", V8_OFF_INTERCEPTORINFO_QUERY, sizeof (uintptr_t) },
+	{ "deleter", V8_OFF_INTERCEPTORINFO_DELETER, sizeof (uintptr_t) },
+	{ "enumerator", V8_OFF_INTERCEPTORINFO_ENUMERATOR, sizeof (uintptr_t) },
+	{ "data", V8_OFF_INTERCEPTORINFO_DATA, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -546,8 +551,8 @@ v8_class_t v8_InterceptorInfo_class = {
 
 /* CallHandlerInfo class */
 v8_field_t v8_CallHandlerInfo_fields[] = {
-	{ "callback", V8_OFF_CallHandlerInfo_callback, sizeof (uintptr_t) },
-	{ "data", V8_OFF_CallHandlerInfo_data, sizeof (uintptr_t) },
+	{ "callback", V8_OFF_CALLHANDLERINFO_CALLBACK, sizeof (uintptr_t) },
+	{ "data", V8_OFF_CALLHANDLERINFO_DATA, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -557,8 +562,8 @@ v8_class_t v8_CallHandlerInfo_class = {
 
 /* TemplateInfo class */
 v8_field_t v8_TemplateInfo_fields[] = {
-	{ "tag", V8_OFF_TemplateInfo_tag, sizeof (uintptr_t) },
-	{ "property_list", V8_OFF_TemplateInfo_property_list, sizeof (uintptr_t) },
+	{ "tag", V8_OFF_TEMPLATEINFO_TAG, sizeof (uintptr_t) },
+	{ "property_list", V8_OFF_TEMPLATEINFO_PROPERTY_LIST, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -568,8 +573,8 @@ v8_class_t v8_TemplateInfo_class = {
 
 /* SignatureInfo class */
 v8_field_t v8_SignatureInfo_fields[] = {
-	{ "receiver", V8_OFF_SignatureInfo_receiver, sizeof (uintptr_t) },
-	{ "args", V8_OFF_SignatureInfo_args, sizeof (uintptr_t) },
+	{ "receiver", V8_OFF_SIGNATUREINFO_RECEIVER, sizeof (uintptr_t) },
+	{ "args", V8_OFF_SIGNATUREINFO_ARGS, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -579,7 +584,7 @@ v8_class_t v8_SignatureInfo_class = {
 
 /* TypeSwitchInfo class */
 v8_field_t v8_TypeSwitchInfo_fields[] = {
-	{ "types", V8_OFF_TypeSwitchInfo_types, sizeof (uintptr_t) },
+	{ "types", V8_OFF_TYPESWITCHINFO_TYPES, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -589,10 +594,10 @@ v8_class_t v8_TypeSwitchInfo_class = {
 
 /* DebugInfo class */
 v8_field_t v8_DebugInfo_fields[] = {
-	{ "shared", V8_OFF_DebugInfo_shared, sizeof (uintptr_t) },
-	{ "original_code", V8_OFF_DebugInfo_original_code, sizeof (uintptr_t) },
-	{ "code", V8_OFF_DebugInfo_code, sizeof (uintptr_t) },
-	{ "break_points", V8_OFF_DebugInfo_break_points, sizeof (uintptr_t) },
+	{ "shared", V8_OFF_DEBUGINFO_SHARED, sizeof (uintptr_t) },
+	{ "original_code", V8_OFF_DEBUGINFO_ORIGINAL_CODE, sizeof (uintptr_t) },
+	{ "code", V8_OFF_DEBUGINFO_CODE, sizeof (uintptr_t) },
+	{ "break_points", V8_OFF_DEBUGINFO_BREAK_POINTS, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -602,10 +607,10 @@ v8_class_t v8_DebugInfo_class = {
 
 /* BreakPointInfo class */
 v8_field_t v8_BreakPointInfo_fields[] = {
-	{ "code_position", V8_OFF_BreakPointInfo_code_position, sizeof (uintptr_t) },
-	{ "source_position", V8_OFF_BreakPointInfo_source_position, sizeof (uintptr_t) },
-	{ "statement_position", V8_OFF_BreakPointInfo_statement_position, sizeof (uintptr_t) },
-	{ "break_point_objects", V8_OFF_BreakPointInfo_break_point_objects, sizeof (uintptr_t) },
+	{ "code_position", V8_OFF_BREAKPOINTINFO_CODE_POSITION, sizeof (uintptr_t) },
+	{ "source_position", V8_OFF_BREAKPOINTINFO_SOURCE_POSITION, sizeof (uintptr_t) },
+	{ "statement_position", V8_OFF_BREAKPOINTINFO_STATEMENT_POSITION, sizeof (uintptr_t) },
+	{ "break_point_objects", V8_OFF_BREAKPOINTINFO_BREAK_POINT_OBJECTS, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -633,6 +638,7 @@ v8_class_t v8_JSBuiltinsObject_class = {
 
 /* SeqAsciiString class */
 v8_field_t v8_SeqAsciiString_fields[] = {
+	{ "chars", V8_OFF_SEQASCIISTRING_CHARS, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -678,19 +684,19 @@ v8_class_t v8_JSRegExpResult_class = {
 
 /* FunctionTemplateInfo class */
 v8_field_t v8_FunctionTemplateInfo_fields[] = {
-	{ "serial_number", V8_OFF_FunctionTemplateInfo_serial_number, sizeof (uintptr_t) },
-	{ "call_code", V8_OFF_FunctionTemplateInfo_call_code, sizeof (uintptr_t) },
-	{ "property_accessors", V8_OFF_FunctionTemplateInfo_property_accessors, sizeof (uintptr_t) },
-	{ "prototype_template", V8_OFF_FunctionTemplateInfo_prototype_template, sizeof (uintptr_t) },
-	{ "parent_template", V8_OFF_FunctionTemplateInfo_parent_template, sizeof (uintptr_t) },
-	{ "named_property_handler", V8_OFF_FunctionTemplateInfo_named_property_handler, sizeof (uintptr_t) },
-	{ "indexed_property_handler", V8_OFF_FunctionTemplateInfo_indexed_property_handler, sizeof (uintptr_t) },
-	{ "instance_template", V8_OFF_FunctionTemplateInfo_instance_template, sizeof (uintptr_t) },
-	{ "class_name", V8_OFF_FunctionTemplateInfo_class_name, sizeof (uintptr_t) },
-	{ "signature", V8_OFF_FunctionTemplateInfo_signature, sizeof (uintptr_t) },
-	{ "instance_call_handler", V8_OFF_FunctionTemplateInfo_instance_call_handler, sizeof (uintptr_t) },
-	{ "access_check_info", V8_OFF_FunctionTemplateInfo_access_check_info, sizeof (uintptr_t) },
-	{ "flag", V8_OFF_FunctionTemplateInfo_flag, sizeof (uintptr_t) },
+	{ "serial_number", V8_OFF_FUNCTIONTEMPLATEINFO_SERIAL_NUMBER, sizeof (uintptr_t) },
+	{ "call_code", V8_OFF_FUNCTIONTEMPLATEINFO_CALL_CODE, sizeof (uintptr_t) },
+	{ "property_accessors", V8_OFF_FUNCTIONTEMPLATEINFO_PROPERTY_ACCESSORS, sizeof (uintptr_t) },
+	{ "prototype_template", V8_OFF_FUNCTIONTEMPLATEINFO_PROTOTYPE_TEMPLATE, sizeof (uintptr_t) },
+	{ "parent_template", V8_OFF_FUNCTIONTEMPLATEINFO_PARENT_TEMPLATE, sizeof (uintptr_t) },
+	{ "named_property_handler", V8_OFF_FUNCTIONTEMPLATEINFO_NAMED_PROPERTY_HANDLER, sizeof (uintptr_t) },
+	{ "indexed_property_handler", V8_OFF_FUNCTIONTEMPLATEINFO_INDEXED_PROPERTY_HANDLER, sizeof (uintptr_t) },
+	{ "instance_template", V8_OFF_FUNCTIONTEMPLATEINFO_INSTANCE_TEMPLATE, sizeof (uintptr_t) },
+	{ "class_name", V8_OFF_FUNCTIONTEMPLATEINFO_CLASS_NAME, sizeof (uintptr_t) },
+	{ "signature", V8_OFF_FUNCTIONTEMPLATEINFO_SIGNATURE, sizeof (uintptr_t) },
+	{ "instance_call_handler", V8_OFF_FUNCTIONTEMPLATEINFO_INSTANCE_CALL_HANDLER, sizeof (uintptr_t) },
+	{ "access_check_info", V8_OFF_FUNCTIONTEMPLATEINFO_ACCESS_CHECK_INFO, sizeof (uintptr_t) },
+	{ "flag", V8_OFF_FUNCTIONTEMPLATEINFO_FLAG, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -700,8 +706,8 @@ v8_class_t v8_FunctionTemplateInfo_class = {
 
 /* ObjectTemplateInfo class */
 v8_field_t v8_ObjectTemplateInfo_fields[] = {
-	{ "constructor", V8_OFF_ObjectTemplateInfo_constructor, sizeof (uintptr_t) },
-	{ "internal_field_count", V8_OFF_ObjectTemplateInfo_internal_field_count, sizeof (uintptr_t) },
+	{ "constructor", V8_OFF_OBJECTTEMPLATEINFO_CONSTRUCTOR, sizeof (uintptr_t) },
+	{ "internal_field_count", V8_OFF_OBJECTTEMPLATEINFO_INTERNAL_FIELD_COUNT, sizeof (uintptr_t) },
 	{ NULL }
 };
 
@@ -777,7 +783,6 @@ v8_class_t *v8_classes[] = {
 	&v8_JSRegExpResult_class,
 	&v8_FunctionTemplateInfo_class,
 	&v8_ObjectTemplateInfo_class,
+	NULL
 };
-
-static const int v8_nclasses = sizeof (v8_classes) / sizeof (v8_classes[0]);
 

@@ -1,8 +1,10 @@
 #define V8CTF_HEAPOBJ_FIELD(klass, name, type, offsetname)	\
-    extern int v8ctf_##klass##__##name##__##type = klass::offsetname;
+    extern int v8ctf_class_##klass##__##name##__##type;		\
+    int v8ctf_class_##klass##__##name##__##type = klass::offsetname;
 
 #include "v8.h"
 #include "objects-inl.h"
+#include "frames-inl.h"
 
 /*
  * Define some of our own that are otherwise left undefined.
@@ -11,8 +13,64 @@ namespace v8 {
 namespace internal {
 V8CTF_HEAPOBJ_FIELD(HeapObject, map, Map, kMapOffset);
 V8CTF_HEAPOBJ_FIELD(JSObject, elements, Object, kElementsOffset);
+V8CTF_HEAPOBJ_FIELD(FixedArray, data, uintptr_t, kHeaderSize);
+V8CTF_HEAPOBJ_FIELD(Map, instance_attributes, int, kInstanceAttributesOffset);
+
+V8CTF_HEAPOBJ_FIELD(ConsString, first, String, kFirstOffset);
+V8CTF_HEAPOBJ_FIELD(ConsString, second, String, kSecondOffset);
+V8CTF_HEAPOBJ_FIELD(ExternalString, resource, Object, kResourceOffset);
+V8CTF_HEAPOBJ_FIELD(SeqAsciiString, chars, char, kHeaderSize);
 }
 }
+
+typedef struct v8_define {
+	const char 	*v8d_name;
+	uintptr_t	v8d_value;
+} v8_define_t;
+
+using namespace v8::internal;
+
+static v8_define_t v8_roots[] = {
+	{ "V8_OFF_ROOTS_VALUE_UNDEFINED", Heap::kUndefinedValueRootIndex },
+	{ "V8_OFF_ROOTS_VALUE_NULL",	Heap::kNullValueRootIndex },
+	{ "V8_OFF_ROOTS_VALUE_TRUE",	Heap::kTrueValueRootIndex },
+	{ "V8_OFF_ROOTS_VALUE_FALSE",	Heap::kFalseValueRootIndex },
+	{ "V8_OFF_ROOTS_VALUE_NAN",	Heap::kNanValueRootIndex },
+	{ "V8_OFF_ROOTS_VALUE_MINZERO",	Heap::kMinusZeroValueRootIndex },
+	{ NULL, 0 }
+};
+
+static v8_define_t v8_objids[] = {
+	{ "V8_FirstNonstringType",		FIRST_NONSTRING_TYPE	},
+
+	{ "V8_IsNotStringMask",			kIsNotStringMask	},
+	{ "V8_StringTag",			kStringTag		},
+	{ "V8_NotStringTag",			kNotStringTag		},
+
+	{ "V8_StringEncodingMask",		kStringEncodingMask	},
+	{ "V8_TwoByteStringTag",		kTwoByteStringTag	},
+	{ "V8_AsciiStringTag",			kAsciiStringTag		},
+
+	{ "V8_StringRepresentationMask",	kStringRepresentationMask },
+	{ "V8_SeqStringTag",			kSeqStringTag 		},
+	{ "V8_ConsStringTag",			kConsStringTag 		},
+	{ "V8_ExternalStringTag",		kExternalStringTag 	},
+
+	{ "V8_FailureTag",			kFailureTag		},
+	{ "V8_FailureTagMask",			kFailureTagMask		},
+	{ "V8_HeapObjectTag",			kHeapObjectTag		},
+	{ "V8_HeapObjectTagMask",		kHeapObjectTagMask	},
+	{ "V8_SmiTag",				kSmiTag			},
+	{ "V8_SmiTagMask",			kSmiTagMask		},
+	{ "V8_SmiValueShift",			kSmiTagSize		},
+
+	{ "V8_OFF_FP_MARKER",	StandardFrameConstants::kMarkerOffset	},
+	{ "V8_OFF_FP_FUNCTION",	JavaScriptFrameConstants::kFunctionOffset },
+
+	{ NULL, 0 }
+};
+
+#include "heap.h"
 
 #include <unistd.h>
 #include <demangle.h>
@@ -21,6 +79,9 @@ V8CTF_HEAPOBJ_FIELD(JSObject, elements, Object, kElementsOffset);
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <ctype.h>
+
+#define	MIN(x, y)	((x) < (y) ? (x) : (y))
 
 typedef struct field {
 	struct field	*f_next;
@@ -37,16 +98,23 @@ typedef struct klass {
 
 klass_t *klasses;
 
-const char *v8ctf_prefix = "v8::internal::v8ctf";
+const char *v8ctf_prefix = "v8::internal::v8ctf_class";
 
 const char *code_header =
     "/*\n"
     " * heap-dbg-inl.h: auto-generated.  Do not edit directly.\n"
-    " * See heap-dbg-common.h for details."
+    " * See heap-dbg-common.h for details.\n"
     " */\n"
+    "\n"
+    "#ifndef HEAPDBG_CONSTANTS_H\n"
+    "#define HEAPDBG_CONSTANTS_H\n"
     "\n"
     "#include \"heap-dbg-common.h\"\n"
     "\n";
+
+const char *code_footer =
+    "\n"
+    "#endif\n";
 
 const char *const_prefix = "V8_OFF";
 
@@ -55,8 +123,6 @@ static int parse_symbol(char *, char **, char **, char **);
 static int add_field(char *, char *, char *, char *);
 
 static void emit_code(void);
-static void emit_head(void);
-static void emit_constants(void);
 
 int
 main(int argc, char *argv[])
@@ -234,32 +300,49 @@ add_field(char *symname, char *klass, char *field, char *type)
 }
 
 static void
+emit_constants(v8_define_t *defs)
+{
+	v8_define_t *dp;
+
+	for (dp = defs; dp->v8d_name != NULL; dp++)
+		(void) printf("#define\t%s\t0x%x\n",
+		    dp->v8d_name, dp->v8d_value);
+}
+
+static void
 emit_code(void)
-{
-	emit_head();
-	emit_constants();
-}
-
-static void
-emit_head(void)
-{
-	(void) printf(code_header);
-}
-
-static void
-emit_constants(void)
 {
 	klass_t *clp;
 	field_t *flp;
+	char buf[128];
+	int ii;
+	size_t len;
+
+	(void) printf(code_header);
 
 	for (clp = klasses; clp != NULL; clp = clp->c_next) {
 		(void) printf("/* %s class constants */\n", clp->c_name);
 
-		for (flp = clp->c_fields; flp != NULL; flp = flp->f_next)
-			(void) printf("#define\t%s_%s_%s\t"
-			    "(V8_OFF_HEAP(0x%x))\n", const_prefix,
-			    clp->c_name, flp->f_name, flp->f_offset);
+		for (flp = clp->c_fields; flp != NULL; flp = flp->f_next) {
+			len = snprintf(buf, sizeof (buf), "%s_%s_%s",
+			    const_prefix, clp->c_name, flp->f_name);
+
+			for (ii = 0; ii < MIN(len, sizeof (buf) - 1); ii++)
+				buf[ii] = toupper(buf[ii]);
+
+			(void) printf("#define\t%s\t(V8_OFF_HEAP(0x%x))\n",
+			    buf, flp->f_offset);
+		}
 
 		(void) printf("\n");
 	}
+
+	(void) printf("/* offsets from \"roots_\" for special values */\n");
+	emit_constants(v8_roots);
+	(void) printf("\n");
+
+	(void) printf("/* offsets for object identification */\n");
+	emit_constants(v8_objids);
+
+	(void) printf(code_footer);
 }

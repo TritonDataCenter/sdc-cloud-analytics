@@ -77,7 +77,7 @@ static v8_enum_t v8_frametypes[] = {
 	{ "None",			0 },
 	{ "EntryFrame"			  },
 	{ "EntryConstructFrame"		  },
-	{ "ExitFrame"		  	  },
+	{ "ExitFrame"			  },
 	{ "JavaScriptFrame"		  },
 	{ "OptimizedFrame"		  },
 	{ "InternalFrame"		  },
@@ -778,7 +778,22 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (opt_v)
 		mdb_printf("\n");
 
-	if (read_heap_ptr(&ftype, addr, V8_OFF_FP_MARKER) != 0)
+	/*
+	 * First figure out what kind of frame this is using the same algorithm
+	 * as V8's ComputeType function.  We only print useful information for
+	 * JavaScriptFrames.  Conveniently, most other frame types are indicated
+	 * by the presence of a frame type identifier on the stack.  For
+	 * ArgumentsAdaptorFrames, the type identifier is in the "context" slot,
+	 * while for other frames the type identifier is in the "marker" slot.
+	 * Like V8, we check for the AdaptorFrame first, then look for other
+	 * types, and if we haven't found a frame type identifier then we assume
+	 * we're looking at a JavaScriptFrame.
+	 */
+	if (read_heap_ptr(&ftype, addr, V8_OFF_FP_CONTEXT) != 0)
+		return (DCMD_ERR);
+
+	if (!(ftype & V8_SmiTagMask) == V8_SmiTag &&
+	    read_heap_ptr(&ftype, addr, V8_OFF_FP_MARKER) != 0)
 		return (DCMD_ERR);
 
 	if ((ftype & V8_SmiTagMask) == V8_SmiTag) {

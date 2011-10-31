@@ -214,6 +214,7 @@
 #define	V8_SmiTag	0x0
 #define	V8_SmiTagMask	0x1
 #define	V8_SmiValueShift	0x1
+#define	V8_OFF_FP_CONTEXT	0xfffffffc
 #define	V8_OFF_FP_MARKER	0xfffffff8
 #define	V8_OFF_FP_FUNCTION	0xfffffff8
 

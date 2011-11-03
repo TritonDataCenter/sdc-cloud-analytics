@@ -1,4 +1,5 @@
-CFLAGS = -Wall
+CC=gcc
+CFLAGS = -Wall -Wno-unknown-pragmas
 CPPFLAGS += -Iv8
 SOLDFLAGS = -shared -fPIC
 

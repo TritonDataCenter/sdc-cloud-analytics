@@ -32,6 +32,28 @@
 		"stat": "loadavg1",
 		"fields": [ "hostname", "zonename" ]
 	}, {
+		"module": "ldapjs",
+		"stat": "connections",
+		"fields": [
+		    "hostname", "zonename", "pid", "execname", "psargs", "raddr"
+		]
+	}, {
+		"module": "ldapjs",
+		"stat": "ops",
+		"fields": [
+		    "hostname", "zonename", "pid", "execname", "psargs",
+		    "raddr", "optype", "ldapbinddn", "ldaprequestdn", "status",
+		    "latency"
+		]
+	}, {
+		"module": "ldapjs",
+		"stat": "search_ops",
+		"fields": [
+		    "hostname", "zonename", "pid", "execname", "psargs",
+		    "raddr", "ldapbinddn", "ldaprequestdn", "status",
+		    "ldapfilter", "ldapscope", "latency"
+		]
+	}, {
 		"module": "memory",
 		"stat": "rss",
 		"fields": [ "hostname", "zonename" ]

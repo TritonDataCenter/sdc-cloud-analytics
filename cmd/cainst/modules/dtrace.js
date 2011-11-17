@@ -25,7 +25,7 @@ var insd_metrics = [ 'syscall-ops', 'node-gc_ops', 'node-httpd_ops',
     'mysql-statement_ops', 'cpu-thread_samples', 'fs-rw_ops',
     'vm-thread_samples', 'vm-irqs', 'vm-physio_ops', 'vm-physio_bytes',
     'tcp-accepts', 'tcp-connects', 'proc-exec', 'proc-exits', 'proc-fork',
-    'thread-create' ];
+    'thread-create', 'ldapjs-connects', 'ldapjs-ops', 'ldapjs-search_ops' ];
 
 if (process.env['DTRACE_LIBPATH']) {
 	insd_dt_libpath = process.env['DTRACE_LIBPATH'].split(':');

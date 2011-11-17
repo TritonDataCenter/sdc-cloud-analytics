@@ -25,6 +25,28 @@
 		"stat": "waittime",
 		"fields": [ "zonename" ]
 	}, {
+		"module": "ldapjs",
+		"stat": "connections",
+		"fields": [
+		    "zonename", "pid", "execname", "psargs", "raddr"
+		]
+	}, {
+		"module": "ldapjs",
+		"stat": "ops",
+		"fields": [
+		    "zonename", "pid", "execname", "psargs",
+		    "raddr", "optype", "ldapbinddn", "ldaprequestdn", "status",
+		    "latency"
+		]
+	}, {
+		"module": "ldapjs",
+		"stat": "search_ops",
+		"fields": [
+		    "zonename", "pid", "execname", "psargs",
+		    "raddr", "ldapbinddn", "ldaprequestdn", "status",
+		    "ldapfilter", "ldapscope", "latency"
+		]
+	}, {
 		"module": "memory",
 		"stat": "rss",
 		"fields": [ "zonename" ]

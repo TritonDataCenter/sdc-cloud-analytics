@@ -1544,6 +1544,56 @@ this metric shows when the zone is experiencing latency as a result of having
 previously exceeded its memory limit.
 
 
+## ldapjs-related metrics
+
+The ldapjs metrics report LDAP protocol activity for Node.js programs using the
+ldapjs library version 0.3.2 or later.
+
+### ldapjs: connections
+
+||**Name**|| ldapjs.connections ||
+||**Raw metric**|| number of client connections to the server ||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, raddr ||
+||**Visibility**|| operators and end users||
+
+This metric reports client connections to an LDAP server, with decompositions
+to identify the server process and client IP address.
+
+
+### ldapjs: all operations
+
+||**Name**|| ldapjs.ops ||
+||**Raw metric**|| number of server LDAP operations ||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, raddr, optype, ldapbinddn, ldaprequestdn, status, latency (heatmap) ||
+||**Visibility**|| operators and end users||
+
+This metric reports LDAP operations executed by the server, with decompositions
+to identify the server process, client IP address, and operation details
+(operation type, bind DN, request DN, and status).  The "latency" field shows a
+heatmap of operation latency, which is useful for identifying cases where the
+LDAP server is a source of systemic latency.  For such cases, the detail fields
+can help isolate the types of operations taking the most time.
+
+Additional information is available for "search" operations using the "ldapjs:
+search operations" metric.
+
+
+### ldapjs: search operations
+
+||**Name**|| ldapjs.search_ops ||
+||**Raw metric**|| number of LDAP "search" operations ||
+||**Decompositions**|| hostname, zonename, pid, execname, psargs, raddr, ldapbinddn, ldaprequestdn, status, ldapfilter, ldapscope, latency (heatmap) ||
+||**Visibility**|| operators and end users||
+
+This metric reports LDAP "search" operations executed by the server, with
+decompositions to identify the server process, client IP address, and search
+query details.  This metric is similar to the "ldapjs: all operations" metric
+but isolates only the "search" operations and includes search-specific fields
+describing the filter and scope.  For investigating poor search performance,
+these fields can be used to identify which queries are taking the most time.
+
+
+
 ## MySQL-related metrics
 
 The MySQL metrics report activity for MySQL and Percona master database
@@ -2256,6 +2306,10 @@ individual values, a vector rather than a scalar).
 || **http_path** || HTTP request URL path (URL without query parameters) ||
 || **http_url** || HTTP request URL ||
 || **irqvector** || IRQ vector ||
+|| **ldapbinddn** || LDAP bind DN ||
+|| **ldapfilter** || LDAP search filter ||
+|| **ldaprequestdn** || LDAP request DN ||
+|| **ldapscope** || LDAP search scope ||
 || **leavereason** || description of why a process came off-CPU ||
 || **nic** || network interface identifier (e.g., "e1000g0") ||
 || **optype** || operation type, often "read" or "write" but can be any operation depending on the  metric ||

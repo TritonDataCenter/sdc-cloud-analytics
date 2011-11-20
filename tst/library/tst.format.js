@@ -16,4 +16,4 @@ mod_assert.equal(format(124123), '02:04.123s');
 mod_assert.equal(format(3600000), '01:00:00.000s');
 mod_assert.equal(format(3604123), '01:00:04.123s');
 mod_assert.equal(format(3674123), '01:01:14.123s');
-mod_assert.equal(format(25 * 3600000), '1 day 01:00:00.000s');
+mod_assert.equal(format(25 * 3600000), '1d 01:00:00.000s');

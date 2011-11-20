@@ -573,6 +573,62 @@ function ccExtractComponents(svcs)
 }
 
 /*
+ * Given a component routekey, return an abbreviated name no longer than the
+ * specified length.
+ */
+function ccAbbrevRoutekey(routekey, length)
+{
+	/*
+	 * Routing keys generally have the form:
+	 *
+	 *    [pfx]ca.<component>.<hostname>[-<suffix>]
+	 *
+	 * where:
+	 *
+	 *    o 'pfx' is completely optional and used for dev and testing
+	 *    o <component> is one of a few known component types
+	 *    o <hostname> can be arbitrarily long
+	 *    o '-<suffix>' is only used for aggregators
+	 *
+	 * The hostname is the part we'd prefer to abbreviate.  Rather than
+	 * parse the entire routing key (which would be both painful and
+	 * brittle), we just identify the <component> section and replace as
+	 * many characters as necessary following that with "...".  That's
+	 * almost true: we actually keep the first 'overlap' (5) characters of
+	 * the hostname since people often recognize these better than the
+	 * characters at the end.
+	 */
+	var components = [ 'config', 'aggregator', 'instrumenter', 'stash' ];
+	var needchop = routekey.length - length;
+	var overlap = 5;
+	var ckey, idx, prefix, suffix, ii;
+
+	if (needchop <= 0)
+		return (routekey);
+
+	/* Chop an additional three for the "..." that we're going to add. */
+	needchop += '...'.length;
+
+	for (ii = 0; ii < components.length; ii++) {
+		ckey = 'ca.' + components[ii] + '.';
+		idx = routekey.indexOf(ckey);
+		if (idx != -1) {
+			prefix = routekey.substr(0, idx + ckey.length +
+			    overlap);
+			suffix = routekey.substr(idx + ckey.length + needchop +
+			    overlap);
+			break;
+		}
+	}
+
+	if (prefix === undefined)
+		/* ignore whatever we didn't understand. */
+		return (routekey);
+
+	return (prefix + '...' + suffix);
+}
+
+/*
  * Print a one-line summary of a CA service.
  */
 function ccSumSvcSummary(svcs, rkey)
@@ -580,15 +636,14 @@ function ccSumSvcSummary(svcs, rkey)
 	var svc, msg;
 
 	if (!rkey) {
-		printf('%-12s  %-40s  %-6s  %s\n', 'SERVICE', 'ROUTEKEY',
-		    'PING', 'UPTIME');
+		printf('%-50s  %-6s  %s\n', 'SERVICES', 'PING', 'UPTIME');
 		return;
 	}
 
 	svc = svcs[rkey];
 	msg = svc.status;
-	printf('%-12s  %-40s  %4dms  %s\n',
-	    msg.s_component.toUpperCase(), msg.ca_source, svc.latency,
+	printf('%-50s  %4dms  %s\n',
+	    ccAbbrevRoutekey(msg.ca_source, 50), svc.latency,
 	    msg.s_status && msg.s_status.uptime ?
 	    mod_ca.caFormatDuration(msg.s_status.uptime) : 'unknown');
 }
@@ -601,13 +656,13 @@ function ccSumSvcAggr(svcs, verbose, rkey)
 	var msg, fqid, instn;
 
 	if (!rkey) {
-		printf('    %-49s  %-7s  %8s\n', 'ROUTEKEY', 'PORT',
+		printf('%-62s  %-5s  %8s\n', 'AGGREGATORS', 'PORT',
 		    'R#INSTNS');
 		return;
 	}
 
 	msg = svcs[rkey].status;
-	printf('    %-49s  %7d  %8d\n', msg.ca_source,
+	printf('%-62s  %5d  %8d\n', msg.ca_source,
 	    msg.s_status.agg_http_port, msg.s_status.agg_ninsts);
 
 	if (!verbose)
@@ -616,11 +671,11 @@ function ccSumSvcAggr(svcs, verbose, rkey)
 	if (caIsEmpty(msg.s_status.agg_insts))
 		return;
 
-	printf('        %-45s  %-6s  %-3s  %-5s  %-3s\n',
+	printf('    %-45s  %-6s  %-3s  %-5s  %-3s\n',
 	    'INSTNID', 'RETAIN', 'PST', 'GRAN', 'DIM');
 	for (fqid in msg.s_status.agg_insts) {
 		instn = msg.s_status.agg_insts[fqid];
-		printf('        %-45s  %5ds  %3s  %4ds  %3d\n',
+		printf('    %-45s  %5ds  %3s  %4ds  %3d\n',
 		    fqid, instn['inst']['retention-time'],
 		    instn['inst']['persist-data'] ? 'Y' : 'N',
 		    instn['inst']['granularity'],
@@ -636,8 +691,8 @@ function ccSumSvcInstr(svcs, verbose, rkey)
 	var msg, ii, metadata;
 
 	msg = svcs[rkey].status;
-	printf('    %-49s  %-7s  %8s\n', 'ROUTEKEY', 'METRICS', 'R#INSTNS');
-	printf('    %-49s  %7d  %8d\n', msg.ca_source,
+	printf('%-62s  %-4s   %8s\n', 'INSTRUMENTERS', 'NMET', 'R#INSTNS');
+	printf('%-62s  %4d   %8d\n', msg.ca_source,
 	    msg.s_metadata['metrics'].length,
 	    msg.s_status.instrumentations.length);
 
@@ -645,7 +700,7 @@ function ccSumSvcInstr(svcs, verbose, rkey)
 		return;
 
 	for (ii = 0; ii < msg.s_status.instrumentations.length; ii++)
-		printf('        %-45s\n',
+		printf('    %-45s\n',
 		    msg.s_status.instrumentations[ii].s_inst_id);
 
 	if (cc_cmd == 'status') {
@@ -663,8 +718,7 @@ function ccSumCfgInstns(svcs, verbose, rkey)
 {
 	var instns, entries, instn, arity, idx, ii;
 
-	printf('\nINSTRUMENTATIONS FOR %s\n', rkey);
-	printf('    %-45s  %-20s  %-10s\n', 'INSTNID',
+	printf('\n%-45s  %-20s  %-10s\n', 'INSTRUMENTATIONS',
 	    'MOD.STAT', 'DIM/ARITY');
 
 	instns = svcs[rkey].status.s_status.cfg_insts;
@@ -676,22 +730,22 @@ function ccSumCfgInstns(svcs, verbose, rkey)
 		if ((idx = arity.indexOf('-decomposition')) != -1)
 			arity = arity.substring(0, idx);
 
-		printf('    %-45s  %-20s  %d/%s\n', entries[ii],
+		printf('%-45s  %-20s  %d/%s\n', entries[ii],
 		    instn['module'] + '.' + instn['stat'],
 		    instn['value-dimension'], arity);
 
 		if (!verbose)
 			continue;
 
-		printf('            %-11s %s\n', 'aggregator:',
+		printf('    %-11s %s\n', 'aggregator:',
 		    instn['aggregator']);
 
 		if (!caIsEmpty(instn['predicate']))
-			printf('            %-11s %s\n', 'predicate:',
+			printf('    %-11s %s\n', 'predicate:',
 			    mod_capred.caPredPrint(instn['predicate']));
 
 		if (instn['decomposition'].length !== 0)
-			printf('            %-11s %j\n', 'decomps:',
+			printf('    %-11s %j\n', 'decomps:',
 			    instn['decomposition']);
 	}
 }
@@ -716,16 +770,10 @@ function ccSumSummarize(err, svcs)
 		printf('warning: expected 1 stash, but found %d\n',
 		    bytype['stash'].length);
 
-	ccSumSvcSummary(svcs);
-	bytype['config'].forEach(ccSumSvcSummary.bind(null, svcs));
-	bytype['stash'].forEach(ccSumSvcSummary.bind(null, svcs));
-	bytype['aggregator'].forEach(ccSumSvcSummary.bind(null, svcs));
-	bytype['instrumenter'].forEach(ccSumSvcSummary.bind(null, svcs));
-
 	bytype['config'].forEach(function (host) {
 		msg = svcs[host].status;
 
-		printf('\nCONFIG %s\n', host);
+		printf('CONFIG %s\n', host);
 		printf('    %-9s %dms\n', 'response:',
 		    msg.s_status['request_latency']);
 		printf('    %-9s %d\n', '# aggrs:',
@@ -738,17 +786,22 @@ function ccSumSummarize(err, svcs)
 		    Object.keys(msg.s_status['instn-scopes']).length);
 	});
 
+	printf('\n');
+	ccSumSvcSummary(svcs);
+	bytype['config'].forEach(ccSumSvcSummary.bind(null, svcs));
+	bytype['stash'].forEach(ccSumSvcSummary.bind(null, svcs));
+	bytype['aggregator'].forEach(ccSumSvcSummary.bind(null, svcs));
+	bytype['instrumenter'].forEach(ccSumSvcSummary.bind(null, svcs));
+
 	if (bytype['aggregator'].length > 0) {
-		if (bytype['aggregator'].length > 1)
-			printf('\nAGGREGATORS\n');
+		printf('\n');
 		ccSumSvcAggr(svcs, false);
 		bytype['aggregator'].forEach(
 		    ccSumSvcAggr.bind(null, svcs, cc_verbose));
 	}
 
 	if (bytype['instrumenter'].length > 0) {
-		if (bytype['instrumenter'].length > 1)
-			printf('\nINSTRUMENTERS\n');
+		printf('\n');
 		bytype['instrumenter'].forEach(ccSumSvcInstr.bind(null, svcs,
 		    cc_verbose));
 	}

@@ -6,6 +6,7 @@ var mod_ca = require('../../../lib/ca/ca-common');
 var mod_dtrace = require('libdtrace');
 var mod_capred = require('../../../lib/ca/ca-pred');
 var mod_caagg = require('../../../lib/ca/ca-agg');
+var mod_fs = require('fs');
 var mod_sys = require('sys');
 var mod_cametad = require('../../../lib/ca/ca-metad');
 var ASSERT = require('assert');
@@ -18,18 +19,8 @@ var insd_dt_strsize = '128';		/* string size */
 var insd_dt_libpath = [];		/* DTrace library Path (-L) */
 var insd_nenablings = 0;		/* number of active enablings */
 
-var insd_metrics = [ 'syscall-ops', 'node-gc_ops', 'node-httpd_ops',
-    'node-httpc_ops', 'node-socket_ops', 'disk-physio_ops',
-    'cpu-thread_executions', 'fs-logical_ops', 'mysql-query_ops',
-    'mysql-connect_ops', 'mysql-filesort_ops', 'mysql-command_ops',
-    'mysql-statement_ops', 'cpu-thread_samples', 'fs-rw_ops',
-    'vm-thread_samples', 'vm-irqs', 'vm-physio_ops', 'vm-physio_bytes',
-    'tcp-accepts', 'tcp-connects', 'proc-exec', 'proc-exits', 'proc-fork',
-    'thread-create', 'ldapjs-connects', 'ldapjs-ops', 'ldapjs-search_ops' ];
-
-if (process.env['DTRACE_LIBPATH']) {
+if (process.env['DTRACE_LIBPATH'])
 	insd_dt_libpath = process.env['DTRACE_LIBPATH'].split(':');
-}
 
 function insdGenerateMetricFunc(desc, metadata)
 {
@@ -45,21 +36,42 @@ function insdGenerateMetricFunc(desc, metadata)
 
 exports.insinit = function (ins, log, callback)
 {
-	var ii, metric, mod;
-
 	insd_log = log;
 
 	ins.registerReporter('dtrace', insdStatus);
 
-	for (ii = 0; ii < insd_metrics.length; ii++) {
-		metric = require(caSprintf('./dtrace/%s', insd_metrics[ii]));
-		mod = caDeepCopy(metric['cadMetricDesc']);
-		mod['impl'] = insdGenerateMetricFunc(metric['cadMetricDesc'],
-		    ins.metadata());
-		ins.registerMetric(mod);
-	}
+	/*
+	 * We expect to be invoked from the root of the package, so we specify a
+	 * complete relative path to our meta-D directory.  However, when we
+	 * "require" these modules below, the path is relative to this source
+	 * file.
+	 */
+	mod_fs.readdir('./cmd/cainst/modules/dtrace', function (err, files) {
+		var ii, metric, mod;
 
-	callback();
+		if (err) {
+			callback(new caSystemError(err,
+			    'failed to list meta-D files'));
+			return;
+		}
+
+		/*
+		 * Sort the files so that we load them in a deterministic order
+		 * each time.  This isn't so that we can depend on this but
+		 * rather to avoid getting bitten by implicit dependencies.
+		 */
+		files.sort();
+
+		for (ii = 0; ii < files.length; ii++) {
+			metric = require(caSprintf('./dtrace/%s', files[ii]));
+			mod = caDeepCopy(metric['cadMetricDesc']);
+			mod['impl'] = insdGenerateMetricFunc(
+			    metric['cadMetricDesc'], ins.metadata());
+			ins.registerMetric(mod);
+		}
+
+		callback();
+	});
 };
 
 function insdStatus()

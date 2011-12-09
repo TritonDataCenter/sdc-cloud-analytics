@@ -1,5 +1,6 @@
 {
     "modules": {
+	"apache":	{ "label": "Apache"			},
 	"ca":		{ "label": "CA"				},
 	"cpu":		{ "label": "CPU"			},
 	"disk":		{ "label": "Disk"			},
@@ -127,6 +128,16 @@
     },
 
     "metrics": [ {
+	"module":	"apache",
+	"stat":		"httpd_ops",
+	"label":	"HTTP requests",
+	"unit":		"requests",
+	"fields":	[
+	    "hostname", "zonename", "pid", "execname", "psargs", "ppid",
+	    "pexecname", "ppsargs", "http_method", "http_url", "raddr",
+	    "rport", "http_path", "latency"
+	]
+    }, {
 	"module":	"cpu",
 	"stat":		"cpus",
 	"label":	"CPUs",

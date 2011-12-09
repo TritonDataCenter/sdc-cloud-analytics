@@ -145,6 +145,7 @@ PKGFILES_cabase = \
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
 	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(PKGROOT)/cabase/lib/ca/errno.js		\
+	$(PKGROOT)/cabase/lib/httpd.d			\
 	$(PKGROOT)/cabase/lib/node.d			\
 	$(PKGROOT)/cabase/tools/nhttpsnoop
 
@@ -313,6 +314,9 @@ deps/%/.git: | deps/%
 	git submodule update --init
 
 $(PKGROOT)/cabase/cmd/node: deps/node/node
+	cp $^ $@
+
+$(PKGROOT)/cabase/lib/httpd.d: lib/httpd.d
 	cp $^ $@
 
 $(PKGROOT)/cabase/lib/node.d: lib/node.d

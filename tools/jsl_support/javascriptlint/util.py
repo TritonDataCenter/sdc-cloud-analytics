@@ -108,9 +108,9 @@ def readfile(path):
         contents = contents[1:]
 
     if contents.startswith('#!'):
-	idx = contents.find('\n');
-	if idx != -1:
-		contents = '\n' + contents[idx + 1:];
+        idx = contents.find('\n');
+        if idx != -1:
+            contents = '\n' + contents[idx + 1:];
 
     return contents
 

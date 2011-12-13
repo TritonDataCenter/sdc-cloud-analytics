@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /*
  * caprof: tool to validate and examine profiles
  */

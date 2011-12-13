@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /*
  * cacore.js: generate a core file from a running CA node program.  See usage.
  */

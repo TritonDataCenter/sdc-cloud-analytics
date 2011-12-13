@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /*
  * cactl: poke and prod components of a Cloud Analytics instance
  */

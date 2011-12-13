@@ -19,6 +19,15 @@ manifest=${svc}.xml
 pkg=${npm_config_prefix}/lib/node_modules/${npm_package_name}
 cabase=${npm_config_prefix}/lib/node_modules/cabase
 
+#
+# cainstsvc, being a global zone service, must deliver its manifest into the
+# appropriate SMF configuration directory.  The other services, being local
+# zone services, need not deliver the manifest at all, but we still need to
+# process and import it, so we stick it in /tmp.
+#
+smfdir=${npm_config_smfdir}
+[[ -n $smfdir ]] || smfdir=/tmp
+
 export CABASE_DIR=$cabase
 export BASE_DIR=$npm_config_prefix
 
@@ -45,7 +54,7 @@ else
 fi
 
 for instance in $instances; do
-	dest=${npm_config_smfdir}/${svc}-$instance.xml
+	dest=$smfdir/${svc}-$instance.xml
 
 	sed -e "s#@@CABASE_DIR@@#$CABASE_DIR#g" \
 	    -e "s#@@BASE_DIR@@#$BASE_DIR#g" \

@@ -10,14 +10,10 @@
 		"caprof":	"tools/caprof.js",
 		"nhttpsnoop":	"tools/nhttpsnoop"
 	},
-	"scripts": {
-		"postactivate":		"pkg/pkg-postactivate.sh",
-		"postdeactivate":	"pkg/pkg-postdeactivate.sh"
-	},
 	"engines": {
 		"node":	"*"
 	},
-	"bundledDependencies": {
+	"dependencies": {
 		"amqp":         "*",
 		"connect":      "*",
 		"heatmap":      "*",
@@ -26,5 +22,9 @@
 		"png":          "*",
 		"uname":        "*",
 		"libGeoIP":     "*"
-	}
+	},
+	"bundledDependencies": [
+		"amqp", "connect", "heatmap", "kstat", "libdtrace", "png", "uname",
+		"libGeoIP"
+	]
 }

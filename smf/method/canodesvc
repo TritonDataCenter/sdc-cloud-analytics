@@ -58,7 +58,7 @@ function load_nodepath
 {
 	NODE_PATH=
 
-	for subdir in node_modules lib/* deps/*; do
+	for subdir in node_modules node_modules/connect/lib lib/* deps/*; do
 		[[ -d $subdir ]] || continue
 		NODE_PATH="$NODE_PATH:$ns_root/$subdir"
 	done

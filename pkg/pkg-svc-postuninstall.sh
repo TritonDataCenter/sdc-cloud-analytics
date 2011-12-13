@@ -9,7 +9,6 @@ function fatal
 }
 
 svc=${npm_package_name}
-manifest=${npm_config_smfdir}/${svc}.xml
 [[ -n $svc ]] || fatal "no svc found"
 
 for fmri in $(svcs -H -ofmri $svc); do
@@ -18,6 +17,9 @@ for fmri in $(svcs -H -ofmri $svc); do
 	svccfg delete $fmri || fatal "could not delete $fmri"
 done
 
-rm $manifest || fatal "could not delete $manifest"
+if [[ -n $npm_config_smfdir ]]; then
+	manifest=${npm_config_smfdir}/${svc}.xml
+	rm $manifest || fatal "could not delete $manifest"
+fi
 
 exit 0

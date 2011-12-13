@@ -1,17 +1,14 @@
 {
 	"name":		"caaggsvc",
 	"description":	"Joyent Cloud Analytics Aggregator Service",
-	"version":	"0.0.2v@@CA_VERSION@@",
+	"version":	"0.1.0v@@CA_VERSION@@",
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",
 	"scripts": {
-		"postactivate":		"pkg/pkg-svc-postactivate.sh",
-		"postdeactivate":	"pkg/pkg-svc-postdeactivate.sh"
+		"postinstall":		"pkg/pkg-svc-postinstall.sh",
+		"postuninstall":	"pkg/pkg-svc-postuninstall.sh"
 	},
 	"engines": {
 		"node":	"*"
-	},
-	"dependencies": {
-		"cabase": 	">1.0.2"
 	}
 }

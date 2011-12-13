@@ -86,21 +86,17 @@ SMF_MANIFESTS = \
 	smf/manifest/castashsvc.xml
 
 SVC_SCRIPTS = \
-	pkg/pkg-svc-postactivate.sh	\
-	pkg/pkg-svc-postdeactivate.sh	\
 	pkg/pkg-svc-postinstall.sh	\
 	pkg/pkg-svc-postuninstall.sh
 
 SH_SCRIPTS = \
-	pkg/pkg-postactivate.sh		\
-	pkg/pkg-postdeactivate.sh	\
+	pkg/pkg-svc-postinstall.sh	\
+	pkg/pkg-svc-postuninstall.sh	\
 	smf/method/canodesvc		\
 	tools/cabranch			\
 	tools/cadeploy			\
-	tools/cadepsvcs			\
 	tools/cainstrfleet		\
 	tools/caupagent			\
-	tools/caupsvcs			\
 	tools/catest			\
 	tools/ca-headnode-setup
 
@@ -233,7 +229,7 @@ deps/node-install:
 	mkdir -p deps/node-install
 
 deps/ctf2json/ctf2json:
-	(cd deps/ctf2json && gmake)
+	(cd deps/ctf2json && $(MAKE))
 
 #
 # The "publish" target copies the build bits to the given BITS_DIR.
@@ -303,12 +299,12 @@ $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)
 
 $(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/%/.git
-	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/deps/$*
-	cd $(PKGROOT)/cabase/node_modules/.npm/$*/active/package && (echo '!./build'; echo '!./node_modules') >> .npmignore
+	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/$*
+	cd $(PKGROOT)/cabase/node_modules/$* && (echo '!./build'; echo '!./node_modules') >> .npmignore
 
 $(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/node-%/.git
-	cd $(PKGROOT)/cabase && $(NPM) bundle install $(SRC)/deps/node-$*
-	cd $(PKGROOT)/cabase/node_modules/.npm/$*/active/package && (echo '!./build'; echo '!./node_modules') >> .npmignore
+	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/node-$*
+	cd $(PKGROOT)/cabase/node_modules/$* && (echo '!./build'; echo '!./node_modules') >> .npmignore
 
 deps/%/.git: | deps/%
 	git submodule update --init

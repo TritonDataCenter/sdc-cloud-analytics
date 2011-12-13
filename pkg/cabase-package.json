@@ -15,7 +15,9 @@
 	},
 	"dependencies": {
 		"amqp":         "*",
+		"ca-native":    "*",
 		"connect":      "*",
+		"ctype":        "*",
 		"heatmap":      "*",
 		"kstat":        "*",
 		"libdtrace":    "*",
@@ -24,7 +26,7 @@
 		"libGeoIP":     "*"
 	},
 	"bundledDependencies": [
-		"amqp", "connect", "heatmap", "kstat", "libdtrace", "png", "uname",
-		"libGeoIP"
+		"amqp", "ca-native", "connect", "ctype", "heatmap", "kstat",
+		"libdtrace", "png", "uname", "libGeoIP"
 	]
 }

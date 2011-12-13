@@ -277,7 +277,7 @@ fi
 export PATH=/opt/local/bin:$PATH
 
 echo "Setting up pkgsrc and packages ... \c"
-pkgin update > /var/tmp/pkgin_update.out
+pkgin -f update > /var/tmp/pkgin_update.out
 pkgin -y in gcc-compiler gcc-runtime gcc-tools cscope pkg-config gmake scmgit python24 python26 png npm-1.0.94 GeoIP GeoLiteCity ghostscript > /var/tmp/pkgin_install.out || fail "failed"
 echo "done."
 EOF

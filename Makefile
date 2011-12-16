@@ -374,8 +374,8 @@ metadata/metric/%.json.check: metadata/metric/%.json tools
 check-manifests: $(SMF_MANIFESTS)
 	$(XMLLINT) --dtdvalid $(SMF_DTD) $(SMF_MANIFESTS)
 
-check-shell: $(SH_SCRIPTS)
-	$(BASH) -n $(SH_SCRIPTS)
+check-shell: $(SH_SCRIPTS) tools/recreate-zone
+	$(BASH) -n $(SH_SCRIPTS) tools/recreate-zone
 
 check-jsl: check-jsl-main check-jsl-web
 

@@ -1,13 +1,13 @@
 EXCEPTION: caError: you did something wrong: arbitrary remote error
     at stack2 (.../tst/library/tst.error_stacktrace.js:15:10)
     at stack1 (.../tst/library/tst.error_stacktrace.js:9:10)
-    at Timer.callback (.../tst/library/tst.error_stacktrace.js:39:8)
+    at Timer.<anonymous> (.../tst/library/tst.error_stacktrace.js:39:8)
 Caused by: EXCEPTION: caError: arbitrary remote error
     at stack3 (.../tst/library/tst.error_stacktrace.js:20:10)
     at stack2 (.../tst/library/tst.error_stacktrace.js:14:14)
     at stack1 (.../tst/library/tst.error_stacktrace.js:9:10)
-    at Timer.callback (.../tst/library/tst.error_stacktrace.js:39:8)
+    at Timer.<anonymous> (.../tst/library/tst.error_stacktrace.js:39:8)
 EXCEPTION: Error: Error: generic V8 error
     at stack4 (.../tst/library/tst.error_stacktrace.js:25:10)
     at stack1 (.../tst/library/tst.error_stacktrace.js:9:10)
-    at Timer.callback (.../tst/library/tst.error_stacktrace.js:42:8)
+    at Timer.<anonymous> (.../tst/library/tst.error_stacktrace.js:42:8)

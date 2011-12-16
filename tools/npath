@@ -20,7 +20,7 @@ cd - > /dev/null
 for dir in $ws_root/deps/*; do
 	mod=$(basename $dir)
 	export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod"
-	export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod/build/default"
+	export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod/build/Release"
 done
 
 export NODE_PATH="$NODE_PATH:$ws_root/deps/connect/lib"

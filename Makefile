@@ -48,7 +48,6 @@ CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
 JSONCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/jsonchk.js
-MKERRNO		 = $(TOOLSDIR)/mkerrno
 NODE		:= $(NODEDIR)/node
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= PATH=$(NODEDIR):$$PATH npm
@@ -69,7 +68,6 @@ DEMO_WEBJSFILES		 = demo/basicvis/caflot.js	\
 	demo/basicvis/caadmin.js			\
 	demo/basicvis/camon.js
 JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
-JS_FILES		+= lib/ca/errno.js
 JSON_FILES		:= $(shell find pkg -name '*.json')
 METAD_FILES		:= $(shell find $(METAD_DIR) -name '*.js')
 METADATA_FILES		:= $(shell find metadata -name '*.json')
@@ -140,7 +138,6 @@ PKGFILES_cabase = \
 	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
 	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
-	$(PKGROOT)/cabase/lib/ca/errno.js		\
 	$(PKGROOT)/cabase/lib/httpd.d			\
 	$(PKGROOT)/cabase/lib/node.d			\
 	$(PKGROOT)/cabase/tools/nhttpsnoop
@@ -350,9 +347,6 @@ $(PKGROOT)/cabase/cmd/ctf2json: deps/ctf2json/ctf2json
 deps/ca-native/build/default/ca-native.node:
 	cd deps/ca-native && $(NODE_WAF) configure && $(NODE_WAF) build
 
-lib/ca/errno.js: /usr/include/sys/errno.h
-	$(MKERRNO) $^ > $@
-
 #
 # The "check" target checks the syntax of various files.
 #
@@ -374,7 +368,7 @@ metadata/metric/%.json.check: metadata/metric/%.json tools
 check-manifests: $(SMF_MANIFESTS)
 	$(XMLLINT) --dtdvalid $(SMF_DTD) $(SMF_MANIFESTS)
 
-check-shell: $(SH_SCRIPTS)
+check-shell: $(SH_SCRIPTS) tools/recreate-zone
 	$(BASH) -n $(SH_SCRIPTS)
 
 check-jsl: check-jsl-main check-jsl-web
@@ -431,13 +425,12 @@ docs/%.html: docs/%.restdown
 #
 clean:
 	-rm -f $(DOC_FILES)
-	-rm -f lib/ca/errno.js
 	-rm -f $(WEBREV)/bin/codereview 
 
 #
-# "dist-clean" target removes installed root and built dependencies
+# "distclean" target removes installed root and built dependencies
 #
-dist-clean: clean
+distclean: clean
 	-(cd deps/node-kstat && $(NODE_WAF) distclean)
 	-(cd deps/node-libdtrace && $(NODE_WAF) distclean)
 	-(cd deps/node-png && $(NODE_WAF) distclean)

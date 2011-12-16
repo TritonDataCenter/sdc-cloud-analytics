@@ -20,7 +20,7 @@
 		"ctype":        "*",
 		"heatmap":      "*",
 		"kstat":        "*",
-		"libdtrace":    "*",
+		"libdtrace":	"*",
 		"png":          "*",
 		"uname":        "*",
 		"libGeoIP":     "*"

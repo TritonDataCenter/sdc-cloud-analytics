@@ -1,20 +1,20 @@
 TEST: EEXIST error
-EXCEPTION: caError: ca stat failed: ENOENT, No such file or directory '/betternotexist'
+EXCEPTION: caError: ca stat failed: ENOENT, no such file or directory '/betternotexist'
     at caError.caSystemError (.../lib/ca/ca-error.js:207:10)
     at Object.<anonymous> (.../tst/library/tst.error_system.js:16:8)
-    at Module._compile (module.js:402:26)
-    at Object..js (module.js:408:10)
-    at Module.load (module.js:334:31)
-    at Function._load (module.js:293:12)
-    at Array.0 (module.js:421:10)
-    at EventEmitter._tickCallback (node.js:126:26)
+    at Module._compile (module.js:441:26)
+    at Object..js (module.js:459:10)
+    at Module.load (module.js:348:31)
+    at Function._load (module.js:308:12)
+    at Array.0 (module.js:479:10)
+    at EventEmitter._tickCallback (node.js:192:40)
 TEST: ENOENT error
-EXCEPTION: caError: ca mkdir failed: EEXIST, File exists '/'
+EXCEPTION: caError: ca mkdir failed: EEXIST, file already exists '/'
     at caError.caSystemError (.../lib/ca/ca-error.js:207:10)
     at Object.<anonymous> (.../tst/library/tst.error_system.js:29:8)
-    at Module._compile (module.js:402:26)
-    at Object..js (module.js:408:10)
-    at Module.load (module.js:334:31)
-    at Function._load (module.js:293:12)
-    at Array.0 (module.js:421:10)
-    at EventEmitter._tickCallback (node.js:126:26)
+    at Module._compile (module.js:441:26)
+    at Object..js (module.js:459:10)
+    at Module.load (module.js:348:31)
+    at Function._load (module.js:308:12)
+    at Array.0 (module.js:479:10)
+    at EventEmitter._tickCallback (node.js:192:40)

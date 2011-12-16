@@ -49,11 +49,11 @@ CSCOPE		 = cscope
 JSL		 = $(TOOLSDIR)/jsl
 JSSTYLE		 = $(TOOLSDIR)/jsstyle
 JSONCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/jsonchk.js
-MKERRNO		 = $(TOOLSDIR)/mkerrno
 NODE		:= $(NODEDIR)/node
 NODE_WAF	:= $(NODEDIR)/node-waf
 NPM		:= PATH=$(NODEDIR):$$PATH npm
-RESTDOWN	 = python2.6 $(SRC)/deps/restdown/bin/restdown
+RESTDOWN_EXEC	 = $(SRC)/deps/restdown/bin/restdown
+RESTDOWN	 = python2.6 $(RESTDOWN_EXEC)
 RMTREE		 = rm -rf
 TAR		 = tar
 XMLLINT		 = xmllint --noout
@@ -70,7 +70,6 @@ DEMO_WEBJSFILES		 = demo/basicvis/caflot.js	\
 	demo/basicvis/caadmin.js			\
 	demo/basicvis/camon.js
 JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
-JS_FILES		+= lib/ca/errno.js
 JSON_FILES		:= $(shell find pkg -name '*.json')
 METAD_FILES		:= $(shell find $(METAD_DIR) -name '*.js')
 METADATA_FILES		:= $(shell find metadata -name '*.json')
@@ -141,7 +140,6 @@ PKGFILES_cabase = \
 	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
 	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
-	$(PKGROOT)/cabase/lib/ca/errno.js		\
 	$(PKGROOT)/cabase/lib/httpd.d			\
 	$(PKGROOT)/cabase/lib/node.d			\
 	$(PKGROOT)/cabase/tools/nhttpsnoop
@@ -196,15 +194,6 @@ PKG_DIRS := \
 	$(PKGDIRS_cainstsvc)	\
 	$(PKGDIRS_castashsvc)
 
-NATIVE_DEPS = \
-	deps/node/build/default/node				\
-	deps/ca-native/build/default/ca-native.node		\
-	deps/node-kstat/build/default/kstat.node		\
-	deps/node-libdtrace/build/default/libdtrace.node	\
-	deps/node-png/build/default/png.node			\
-	deps/node-uname/build/default/uname.node		\
-	deps/node-libGeoIP/build/default/libGeoIP.node
-
 DOC_FILES = \
 	docs/index.html
 
@@ -218,23 +207,27 @@ DEVDOC_FILES = \
 all: tools release
 
 # XXX don't think we need codereview at all
-tools: $(WEBREV)/bin/codereview $(NODEDIR)/node $(NATIVE_DEPS) deps/ctf2json/ctf2json
+tools: $(WEBREV)/bin/codereview $(NODEDIR)/node deps/ctf2json/ctf2json
 .PHONY: tools
 
 $(WEBREV)/bin/codereview:
 	$(CC) $(WEBREV)/src/lwlp.c -o $(WEBREV)/bin/codereview
 
-$(NODEDIR)/node: deps/node/build/default/node
-
-deps/node/build/default/node: | deps/node/.git deps/node-install
+$(NODEDIR)/node: | deps/node/.git deps/node-install
 	(cd deps/node && ./configure --with-dtrace \
 	    --prefix=$(SRC)/deps/node-install && make install)
+
+deps/node/.git:
+	git submodule update --init deps/node
 
 deps/node-install:
 	mkdir -p deps/node-install
 
-deps/ctf2json/ctf2json:
+deps/ctf2json/ctf2json: | deps/ctf2json/.git
 	(cd deps/ctf2json && $(MAKE))
+
+deps/ctf2json/.git:
+	git submodule update --init deps/ctf2json
 
 #
 # The "publish" target copies the build bits to the given BITS_DIR.
@@ -277,13 +270,7 @@ $(DIST):
 #
 pkg: $(PKG_TARBALLS)
 
-#
-# We have to depend on NATIVE_DEPS here because otherwise "npm bundle install"
-# will happily install a dependency package (like node-uname) even though its
-# binary hasn't actually been built.  We have to trigger the building of the
-# binary.
-#
-$(PKGROOT)/cabase.tar.gz: $(NATIVE_DEPS) $(PKGFILES_cabase) | $(PKGDEPS_cabase) $(PKG_DIRS)
+$(PKGROOT)/cabase.tar.gz: $(PKGFILES_cabase) | $(PKGDEPS_cabase) $(PKG_DIRS)
 	(cd $(PKGROOT) && $(TAR) cf - cabase) | gzip > $@
 
 $(PKGROOT)/caconfigsvc.tar.gz: $(PKGFILES_caconfigsvc) | $(PKG_DIRS)
@@ -303,18 +290,22 @@ $(PKGFILES_cabase) $(PKGFILES_caconfigsvc) $(PKGFILES_caaggsvc) $(PKGFILES_cains
 $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)
 
+$(PKGROOT)/cabase/node_modules/ca-native: | $(NODE)
+	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/ca-native
+	(echo '!./build'; echo '!./node_modules') >> $(PKGROOT)/cabase/node_modules/ca-native/.npmignore
+
 $(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/%/.git
 	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/$*
-	cd $(PKGROOT)/cabase/node_modules/$* && (echo '!./build'; echo '!./node_modules') >> .npmignore
+	(echo '!./build'; echo '!./node_modules') >> $(PKGROOT)/cabase/node_modules/$*/.npmignore
 
 $(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/node-%/.git
 	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/node-$*
-	cd $(PKGROOT)/cabase/node_modules/$* && (echo '!./build'; echo '!./node_modules') >> .npmignore
+	(echo '!./build'; echo '!./node_modules') >> $(PKGROOT)/cabase/node_modules/$*/.npmignore
 
 deps/%/.git: | deps/%
-	git submodule update --init
+	git submodule update --init deps/$*
 
-$(PKGROOT)/cabase/cmd/node: deps/node/node
+$(PKGROOT)/cabase/cmd/node: $(NODEDIR)/node
 	cp $^ $@
 
 $(PKGROOT)/cabase/lib/httpd.d: lib/httpd.d
@@ -351,12 +342,6 @@ $(PKGROOT)/cabase/cmd/ctf2json: deps/ctf2json/ctf2json
 .SECONDEXPANSION:
 %.node: | deps/node-$$(*F)/.git
 	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
-
-deps/ca-native/build/default/ca-native.node:
-	cd deps/ca-native && $(NODE_WAF) configure && $(NODE_WAF) build
-
-lib/ca/errno.js: /usr/include/sys/errno.h
-	$(MKERRNO) $^ > $@
 
 #
 # The "check" target checks the syntax of various files.
@@ -431,12 +416,12 @@ cscope.files:
 .PHONY: docs
 docs: doc
 
-doc: $(RESTDOWN) $(DOC_FILES) $(DEVDOC_FILES)
+doc: $(RESTDOWN_EXEC) $(DOC_FILES) $(DEVDOC_FILES)
 
-docs/%.html: docs/%.restdown
+docs/%.html: docs/%.restdown | $(RESTDOWN_EXEC)
 	$(RESTDOWN) $<
 
-$(RESTDOWN): | deps/restdown/.git
+$(RESTDOWN_EXEC): | deps/restdown/.git
 
 deps/restdown/.git:
 	git submodule update --init deps/restdown
@@ -446,13 +431,12 @@ deps/restdown/.git:
 #
 clean:
 	-rm -f $(DOC_FILES) $(DEVDOC_FILES)
-	-rm -f lib/ca/errno.js
 	-rm -f $(WEBREV)/bin/codereview 
 
 #
-# "dist-clean" target removes installed root and built dependencies
+# "distclean" target removes installed root and built dependencies
 #
-dist-clean: clean
+distclean: clean
 	-(cd deps/node-kstat && $(NODE_WAF) distclean)
 	-(cd deps/node-libdtrace && $(NODE_WAF) distclean)
 	-(cd deps/node-png && $(NODE_WAF) distclean)

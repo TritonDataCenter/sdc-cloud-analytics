@@ -33,4 +33,7 @@
 	url = git://github.com/rmustacc/ctf2json
 [submodule "deps/node-ctype"]
 	path = deps/node-ctype
-	url = git://github.com/rmustacc/node-ctype
+	url = git://github.com/rmustacc/node-ctype.git
+[submodule "deps/eng"]
+	path = deps/eng
+	url = git@git.joyent.com:eng.git

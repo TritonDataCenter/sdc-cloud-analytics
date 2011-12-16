@@ -16,15 +16,13 @@ cd - > /dev/null
 # For each subdir under deps', add it to NODE_PATH.  This isn't pretty but it
 # gets the job done.
 #
-
-for dir in $ws_root/deps/*; do
-	mod=$(basename $dir)
-	export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod"
-	export NODE_PATH="$NODE_PATH:$ws_root/deps/$mod/build/default"
+ws_mods=$ws_root/build/pkg/cabase/node_modules
+for dir in $ws_mods/*; do
+	export NODE_PATH="$NODE_PATH:$dir:$dir/build/Release"
 done
 
-export NODE_PATH="$NODE_PATH:$ws_root/deps/connect/lib"
-export NODE_PATH="$NODE_PATH:$ws_root/deps/node-heatmap/lib"
+export NODE_PATH="$NODE_PATH:$ws_mods/connect/lib"
+export NODE_PATH="$NODE_PATH:$ws_mods/heatmap/lib"
 
 echo "NODE_PATH=$NODE_PATH"
 

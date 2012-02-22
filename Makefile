@@ -5,8 +5,10 @@
 #
 # Constants
 #
+AWK		:= $(shell ( which gawk > /dev/null && echo gawk ) || \
+    ( which nawk > /dev/null && echo nawk ) || echo awk )
 CA_VERSION	:= $(shell git symbolic-ref HEAD | \
-	nawk -F / '{print $$3}')-$(shell git describe --dirty)
+	$(AWK) -F / '{print $$3}')-$(shell git describe --dirty)
 SRC		:= $(shell pwd)
 NODEENV		:= $(shell tools/npath)
 # As per mountain-gorilla "Package Versioning".
@@ -18,8 +20,8 @@ ifeq ($(IGNORE_DIRTY), 1)
 	DIRTY_ARG=
 endif
 CA_PUBLISH_VERSION := $(shell git symbolic-ref HEAD | \
-	nawk -F / '{print $$3}')-$(TIMESTAMP)-g$(shell \
-	git describe --all --long $(DIRTY_ARG) | nawk -F '-g' '{print $$NF}')
+	$(AWK) -F / '{print $$3}')-$(TIMESTAMP)-g$(shell \
+	git describe --all --long $(DIRTY_ARG) | $(AWK) -F '-g' '{print $$NF}')
 
 #
 # Directories
@@ -419,12 +421,23 @@ cscope.files:
 .PHONY: cscope.files
 
 #
-# The "doc" target builds docs HTML from restdown.
+# The "doc" target builds docs HTML from restdown.  "docs" is an alias for
+# "doc" for compatibility with the rest of the build infrastructure.  We should
+# remove "doc" when we verify that nobody is using it.
 #
+.PHONY: docs
+docs: doc
+
+doc: $(RESTDOWN)
 doc: $(DOC_FILES)
 
 docs/%.html: docs/%.restdown
 	$(RESTDOWN) $<
+
+$(RESTDOWN): | deps/restdown/.git
+
+deps/restdown/.git:
+	git submodule update --init deps/restdown
 
 #
 # The "clean" target removes created files -- we currently have none

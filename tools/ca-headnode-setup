@@ -26,7 +26,7 @@ sdc-compnode -c headnode -r false || fail "failed"
 echo "done."
 
 echo "Provisioning cloud services ... \c"
-sdc-setup -c headnode -A || fail "failed"
+sdc-setup -c headnode -r riak ufds ca adminui cloudapi portal || fail "failed"
 echo "done."
 
 [[ -f /lib/sdc/config.sh ]] || fail "Missing /lib/sdc/config.sh"

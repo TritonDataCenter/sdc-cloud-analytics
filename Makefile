@@ -399,7 +399,7 @@ check-json: $(JSON_FILES:%=%.check)
 # The "test" target runs catest.
 #
 test: release
-	tools/catest -a
+	tools/catest -a -t build/test_results.tap
 
 #
 # The "pbchk" target runs pre-push checks.

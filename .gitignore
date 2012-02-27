@@ -10,6 +10,6 @@ lib/ca/errno.js
 tools/webrev_support/bin/codereview
 webrev
 cacore.*
-docs/index.html
-docs/index.json
+docs/*.html
+docs/*.json
 .lock-wscript

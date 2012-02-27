@@ -209,6 +209,10 @@ NATIVE_DEPS = \
 DOC_FILES = \
 	docs/index.html
 
+# DEVDOC_FILES are not actually installed with the CA package.
+DEVDOC_FILES = \
+	docs/dev.html
+
 #
 # Targets
 #
@@ -428,8 +432,7 @@ cscope.files:
 .PHONY: docs
 docs: doc
 
-doc: $(RESTDOWN)
-doc: $(DOC_FILES)
+doc: $(RESTDOWN) $(DOC_FILES) $(DEVDOC_FILES)
 
 docs/%.html: docs/%.restdown
 	$(RESTDOWN) $<
@@ -443,7 +446,7 @@ deps/restdown/.git:
 # The "clean" target removes created files -- we currently have none
 #
 clean:
-	-rm -f $(DOC_FILES)
+	-rm -f $(DOC_FILES) $(DEVDOC_FILES)
 	-rm -f lib/ca/errno.js
 	-rm -f $(WEBREV)/bin/codereview 
 

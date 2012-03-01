@@ -5,13 +5,12 @@
 #
 # Constants
 #
-AWK		:= $(shell ( which gawk > /dev/null && echo gawk ) || \
-    ( which nawk > /dev/null && echo nawk ) || echo awk )
-CA_VERSION	:= $(shell git symbolic-ref HEAD | \
-	$(AWK) -F / '{print $$3}')-$(shell git describe --dirty)
 SRC		:= $(shell pwd)
 NODEENV		:= $(shell tools/npath)
+
 # As per mountain-gorilla "Package Versioning".
+AWK		:= $(shell ( which gawk > /dev/null && echo gawk ) || \
+    ( which nawk > /dev/null && echo nawk ) || echo awk )
 ifeq ($(TIMESTAMP),)
 	TIMESTAMP=$(shell date -u "+%Y%m%dT%H%M%SZ")
 endif
@@ -19,7 +18,7 @@ DIRTY_ARG=--dirty
 ifeq ($(IGNORE_DIRTY), 1)
 	DIRTY_ARG=
 endif
-CA_PUBLISH_VERSION := $(shell git symbolic-ref HEAD | \
+CA_VERSION := $(shell git symbolic-ref HEAD | \
 	$(AWK) -F / '{print $$3}')-$(TIMESTAMP)-g$(shell \
 	git describe --all --long $(DIRTY_ARG) | $(AWK) -F '-g' '{print $$NF}')
 
@@ -244,9 +243,9 @@ publish: $(RELEASE_TARBALL)
 		exit 1; \
 	fi
 	mkdir -p $(BITS_DIR)/ca
-	cp $(RELEASE_TARBALL) $(BITS_DIR)/ca/ca-pkg-$(CA_PUBLISH_VERSION).tar.bz2
-	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/ca/cabase-$(CA_PUBLISH_VERSION).tar.gz
-	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/ca/cainstsvc-$(CA_PUBLISH_VERSION).tar.gz
+	cp $(RELEASE_TARBALL) $(BITS_DIR)/ca/ca-pkg-$(CA_VERSION).tar.bz2
+	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/ca/cabase-$(CA_VERSION).tar.gz
+	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/ca/cainstsvc-$(CA_VERSION).tar.gz
 
 #
 # The "release" target creates a ca-pkg.tar.bz2 suitable for release to the

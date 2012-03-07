@@ -6,7 +6,15 @@
 # Constants
 #
 SRC		:= $(shell pwd)
-NODEENV		:= $(shell tools/npath)
+
+#
+# The NODEENV definition should really use ":=" to avoid invoking the shell
+# every time it's used, but this doesn't work because tools/npath computes the
+# desired environment based on what's been installed into build/pkg/cabase,
+# which will not necessarily have been set up when make processes this line.
+# Once INTRO-632 is implemented, we shouldn't need tools/npath at all.
+#
+NODEENV		 = $(shell tools/npath)
 
 # As per mountain-gorilla "Package Versioning".
 AWK		:= $(shell ( which gawk > /dev/null && echo gawk ) || \
@@ -21,6 +29,14 @@ endif
 CA_VERSION := $(shell git symbolic-ref HEAD | \
 	$(AWK) -F / '{print $$3}')-$(TIMESTAMP)-g$(shell \
 	git describe --all --long $(DIRTY_ARG) | $(AWK) -F '-g' '{print $$NF}')
+
+#
+# Instruct make to keep around temporary files. We have rules below that
+# automatically update git submodules as needed, but they employ a deps/*/.git
+# temporary file. Without this directive, make tries to remove these .git
+# directories after the build has completed.
+#
+.SECONDARY:
 
 #
 # Directories
@@ -344,10 +360,12 @@ $(PKGROOT)/cabase/cmd/ctf2json: deps/ctf2json/ctf2json
 	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
 
 #
-# The "check" target checks the syntax of various files.
+# The "check" target checks the syntax of various files. It depends on "pkg"
+# because the check tools require that the modules be built and installed, and
+# the only place we do that right now is inside pkg/cabase.
 #
-check: check-metadata check-metad check-shell check-manifests check-jsstyle \
-    check-jsl check-json
+check: pkg check-metadata check-metad check-shell check-manifests \
+    check-jsstyle check-jsl check-json
 	@echo check okay
 
 check-metadata: tools $(METADATA_FILES:%=%.check)

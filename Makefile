@@ -1,148 +1,140 @@
 #
-# Makefile: top-level makefile
+# Makefile: top-level makefile.
+# 
+# This Makefile uses many conventions documented in the eng.git Makefile
+# system.  We also make heavy use of the Makefiles in that repo.
 #
 
 #
-# Constants
+# The following definitions and rules bootstrap us to where we can include
+# Makefiles from the eng.git submodule.
 #
-SRC		:= $(shell pwd)
+.DEFAULT_GOAL	:= all
+INCMAKE		 = deps/eng/tools/mk
+
+$(INCMAKE)/%:
+	git submodule update --init deps/eng
 
 #
-# The NODEENV definition should really use ":=" to avoid invoking the shell
-# every time it's used, but this doesn't work because tools/npath computes the
-# desired environment based on what's been installed into build/pkg/cabase,
-# which will not necessarily have been set up when make processes this line.
-# Once INTRO-632 is implemented, we shouldn't need tools/npath at all.
+# Directories and files used during the build.
 #
-NODEENV		 = $(shell tools/npath)
-
-# As per mountain-gorilla "Package Versioning".
-AWK		:= $(shell ( which gawk > /dev/null && echo gawk ) || \
-    ( which nawk > /dev/null && echo nawk ) || echo awk )
-ifeq ($(TIMESTAMP),)
-	TIMESTAMP=$(shell date -u "+%Y%m%dT%H%M%SZ")
-endif
-DIRTY_ARG=--dirty
-ifeq ($(IGNORE_DIRTY), 1)
-	DIRTY_ARG=
-endif
-CA_VERSION := $(shell git symbolic-ref HEAD | \
-	$(AWK) -F / '{print $$3}')-$(TIMESTAMP)-g$(shell \
-	git describe --all --long $(DIRTY_ARG) | $(AWK) -F '-g' '{print $$NF}')
-
-#
-# Instruct make to keep around temporary files. We have rules below that
-# automatically update git submodules as needed, but they employ a deps/*/.git
-# temporary file. Without this directive, make tries to remove these .git
-# directories after the build has completed.
-#
-.SECONDARY:
-
-#
-# Directories
-#
-BUILD		 = build
-DIST		 = $(BUILD)/dist
-PKGROOT		 = $(BUILD)/pkg
-
 DEMO_DIRS	:= $(shell find demo -type d)
-METAD_DIR	 = $(SRC)/cmd/cainst/modules/dtrace/
-NODEDIR		:= $(SRC)/deps/node-install/bin
-JS_SUBDIRS	 = cmd lib tools
-TOOLSDIR	 = tools
-TST_SUBDIRS	 = tst
-WEBREV		 = $(TOOLSDIR)/webrev_support
-
-#
-# Tools
-#
-BASH		 = bash
-CC		 = gcc
-CAPROF		 = $(NODEENV) $(NODE) $(TOOLSDIR)/caprof.js
-CAMCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/camchk.js > /dev/null
-CAMD		 = $(NODEENV) $(NODE) $(TOOLSDIR)/camd.js
-CSCOPE		 = cscope
-JSL		 = $(TOOLSDIR)/jsl
-JSSTYLE		 = $(TOOLSDIR)/jsstyle
-JSONCHK		 = $(NODEENV) $(NODE) $(TOOLSDIR)/jsonchk.js
-NODE		:= $(NODEDIR)/node
-NODE_WAF	:= $(NODEDIR)/node-waf
-NPM		:= PATH=$(NODEDIR):$$PATH npm
-RESTDOWN_EXEC	 = $(SRC)/deps/restdown/bin/restdown
-RESTDOWN	 = python2.6 $(RESTDOWN_EXEC)
-RMTREE		 = rm -rf
-TAR		 = tar
-XMLLINT		 = xmllint --noout
-
-#
-# Files
-#
-JSL_CONF_MAIN		 = $(TOOLSDIR)/jsl_support/jsl.conf
-JSL_CONF_WEB		 = $(TOOLSDIR)/jsl_support/jsl.web.conf
-
-DEMO_FILES		:= $(shell find demo -type f)
-DEMO_JSFILES		 = demo/basicvis/cademo.js
-DEMO_WEBJSFILES		 = demo/basicvis/caflot.js	\
-	demo/basicvis/caadmin.js			\
+DEMO_FILES	:= $(shell find demo -type f)
+DEMO_JSFILES	:= demo/basicvis/cademo.js
+DEMO_WEBJSFILES	:= \
+	demo/basicvis/caflot.js		\
+	demo/basicvis/caadmin.js	\
 	demo/basicvis/camon.js
-JS_FILES 		:= $(shell find $(JS_SUBDIRS) -name '*.js')
-JSON_FILES		:= $(shell find pkg -name '*.json')
-METAD_FILES		:= $(shell find $(METAD_DIR) -name '*.js')
-METADATA_FILES		:= $(shell find metadata -name '*.json')
-RELEASE_TARBALL  	 = $(DIST)/ca-pkg-$(CA_VERSION).tar.bz2
-TST_JSFILES		:= $(shell find $(TST_SUBDIRS) -name '*.js')
-WEBJS_FILES 		 = $(DEMO_WEBJSFILES)
 
-SMF_DTD 		 = /usr/share/lib/xml/dtd/service_bundle.dtd.1
+JS_SUBDIRS	 = cmd lib tools tst
+JS_FILES 	:= $(shell find $(JS_SUBDIRS) -name '*.js')
 
-SMF_MANIFESTS = \
-	smf/manifest/caconfigsvc.xml			\
-	smf/manifest/caaggsvc.xml			\
-	smf/manifest/cainstsvc.xml			\
-	smf/manifest/castashsvc.xml
+JSON_FILES	:= $(shell find pkg -name '*.json')
 
-SVC_SCRIPTS = \
-	pkg/pkg-svc-postinstall.sh	\
-	pkg/pkg-svc-postuninstall.sh
+METAD_DIR	 = cmd/cainst/modules/dtrace
+METAD_FILES	:= $(shell find $(METAD_DIR) -name '*.js')
 
-SH_SCRIPTS = \
+METADATA_FILES	:= $(shell find metadata -name '*.json')
+
+SH_SCRIPTS	= \
 	pkg/pkg-svc-postinstall.sh	\
 	pkg/pkg-svc-postuninstall.sh	\
 	smf/method/canodesvc		\
 	tools/cabranch			\
-	tools/cadeploy			\
 	tools/cainstrfleet		\
-	tools/caupagent			\
 	tools/catest			\
-	tools/ca-headnode-setup
+	tools/caupagent			\
+	tools/ca-headnode-setup		\
+	tools/recreate-zone
+
+SVC_SCRIPTS	 = \
+	pkg/pkg-svc-postinstall.sh	\
+	pkg/pkg-svc-postuninstall.sh
+
+TOOLSDIR	 = tools
+
+TST_DIRS	 := $(shell find tst -type d)
 
 #
-# Package definitions
+# Release artifacts
 #
-PKGS		 = cabase caconfigsvc caaggsvc cainstsvc castashsvc
-PKG_TARBALLS	 = $(PKGS:%=$(PKGROOT)/%.tar.gz)
+BUILD		 = build
+DIST		 = $(BUILD)/dist
+RELEASE_TARBALL  = $(DIST)/ca-pkg-$(STAMP).tar.bz2
 
-PKGDIRS_cabase := \
-	$(PKGROOT)/cabase			\
-	$(PKGROOT)/cabase/cmd			\
-	$(PKGROOT)/cabase/cmd/caagg		\
-	$(PKGROOT)/cabase/cmd/caagg/transforms	\
-	$(PKGROOT)/cabase/cmd/cainst		\
-	$(PKGROOT)/cabase/cmd/cainst/modules	\
+#
+# Package definitions: since cloud-analytics delivers multiple packages, we
+# dynamically construct each one at build time by copying the appropriate
+# files into $(PKGROOT)/<pkgname>.  The following variable definitions define
+# what should go where, and several targets below use these to implement that.
+#
+PKGROOT		 = $(BUILD)/pkg
+PKG_NAMES	 = cabase caconfigsvc caaggsvc cainstsvc castashsvc
+PKG_TARBALLS	 = $(PKG_NAMES:%=$(PKGROOT)/%.tar.gz)
+
+PKG_DIRS = \
+	$(PKGROOT)		\
+	$(PKGDIRS_cabase)	\
+	$(PKGDIRS_caconfigsvc)	\
+	$(PKGDIRS_caaggsvc)	\
+	$(PKGDIRS_cainstsvc)	\
+	$(PKGDIRS_castashsvc)
+
+# caaggsvc package
+PKGDIRS_caaggsvc := \
+	$(PKGROOT)/caaggsvc/pkg
+
+PKGFILES_caaggsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/caaggsvc/%)		\
+	$(PKGROOT)/caaggsvc/package.json
+
+# caconfigsvc package
+PKGDIRS_caconfigsvc := \
+	$(PKGROOT)/caconfigsvc/pkg
+
+PKGFILES_caconfigsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/caconfigsvc/%)		\
+	$(PKGROOT)/caconfigsvc/package.json
+
+# cainstsvc package
+PKGDIRS_cainstsvc := \
+	$(PKGROOT)/cainstsvc/pkg
+
+PKGFILES_cainstsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/cainstsvc/%)		\
+	$(PKGROOT)/cainstsvc/package.json
+
+# castashsvc package
+PKGDIRS_castashsvc := \
+	$(PKGROOT)/castashsvc/pkg
+
+PKGFILES_castashsvc = \
+	$(SVC_SCRIPTS:%=$(PKGROOT)/castashsvc/%)	\
+	$(PKGROOT)/castashsvc/package.json
+
+# cabase package
+PKGDIRS_cabase = \
+	$(PKGROOT)/cabase				\
+	$(PKGROOT)/cabase/cmd				\
+	$(PKGROOT)/cabase/cmd/caagg			\
+	$(PKGROOT)/cabase/cmd/caagg/transforms		\
+	$(PKGROOT)/cabase/cmd/cainst			\
+	$(PKGROOT)/cabase/cmd/cainst/modules		\
 	$(PKGROOT)/cabase/cmd/cainst/modules/dtrace	\
-	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)	\
-	$(PKGROOT)/cabase/docs			\
-	$(PKGROOT)/cabase/lib			\
-	$(PKGROOT)/cabase/lib/ca		\
-	$(PKGROOT)/cabase/lib/tst		\
-	$(PKGROOT)/cabase/metadata		\
-	$(PKGROOT)/cabase/metadata/metric	\
-	$(PKGROOT)/cabase/metadata/profile	\
-	$(PKGROOT)/cabase/pkg			\
-	$(PKGROOT)/cabase/smf			\
-	$(PKGROOT)/cabase/smf/manifest		\
-	$(PKGROOT)/cabase/smf/method		\
-	$(PKGROOT)/cabase/tools
+	$(DEMO_DIRS:%=$(PKGROOT)/cabase/%)		\
+	$(PKGROOT)/cabase/docs				\
+	$(PKGROOT)/cabase/lib				\
+	$(PKGROOT)/cabase/lib/ca			\
+	$(PKGROOT)/cabase/lib/tst			\
+	$(PKGROOT)/cabase/metadata			\
+	$(PKGROOT)/cabase/metadata/metric		\
+	$(PKGROOT)/cabase/metadata/profile		\
+	$(PKGROOT)/cabase/pkg				\
+	$(PKGROOT)/cabase/smf				\
+	$(PKGROOT)/cabase/smf/manifest			\
+	$(PKGROOT)/cabase/smf/method			\
+	$(PKGROOT)/cabase/tools				\
+	$(TST_DIRS:%=$(PKGROOT)/cabase/%)
 
 PKGFILES_cabase = \
 	$(PKGROOT)/cabase/package.json			\
@@ -151,9 +143,9 @@ PKGFILES_cabase = \
 	$(PKGROOT)/cabase/cmd/cactl.js			\
 	$(PKGROOT)/cabase/cmd/ctf2json			\
 	$(DEMO_FILES:%=$(PKGROOT)/cabase/%)		\
-	$(DOC_FILES:%=$(PKGROOT)/cabase/%)		\
+	$(DOC_FILES:%.restdown=$(PKGROOT)/cabase/docs/%.html)	\
 	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
-	$(SH_SCRIPTS:%=$(PKGROOT)/cabase/%)		\
+	$(BASH_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
 	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(PKGROOT)/cabase/lib/httpd.d			\
@@ -174,80 +166,117 @@ DEPS_cabase = \
 
 PKGDEPS_cabase = $(DEPS_cabase:%=$(PKGROOT)/cabase/node_modules/%)
 
-PKGDIRS_caconfigsvc := \
-	$(PKGROOT)/caconfigsvc/pkg
+#
+# Build configuration: these variables are used by various targets provided the
+# included Makefiles.
+#
+BASH_FILES	 = $(SH_SCRIPTS) $(SVC_SCRIPTS)
 
-PKGFILES_caconfigsvc = \
-	$(SVC_SCRIPTS:%=$(PKGROOT)/caconfigsvc/%)		\
-	$(PKGROOT)/caconfigsvc/package.json
+CLEAN_FILES	+= $(BUILD)
 
-PKGDIRS_caaggsvc := \
-	$(PKGROOT)/caaggsvc/pkg
+CSCOPE_DIRS	 = cmd demo lib tst deps
 
-PKGFILES_caaggsvc = \
-	$(SVC_SCRIPTS:%=$(PKGROOT)/caaggsvc/%)		\
-	$(PKGROOT)/caaggsvc/package.json
+DOC_FILES	 = \
+	dev.restdown			\
+	index.restdown			\
 
-PKGDIRS_cainstsvc := \
-	$(PKGROOT)/cainstsvc/pkg
+JSL_FILES_NODE	 = $(JS_FILES) $(DEMO_JSFILES)
+JSL_FILES_WEB    = $(DEMO_WEBJSFILES)
+JSL_CONF_WEB	 = tools/jsl.web.conf
+JSL_CONF_NODE	 = tools/jsl.node.conf
+JSSTYLE_FILES	 = $(JSL_FILES_NODE) $(JSL_FILES_WEB)
 
-PKGFILES_cainstsvc = \
-	$(SVC_SCRIPTS:%=$(PKGROOT)/cainstsvc/%)		\
-	$(PKGROOT)/cainstsvc/package.json
-
-PKGDIRS_castashsvc := \
-	$(PKGROOT)/castashsvc/pkg
-
-PKGFILES_castashsvc = \
-	$(SVC_SCRIPTS:%=$(PKGROOT)/castashsvc/%)	\
-	$(PKGROOT)/castashsvc/package.json
-
-PKG_DIRS := \
-	$(PKGROOT)		\
-	$(PKGDIRS_cabase)	\
-	$(PKGDIRS_caconfigsvc)	\
-	$(PKGDIRS_caaggsvc)	\
-	$(PKGDIRS_cainstsvc)	\
-	$(PKGDIRS_castashsvc)
-
-DOC_FILES = \
-	docs/index.html
-
-# DEVDOC_FILES are not actually installed with the CA package.
-DEVDOC_FILES = \
-	docs/dev.html
+SMF_DTD		 = deps/eng/tools/service_bundle.dtd.1
+SMF_MANIFESTS	 = \
+	smf/manifest/caconfigsvc.xml	\
+	smf/manifest/caaggsvc.xml	\
+	smf/manifest/cainstsvc.xml	\
+	smf/manifest/castashsvc.xml
 
 #
-# Targets
+# Tools used by the build process
 #
-all: tools release
-
-# XXX don't think we need codereview at all
-tools: $(WEBREV)/bin/codereview $(NODEDIR)/node deps/ctf2json/ctf2json
-.PHONY: tools
-
-$(WEBREV)/bin/codereview:
-	$(CC) $(WEBREV)/src/lwlp.c -o $(WEBREV)/bin/codereview
-
-$(NODEDIR)/node: | deps/node/.git deps/node-install
-	(cd deps/node && ./configure --with-dtrace \
-	    --prefix=$(SRC)/deps/node-install && make install)
-
-deps/node/.git:
-	git submodule update --init deps/node
-
-deps/node-install:
-	mkdir -p deps/node-install
-
-deps/ctf2json/ctf2json: | deps/ctf2json/.git
-	(cd deps/ctf2json && $(MAKE))
-
-deps/ctf2json/.git:
-	git submodule update --init deps/ctf2json
 
 #
-# The "publish" target copies the build bits to the given BITS_DIR.
-# This is typically called by an external driver (e.g. CI).
+# NODE_ENV defines the NODE_PATH environment variable for use when we invoke
+# tools.  We need this because the tools use modules that don't get set up by
+# npm (see INTRO-632).  This definition should really use ":=" to avoid
+# invoking the shell every time it's used, but tools/npath computes the desired
+# environment based on what's already been built, which may be nothing until
+# later in the build.
+#
+NODE_ENV	 = $(shell tools/npath)
+
+BASHSTYLE	 = deps/eng/tools/bashstyle
+CAMCHK		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/camchk.js > /dev/null
+CAMD		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/camd.js
+CAPROF		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/caprof.js
+JSONCHK		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/jsonchk.js
+RESTDOWN	 = python2.6 $(TOP)/deps/restdown/bin/restdown
+TAR		 = tar
+
+include $(INCMAKE)/Makefile.defs
+include $(INCMAKE)/Makefile.smf.defs
+include $(INCMAKE)/Makefile.node.defs
+
+#
+# Targets.  See the Joyent Engineering Guidelines or the included Makefiles for
+# descriptions of what these targets are supposed to do.  Note that many of
+# these targets (notably check, clean, and distclean) are augmented by the
+# included Makefiles.
+#
+all: release
+
+test: pkg
+	tools/catest -a -t build/test_results.tap
+
+# For historical reasons, we alias "pbchk" to "prepush"
+pbchk: prepush
+
+clean::
+	-(cd deps/ctf2json && $(MAKE) clean)
+
+distclean:: clean
+	-(cd deps/javascriptlint && $(MAKE) clean)
+	-(cd deps/node && $(MAKE) distclean)
+
+#
+# "release" target implementation
+#
+release: $(RELEASE_TARBALL)
+
+$(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
+	mkdir -p $(BUILD)/root
+	[[ -e $(BUILD)/root/pkg ]] || ln -s $(TOP)/$(BUILD)/pkg $(BUILD)/root/pkg
+	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz) | bzip2 > $@
+
+$(DIST):
+	mkdir -p $@
+
+#
+# "check" target implementation.
+#
+check: check-metadata check-metad check-json
+
+check-metadata: $(METADATA_FILES:%=%.check)
+
+check-metad: | $(PKG_TARBALLS)
+	$(CAMD) $(METAD_FILES)
+
+metadata/profile/%.json.check: metadata/profile/%.json | $(PKG_TARBALLS)
+	$(CAPROF) $<
+
+metadata/metric/%.json.check: metadata/metric/%.json | $(PKG_TARBALLS)
+	$(CAMCHK) $<
+
+check-json: $(JSON_FILES:%=%.check)
+
+%.json.check: %.json $(PKG_TARBALLS)
+	$(JSONCHK) $<
+
+#
+# The "publish" target copies the build bits to the given BITS_DIR.  This is
+# invoked by an external driver (e.g. CI).
 #
 publish: $(RELEASE_TARBALL)
 	@if [[ -z "$(BITS_DIR)" ]]; then \
@@ -255,80 +284,64 @@ publish: $(RELEASE_TARBALL)
 		exit 1; \
 	fi
 	mkdir -p $(BITS_DIR)/ca
-	cp $(RELEASE_TARBALL) $(BITS_DIR)/ca/ca-pkg-$(CA_VERSION).tar.bz2
-	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/ca/cabase-$(CA_VERSION).tar.gz
-	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/ca/cainstsvc-$(CA_VERSION).tar.gz
+	cp $(RELEASE_TARBALL) $(BITS_DIR)/ca/ca-pkg-$(STAMP).tar.bz2
+	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/ca/cabase-$(STAMP).tar.gz
+	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/ca/cainstsvc-$(STAMP).tar.gz
 
 #
-# The "release" target creates a ca-pkg.tar.bz2 suitable for release to the
-# head-node. To formally release this, it should be copied to the build server
-# as follows:
-#
-#    scp build/dist/ca-pkg-*.tar.bz2 \
-#	bamboo@10.2.0.190:/rpool/data/coal/live_147/assets
-#
-# Subsequent head-node builds will then pick up the new release.  (This address
-# can only be accessed through the Bellingham VPN, and access via the user
-# "bamboo" is exclusively by ssh key.)
-#
-release: $(RELEASE_TARBALL)
-
-$(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
-	mkdir -p $(BUILD)/root
-	[[ -e $(BUILD)/root/pkg ]] || ln -s $(SRC)/$(BUILD)/pkg $(BUILD)/root/pkg
-	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz) | bzip2 > $@
-
-$(DIST):
-	mkdir -p $@
-
-#
-# The "pkg" target builds tarballs for each of the npm packages.
+# The "pkg" target builds tarballs for each of the npm packages based on the
+# PKG variables defined above.  These targets describe how to construct the
+# file tree that goes in each package.
 #
 pkg: $(PKG_TARBALLS)
 
-$(PKGROOT)/cabase.tar.gz: $(PKGFILES_cabase) | $(PKGDEPS_cabase) $(PKG_DIRS)
-	(cd $(PKGROOT) && $(TAR) cf - cabase) | gzip > $@
+$(PKGROOT)/%.tar.gz:
+	(cd $(PKGROOT) && $(TAR) cf - $*) | gzip > $@
 
-$(PKGROOT)/caconfigsvc.tar.gz: $(PKGFILES_caconfigsvc) | $(PKG_DIRS)
-	(cd $(PKGROOT) && $(TAR) cf - caconfigsvc) | gzip > $@
+$(PKGROOT)/cabase.tar.gz:	$(PKGFILES_cabase) | $(PKGDEPS_cabase)
+$(PKGROOT)/caconfigsvc.tar.gz:	$(PKGFILES_caconfigsvc)
+$(PKGROOT)/caaggsvc.tar.gz:	$(PKGFILES_caaggsvc)
+$(PKGROOT)/cainstsvc.tar.gz:	$(PKGFILES_cainstsvc)
+$(PKGROOT)/castashsvc.tar.gz:	$(PKGFILES_castashsvc)
 
-$(PKGROOT)/caaggsvc.tar.gz: $(PKGFILES_caaggsvc) | $(PKG_DIRS)
-	(cd $(PKGROOT) && $(TAR) cf - caaggsvc) | gzip > $@
-
-$(PKGROOT)/cainstsvc.tar.gz: $(PKGFILES_cainstsvc) | $(PKG_DIRS)
-	(cd $(PKGROOT) && $(TAR) cf - cainstsvc) | gzip > $@
-
-$(PKGROOT)/castashsvc.tar.gz: $(PKGFILES_castashsvc) | $(PKG_DIRS)
-	(cd $(PKGROOT) && $(TAR) cf - castashsvc) | gzip > $@
-
-$(PKGFILES_cabase) $(PKGFILES_caconfigsvc) $(PKGFILES_caaggsvc) $(PKGFILES_cainstsvc) $(PKGFILES_castashsvc): | $(PKG_DIRS)
+$(PKGFILES_cabase)	\
+$(PKGFILES_caconfigsvc)	\
+$(PKGFILES_caaggsvc)	\
+$(PKGFILES_cainstsvc)	\
+$(PKGFILES_castashsvc): | $(PKG_DIRS)
 
 $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)
 
-$(PKGROOT)/cabase/node_modules/ca-native: | $(NODE)
-	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/ca-native
-	(echo '!./build'; echo '!./node_modules') >> $(PKGROOT)/cabase/node_modules/ca-native/.npmignore
+$(PKGROOT)/cabase/node_modules/ca-native: | $(NPM_EXEC)
+	cd $(PKGROOT)/cabase && $(NPM) install $(TOP)/deps/ca-native
+	(echo '!./build'; echo '!./node_modules') >> \
+	    $(PKGROOT)/cabase/node_modules/ca-native/.npmignore
 
-$(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/%/.git
-	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/$*
-	(echo '!./build'; echo '!./node_modules') >> $(PKGROOT)/cabase/node_modules/$*/.npmignore
+$(PKGROOT)/cabase/node_modules/connect: | $(NPM_EXEC) deps/connect/.git
+	cd $(PKGROOT)/cabase && $(NPM) install $(TOP)/deps/connect
+	(echo '!./build'; echo '!./node_modules') >> \
+	    $(PKGROOT)/cabase/node_modules/connect/.npmignore
 
-$(PKGROOT)/cabase/node_modules/%: $(NODE) | deps/node-%/.git
-	cd $(PKGROOT)/cabase && $(NPM) install $(SRC)/deps/node-$*
-	(echo '!./build'; echo '!./node_modules') >> $(PKGROOT)/cabase/node_modules/$*/.npmignore
+$(PKGROOT)/cabase/node_modules/%: | $(NPM_EXEC) deps/node-%/.git
+	cd $(PKGROOT)/cabase && $(NPM) install $(TOP)/deps/node-$*
+	(echo '!./build'; echo '!./node_modules') >> \
+	    $(PKGROOT)/cabase/node_modules/$*/.npmignore
 
-deps/%/.git: | deps/%
-	git submodule update --init deps/$*
-
-$(PKGROOT)/cabase/cmd/node: $(NODEDIR)/node
+$(PKGROOT)/cabase/cmd/node: $(NODE_EXEC)
 	cp $^ $@
 
-$(PKGROOT)/cabase/lib/httpd.d: lib/httpd.d
+$(PKGROOT)/cabase/cmd/ctf2json: deps/ctf2json/ctf2json
 	cp $^ $@
 
-$(PKGROOT)/cabase/lib/node.d: lib/node.d
-	cp $^ $@
+deps/ctf2json/ctf2json: | deps/ctf2json/.git
+	cd deps/ctf2json && $(MAKE)
+
+$(PKGROOT)/%/package.json: pkg/%-package.json FORCE
+	sed -e 's#@@CA_VERSION@@#$(STAMP)#g' $< > $@
+
+$(PKGROOT)/%/.npmignore: pkg/npm-ignore
+	grep -v ^# $^ > $@
 
 $(PKGROOT)/cabase/%: %
 	cp $^ $@
@@ -345,130 +358,14 @@ $(PKGROOT)/cainstsvc/%: %
 $(PKGROOT)/castashsvc/%: %
 	cp $^ $@
 
-$(PKGROOT)/%/package.json: pkg/%-package.json FORCE
-	sed -e 's#@@CA_VERSION@@#$(CA_VERSION)#g' $< > $@
-
-$(PKGROOT)/%/.npmignore: pkg/npm-ignore
-	grep -v ^# $^ > $@
-
-
-$(PKGROOT)/cabase/cmd/ctf2json: deps/ctf2json/ctf2json
-	cp $^ $@
-
-.SECONDEXPANSION:
-%.node: | deps/node-$$(*F)/.git
-	(cd deps/node-$(*F) && $(NODE_WAF) configure && $(NODE_WAF) build)
-
-#
-# The "check" target checks the syntax of various files. It depends on "pkg"
-# because the check tools require that the modules be built and installed, and
-# the only place we do that right now is inside pkg/cabase.
-#
-check: pkg check-metadata check-metad check-shell check-manifests \
-    check-jsstyle check-jsl check-json
-	@echo check okay
-
-check-metadata: tools $(METADATA_FILES:%=%.check)
-
-check-metad: tools
-	$(CAMD) $(METAD_FILES)
-
-metadata/profile/%.json.check: metadata/profile/%.json tools
-	$(CAPROF) $<
-
-metadata/metric/%.json.check: metadata/metric/%.json tools
-	$(CAMCHK) $<
-
-check-manifests: $(SMF_MANIFESTS)
-	$(XMLLINT) --dtdvalid $(SMF_DTD) $(SMF_MANIFESTS)
-
-check-shell: $(SH_SCRIPTS) tools/recreate-zone
-	$(BASH) -n $(SH_SCRIPTS) tools/recreate-zone
-
-check-jsl: check-jsl-main check-jsl-web
-
-check-jsl-main: tools $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
-	$(JSL) --conf=$(JSL_CONF_MAIN) $(JS_FILES) $(DEMO_JSFILES) $(TST_JSFILES)
-
-check-jsl-web: tools $(WEBJS_FILES)
-	$(JSL) --conf=$(JSL_CONF_WEB) $(WEBJS_FILES)
-
-check-jsstyle: tools $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
-	$(JSSTYLE) $(JS_FILES) $(DEMO_JSFILES) $(WEBJS_FILES) $(TST_JSFILES)
-
-check-json: $(JSON_FILES:%=%.check)
-
-%.json.check: %.json tools
-	$(JSONCHK) $<
-
-#
-# The "test" target runs catest.
-#
-test: release
-	tools/catest -a -t build/test_results.tap
-
-#
-# The "pbchk" target runs pre-push checks.
-#
-pbchk: check test
-
-#
-# The "xref" target builds the cscope cross-reference.
-#
-xref: cscope.files
-	$(CSCOPE) -bqR
-
-cscope.files:
-	find deps \
-	    $(JS_SUBDIRS) $(DEMO_JSFILES) $(DEMO_WEBJSFILES) $(TST_SUBDIRS) \
-	    -type f -name '*.js' -o -name '*.c' -o \
-	    -name '*.cpp' -o -name '*.cc' -o -name '*.h' > cscope.files
-
-.PHONY: cscope.files
-
-#
-# The "doc" target builds docs HTML from restdown.  "docs" is an alias for
-# "doc" for compatibility with the rest of the build infrastructure.  We should
-# remove "doc" when we verify that nobody is using it.
-#
-.PHONY: docs
-docs: doc
-
-doc: $(RESTDOWN_EXEC) $(DOC_FILES) $(DEVDOC_FILES)
-
-docs/%.html: docs/%.restdown | $(RESTDOWN_EXEC)
-	$(RESTDOWN) $<
-
-$(RESTDOWN_EXEC): | deps/restdown/.git
-
-deps/restdown/.git:
-	git submodule update --init deps/restdown
-
-#
-# The "clean" target removes created files -- we currently have none
-#
-clean:
-	-rm -f $(DOC_FILES) $(DEVDOC_FILES)
-	-rm -f $(WEBREV)/bin/codereview 
-
-#
-# "distclean" target removes installed root and built dependencies
-#
-distclean: clean
-	-(cd deps/node-kstat && $(NODE_WAF) distclean)
-	-(cd deps/node-libdtrace && $(NODE_WAF) distclean)
-	-(cd deps/node-png && $(NODE_WAF) distclean)
-	-(cd deps/node-uname && $(NODE_WAF) distclean)
-	-(cd deps/node-libGeoIP && $(NODE_WAF) distclean)
-	-(cd deps/node && $(MAKE) distclean)
-	-(cd deps/ctf2json && $(MAKE) clean)
-	-(cd deps/ca-native && $(NODE_WAF) distclean)
-	-$(RMTREE) $(BUILD) deps/node-install
-
 #
 # "FORCE" target is used as a dependency to require a given target to run every
 # time.  This should rarely be necessary.
 #
 FORCE:
-
 .PHONY: FORCE
+
+include $(INCMAKE)/Makefile.deps
+include $(INCMAKE)/Makefile.targ
+include $(INCMAKE)/Makefile.smf.targ
+include $(INCMAKE)/Makefile.node.targ

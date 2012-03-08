@@ -62,7 +62,8 @@ for instance in $instances; do
 	    $src > $dest || fatal "could not process $src to $dest"
 
 	svccfg import $dest || fatal "could not import $dest"
-	svcadm enable -s $fmri:$instance || fatal "could not enable $fmri:$instance"
+	svcadm enable -s $fmri:$instance || \
+	    fatal "could not enable $fmri:$instance"
 done
 
 exit 0

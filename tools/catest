@@ -20,7 +20,7 @@ cat_node="deps/node/node"		# relative path to "node"
 cat_tests=""				# list of tests (absolute paths)
 opt_a=false				# run all tests
 opt_k=false				# keep output of successful tests
-opt_o="/var/tmp"			# containing directory for output directory
+opt_o="/var/tmp"			# parent directory for output directory
 opt_t=					# TAP format output file
 
 #
@@ -268,7 +268,8 @@ export CATMPDIR="/var/tmp/catest.$$_tmpfiles"
 export CA_AMQP_PREFIX="test"
 
 if [[ $opt_a = "true" ]]; then
-	cat_tests=$(find $SRC/$cat_tstdir -name 'tst*.js' -o -name 'tst*.sh') || \
+	cat_tests=$(find $SRC/$cat_tstdir \
+	    -name 'tst*.js' -o -name 'tst*.sh') || \
 	    fail "failed to locate tests in $SRC/$cat_tstdir"
 else
 	for t in $@; do
@@ -307,7 +308,8 @@ ping "$AMQP_HOST" 2 >/dev/null || fail "couldn't reach AMQP_HOST: $AMQP_HOST"
 echo "done"
 
 if [[ -n "$cat_tapfile" ]]; then
-	echo "1..$(($cat_ntests))" > $cat_tapfile || fail "failed to emit TAP output"
+	echo "1..$(($cat_ntests))" > $cat_tapfile || \
+	    fail "failed to emit TAP output"
 fi
 
 #

@@ -163,12 +163,12 @@ sh_provision $sh_cust "$sh_dataset_name-$sh_dataset_version" || fail "failed"
 echo "$sh_zonename ($sh_zoneip)"
 
 #
-# Work around PROV-487.  The zone may be booted, but it might be running zoneinit,
-# after which it will reboot.  We need to wait for this second boot before
-# trying to log in.  We separately wait for the reboot to complete and then for
-# logins to work again.  We check for network connectivity to make sure that
-# when we run our real setup script later it can assume a working network
-# environment.
+# Work around PROV-487.  The zone may be booted, but it might be running
+# zoneinit, after which it will reboot.  We need to wait for this second boot
+# before trying to log in.  We separately wait for the reboot to complete and
+# then for logins to work again.  We check for network connectivity to make
+# sure that when we run our real setup script later it can assume a working
+# network environment.
 #
 echo "Waiting for zone $sh_zonename to reboot ... \c"
 while zlogin $sh_zonename pgrep -x reboot > /dev/null 2>&1; do
@@ -198,8 +198,8 @@ function fail
 
 echo "Enabling root login via ssh for CA zone ... \c"
 sed -e 's#^PermitRootLogin no\$#PermitRootLogin yes#' /etc/ssh/sshd_config > \
-    /etc/ssh/sshd_config_new && mv /etc/ssh/sshd_config_new /etc/ssh/sshd_config \
-    || fail "failed"
+    /etc/ssh/sshd_config_new && \
+    mv /etc/ssh/sshd_config_new /etc/ssh/sshd_config || fail "failed"
 svcadm disable -s ssh || fail "failed to disable service"
 svcadm enable -s ssh || fail "failed to enable service"
 echo "done."
@@ -236,8 +236,8 @@ ping example.com || fail "failed"
 
 echo "Enabling root login via ssh ... \c"
 sed -e 's#^PermitRootLogin no\$#PermitRootLogin yes#' /etc/ssh/sshd_config > \
-    /etc/ssh/sshd_config_new && mv /etc/ssh/sshd_config_new /etc/ssh/sshd_config \
-    || fail "failed"
+    /etc/ssh/sshd_config_new && mv /etc/ssh/sshd_config_new \
+    /etc/ssh/sshd_config || fail "failed"
 svcadm disable -s ssh || fail "failed to disable service"
 svcadm enable -s ssh || fail "failed to enable service"
 echo "done."
@@ -257,8 +257,10 @@ tar = gtar
 NPMRC
 
 cat > /home/$sh_user/.profile << PROFILE
-export PATH=/usr/bin:/usr/sbin:/opt/local/bin:/opt/local/sbin:/usr/sfw/bin:/usr/openwin/bin:/usr/ccs/bin:/usr/xpg4/bin
-export MANPATH=/opt/local/man:/opt/local/share/man:/usr/share/man:/usr/sfw/share/man:/usr/openwin/share/man
+export PATH=/usr/bin:/usr/sbin:/opt/local/bin:/opt/local/sbin:/usr/sfw/bin
+export PATH=\$PATH:/usr/openwin/bin:/usr/ccs/bin:/usr/xpg4/bin
+export MANPATH=/opt/local/man:/opt/local/share/man:/usr/share/man
+export MANPATH=\$MANPATH:/usr/sfw/share/man:/usr/openwin/share/man
 PROFILE
 chown -R $sh_user:staff /home/$sh_user || fail "failed to chmod"
 
@@ -278,13 +280,17 @@ export PATH=/opt/local/bin:$PATH
 
 echo "Setting up pkgsrc and packages ... \c"
 pkgin -f update > /var/tmp/pkgin_update.out
-pkgin -y in gcc-compiler gcc-runtime gcc-tools cscope pkg-config gmake scmgit python24 python26 png npm-1.0.94 GeoIP GeoLiteCity ghostscript > /var/tmp/pkgin_install.out || fail "failed"
+pkgin -y in gcc-compiler gcc-runtime binutils cscope pkg-config		\
+    gmake scmgit python24 python26 png npm-1.0.94 GeoIP GeoLiteCity	\
+    ghostscript > /var/tmp/pkgin_install.out || fail "failed"
 echo "done."
 EOF
 
 chmod +x /zones/$sh_zonename/root/root/setup_zone.sh
 [[ $sh_skip_setup = true ]] || zlogin $sh_zonename /root/setup_zone.sh || fail
 
-echo "Setup complete for zone $sh_zonename at $sh_zoneip."
-echo "If you have not yet done so, you will need to set up a public key for the "
-echo "admin user in CAPI in order to log into the zone as either root or $sh_user."
+cat <<EOF
+Setup complete for zone $sh_zonename at $sh_zoneip.
+If you have not yet done so, you will need to set up a public key for the admin
+user in CAPI in order to log into the zone as either root or $sh_user.
+EOF

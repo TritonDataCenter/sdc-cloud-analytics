@@ -7,7 +7,7 @@ var ASSERT = mod_assert.ok;
 
 var mod_casvc = require('../../lib/ca/ca-svc-stash');
 var mod_tl = require('../../lib/tst/ca-test');
-mod_tl.ctSetTimeout(10 * 1000);	/* 10s */
+mod_tl.ctSetTimeout(30 * 1000);	/* 30s */
 
 var tmpdir, svc, svckey, cap, connected;
 

@@ -169,8 +169,14 @@ function check_data()
 
 	after = new Date().getTime();
 
+	/*
+	 * Depending on how long other steps have taken, we may have received
+	 * two or three datapoints up to this point, but we only want to look at
+	 * the first two since the others will be examined by subsequent stages.
+	 */
 	mod_tl.ctStdout.info('received: %j', received_datapoints);
-	mod_assert.equal(received_datapoints.length, 2);
+	mod_assert.ok(received_datapoints.length == 2 ||
+	    received_datapoints.length == 3);
 
 	for (ii = 0; ii < received_datapoints.length; ii++) {
 		msg = received_datapoints[ii];
@@ -197,7 +203,7 @@ function check_data()
 		ptime = time;
 	}
 
-	received_datapoints = [];
+	received_datapoints = received_datapoints.slice(2);
 	mod_tl.advance();
 }
 
@@ -206,7 +212,8 @@ function check_data_double()
 	var ii, msg, n1, n2;
 
 	mod_tl.ctStdout.info('received: %j', received_datapoints);
-	mod_assert.equal(received_datapoints.length, 4);
+	mod_assert.ok(received_datapoints.length == 4 ||
+	    received_datapoints.length == 5);
 
 	n2 = 2;
 	n1 = 0;
@@ -261,7 +268,8 @@ mod_tl.ctPushFunc(disable_mod1.bind(null, instn1id, true));
 mod_tl.ctPushFunc(disable_mod1.bind(null, instn1id, false));
 
 /*
- * Wait a full two seconds and then make sure we received three data points.
+ * Wait a full two seconds and then make sure we received two or three data
+ * points.
  */
 mod_tl.ctPushFunc(mod_tl.ctSleep(2 * 1000));
 mod_tl.ctPushFunc(check_data);

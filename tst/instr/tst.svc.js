@@ -99,7 +99,7 @@ function enable_mod1(instnid, instnkey, expect_increment)
 	}
 
 	cap.cmdEnableInst(svc.routekey(), instnid, instnkey, props, zones,
-	    250, function (err) {
+	    1000, function (err) {
 		if (err)
 			console.error('error: %s (%j)', err.message, err);
 		mod_assert.ok(!err);
@@ -127,7 +127,7 @@ function enable_mod2(instnid, instnkey, expected_increment)
 	expected_mod2++;
 
 	cap.cmdEnableInst(svc.routekey(), instnid, instnkey, props, zones,
-	    250, function (err) {
+	    1000, function (err) {
 		mod_assert.ok(!err);
 		mod_assert.equal(mod1.ninstns, expected_mod1);
 		mod_assert.equal(mod2.ninstns, expected_mod2);
@@ -137,7 +137,7 @@ function enable_mod2(instnid, instnkey, expected_increment)
 
 function do_disable(instnid)
 {
-	cap.cmdDisableInst(svc.routekey(), instnid, 250, function (err) {
+	cap.cmdDisableInst(svc.routekey(), instnid, 1000, function (err) {
 		if (err)
 			console.error('error: %s (%j)', err.message, err);
 		mod_assert.ok(!err);

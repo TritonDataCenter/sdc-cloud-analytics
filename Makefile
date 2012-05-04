@@ -134,6 +134,7 @@ PKGDIRS_cabase = \
 	$(PKGROOT)/cabase/smf/manifest			\
 	$(PKGROOT)/cabase/smf/method			\
 	$(PKGROOT)/cabase/tools				\
+	$(PKGROOT)/cabase/tools/dev			\
 	$(TST_DIRS:%=$(PKGROOT)/cabase/%)
 
 PKGFILES_cabase = \

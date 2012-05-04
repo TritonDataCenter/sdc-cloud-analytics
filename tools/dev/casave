@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+
+/*
+ * casave: causes an instrumentation's data to be saved persistently
+ */
+
+var mod_cac = require('./calib');
+
+main();
+
+function usage()
+{
+	console.error('usage: %s %s <instnid>', process.argv[0],
+	    process.argv[1]);
+	process.exit(2);
+}
+
+function main()
+{
+	if (process.argv.length < 3)
+		usage();
+
+	instnid = parseInt(process.argv[2], 10);
+
+	if (isNaN(instnid))
+		usage();
+
+	mod_cac.caInstnModify(instnid, { 'persist-data': true }, function (err) {
+		if (err) {
+			console.error('error on instn %s: %s', instnid,
+			    err.message);
+			process.exit(1);
+		}
+
+		console.log('updated instn %s', instnid);
+	    });
+}

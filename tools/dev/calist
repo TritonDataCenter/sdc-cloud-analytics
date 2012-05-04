@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+
+/*
+ * calist: list instrumentations
+ */
+
+var mod_cac = require('./calib');
+
+var opt_h = false;		/* skip header line */
+
+main();
+
+function printf()
+{
+	process.stdout.write(mod_cac.caSprintf.apply(null, arguments));
+}
+
+function main()
+{
+	/*
+	 * We should really use node-getopt for this.
+	 */
+	process.argv.slice(2).forEach(function (opt) {
+		if (opt[0] != '-')
+			return;
+
+		if (opt.indexOf('h') != -1)
+			opt_h = true;
+	});
+
+	mod_cac.caListInstrumentations(function (err, instns) {
+		if (err) {
+			console.error(err.message);
+			process.exit(1);
+		}
+
+		printInstrumentations(instns);
+	});
+}
+
+function printInstrumentations(instns)
+{
+	var ii, instn;
+
+	if (!opt_h) {
+		printf('%-3s  %-6s  %-15s  %-15s  %-30s\n',
+		    'ID', 'RETAIN', 'METRIC', 'DECOMPOSITION', 'PREDICATE');
+	}
+
+	for (ii = 0; ii < instns.length; ii++) {
+		instn = instns[ii];
+		printf('%3d  %5ds  %-15s  %-15s  %-30j\n',
+		    instn['id'], instn['retention-time'], instn['module'] + '.' +
+		    instn['stat'], instn['decomposition'], instn['predicate']);
+	}
+}

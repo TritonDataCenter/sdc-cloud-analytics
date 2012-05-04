@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+
+/*
+ * caextend: extends the retention-time for a given metric
+ */
+
+var mod_cac = require('./calib');
+
+var ca_instn_retention_time = 60 * 60 * 24;	/* 24 hours */
+
+main();
+
+function usage()
+{
+	console.error('usage: %s %s <instnid> <value>', process.argv[0],
+	    process.argv[1]);
+	process.exit(2);
+}
+
+function main()
+{
+	if (process.argv.length < 4)
+		usage();
+
+	instnid = parseInt(process.argv[2], 10);
+	retain = parseInt(process.argv[3], 10);
+
+	if (isNaN(instnid) || isNaN(retain))
+		usage();
+
+	mod_cac.caInstnModify(instnid, { 'retention-time': retain },
+	    function (err) {
+		if (err) {
+			console.error('error on instn %s: %s', instnid,
+			    err.message);
+			process.exit(1);
+		}
+
+		console.log('updated instn %s', instnid);
+	    });
+}

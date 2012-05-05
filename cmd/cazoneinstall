@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#
+# cazoneinstall: installs the CA services into the CA zone.  This is invoked by
+# the CA zone setup process.
+#
+
+set -o xtrace
+
+function fail
+{
+	echo "$(basename $0): fatal error: $*" >&2
+	exit 1
+}
+
+cd $(dirname $0)/..
+czi_cabase=$PWD
+czi_smfdir=/tmp
+czi_base=/opt/smartdc
+
+function install_service
+{
+	local svc=$1
+	local manifest=$svc.xml
+	local src fmri instances dest
+
+	src=$czi_cabase/smf/manifest/$manifest
+	[[ -f $src ]] || fail "couldn't find manifest at '$src'"
+
+	fmri=$(svccfg inventory $src | \
+	    grep ':@@INSTANCE_NAME@@' | sed -e s'#:@.*##') || \
+	    fail "failed to remove INSTANCE_NAME from $src"
+
+	instances=
+	if [[ $svc = "caaggsvc" ]]; then
+		ncpus=$(psrinfo | wc -l) || fail "failed to count ncpus"
+		for (( ii = 0; ii < ncpus; ii++ )) {
+			instances="$instances auto$ii"
+		}
+	else
+		instances="default"
+	fi
+
+	for instance in $instances; do
+		dest=$czi_smfdir/${svc}-$instance.xml
+	
+		sed -e "s#@@CABASE_DIR@@#$czi_cabase#g"	\
+		    -e "s#@@BASE_DIR@@#$czi_base#g"	\
+		    -e "s#@@INSTANCE_NAME@@#$instance#g" $src > $dest || \
+		    fail "could not process $src to $dest"
+	
+		svccfg import $dest || fail "could not import $dest"
+		svcadm enable -s $fmri:$instance || \
+		    fail "could not enable $fmri:$instance"
+	done
+}
+
+install_service caconfigsvc
+install_service castashsvc
+install_service caaggsvc

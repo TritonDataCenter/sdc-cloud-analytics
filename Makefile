@@ -37,6 +37,7 @@ METAD_FILES	:= $(shell find $(METAD_DIR) -name '*.js')
 METADATA_FILES	:= $(shell find metadata -name '*.json')
 
 SH_SCRIPTS	= \
+	cmd/cazoneinstall		\
 	pkg/pkg-svc-postinstall.sh	\
 	pkg/pkg-svc-postuninstall.sh	\
 	smf/method/canodesvc		\
@@ -69,32 +70,13 @@ RELEASE_TARBALL  = $(DIST)/ca-pkg-$(STAMP).tar.bz2
 # what should go where, and several targets below use these to implement that.
 #
 PKGROOT		 = $(BUILD)/pkg
-PKG_NAMES	 = cabase caconfigsvc caaggsvc cainstsvc castashsvc
+PKG_NAMES	 = cabase cainstsvc
 PKG_TARBALLS	 = $(PKG_NAMES:%=$(PKGROOT)/%.tar.gz)
 
 PKG_DIRS = \
 	$(PKGROOT)		\
 	$(PKGDIRS_cabase)	\
-	$(PKGDIRS_caconfigsvc)	\
-	$(PKGDIRS_caaggsvc)	\
 	$(PKGDIRS_cainstsvc)	\
-	$(PKGDIRS_castashsvc)
-
-# caaggsvc package
-PKGDIRS_caaggsvc := \
-	$(PKGROOT)/caaggsvc/pkg
-
-PKGFILES_caaggsvc = \
-	$(SVC_SCRIPTS:%=$(PKGROOT)/caaggsvc/%)		\
-	$(PKGROOT)/caaggsvc/package.json
-
-# caconfigsvc package
-PKGDIRS_caconfigsvc := \
-	$(PKGROOT)/caconfigsvc/pkg
-
-PKGFILES_caconfigsvc = \
-	$(SVC_SCRIPTS:%=$(PKGROOT)/caconfigsvc/%)		\
-	$(PKGROOT)/caconfigsvc/package.json
 
 # cainstsvc package
 PKGDIRS_cainstsvc := \
@@ -103,14 +85,6 @@ PKGDIRS_cainstsvc := \
 PKGFILES_cainstsvc = \
 	$(SVC_SCRIPTS:%=$(PKGROOT)/cainstsvc/%)		\
 	$(PKGROOT)/cainstsvc/package.json
-
-# castashsvc package
-PKGDIRS_castashsvc := \
-	$(PKGROOT)/castashsvc/pkg
-
-PKGFILES_castashsvc = \
-	$(SVC_SCRIPTS:%=$(PKGROOT)/castashsvc/%)	\
-	$(PKGROOT)/castashsvc/package.json
 
 # cabase package
 PKGDIRS_cabase = \
@@ -247,9 +221,11 @@ distclean:: clean
 release: $(RELEASE_TARBALL)
 
 $(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
-	mkdir -p $(BUILD)/root
+	mkdir -p $(BUILD)/root/opt/smartdc
 	[[ -e $(BUILD)/root/pkg ]] || ln -s $(TOP)/$(BUILD)/pkg $(BUILD)/root/pkg
-	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz) | bzip2 > $@
+	[[ -e $(BUILD)/root/opt/smartdc/ca ]] || \
+	    ln -s $(TOP)/$(BUILD)/pkg/cabase $(BUILD)/root/opt/smartdc/ca
+	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz root/opt) | bzip2 > $@
 
 $(DIST):
 	mkdir -p $@
@@ -300,16 +276,9 @@ $(PKGROOT)/%.tar.gz:
 	(cd $(PKGROOT) && $(TAR) cf - $*) | gzip > $@
 
 $(PKGROOT)/cabase.tar.gz:	$(PKGFILES_cabase) | $(PKGDEPS_cabase)
-$(PKGROOT)/caconfigsvc.tar.gz:	$(PKGFILES_caconfigsvc)
-$(PKGROOT)/caaggsvc.tar.gz:	$(PKGFILES_caaggsvc)
 $(PKGROOT)/cainstsvc.tar.gz:	$(PKGFILES_cainstsvc)
-$(PKGROOT)/castashsvc.tar.gz:	$(PKGFILES_castashsvc)
 
-$(PKGFILES_cabase)	\
-$(PKGFILES_caconfigsvc)	\
-$(PKGFILES_caaggsvc)	\
-$(PKGFILES_cainstsvc)	\
-$(PKGFILES_castashsvc): | $(PKG_DIRS)
+$(PKGFILES_cabase) $(PKGFILES_cainstsvc): | $(PKG_DIRS)
 
 $(PKG_DIRS):
 	mkdir -p $(PKG_DIRS)
@@ -347,16 +316,7 @@ $(PKGROOT)/%/.npmignore: pkg/npm-ignore
 $(PKGROOT)/cabase/%: %
 	cp $^ $@
 
-$(PKGROOT)/caconfigsvc/%: %
-	cp $^ $@
-
-$(PKGROOT)/caaggsvc/%: %
-	cp $^ $@
-
 $(PKGROOT)/cainstsvc/%: %
-	cp $^ $@
-
-$(PKGROOT)/castashsvc/%: %
 	cp $^ $@
 
 #

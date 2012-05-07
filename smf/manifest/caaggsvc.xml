@@ -16,7 +16,7 @@
 
 <instance name="@@INSTANCE_NAME@@" enabled="true">
 	<property_group name="com.joyent.ca,caconfig" type="application">
-		<propval name="amqp-host" type="astring" value="10.99.99.5" />
+		<propval name="amqp-host" type="astring" value="10.99.99.12" />
 		<propval name="path-logs" type="astring" value="/var/smartdc/ca/log" />
 		<propval name="path-node" type="astring" value="@@CABASE_DIR@@/cmd/node" />
 		<propval name="path-dist" type="astring" value="@@CABASE_DIR@@" />

@@ -16,7 +16,7 @@
 
 <instance name="@@INSTANCE_NAME@@" enabled="true">
 	<property_group name="com.joyent.ca,caconfig" type="application">
-		<propval name="amqp-host" type="astring" value="10.99.99.5" />
+		<propval name="amqp-host" type="astring" value="10.99.99.12" />
 		<propval name="mapi-host" type="astring" value="" />
 		<propval name="mapi-port" type="astring" value="" />
 		<propval name="mapi-user" type="astring" value="" />

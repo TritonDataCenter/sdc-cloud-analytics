@@ -190,7 +190,7 @@ well as aggregated CA state.
 You run `cactl` from the global zone like this:
 
     # cd /opt/smartdc/agents/bin
-    # export AMQP_HOST=10.99.99.5
+    # export AMQP_HOST=10.99.99.12
     # ./cactl 
 
 With no arguments, `cactl` will print out detailed usage notes.

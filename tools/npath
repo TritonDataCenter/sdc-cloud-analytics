@@ -26,6 +26,6 @@ export NODE_PATH="$NODE_PATH:$ws_mods/heatmap/lib"
 
 echo "NODE_PATH=$NODE_PATH"
 
-[[ -z $AMQP_HOST ]] && echo AMQP_HOST=10.99.99.5
+[[ -z $AMQP_HOST ]] && echo AMQP_HOST=10.99.99.12
 [[ -z $GEOIP_DATABASE ]] && \
     echo GEOIP_DATABASE=/opt/local/share/GeoIP/GeoLiteCity.dat

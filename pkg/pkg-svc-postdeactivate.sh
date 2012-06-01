@@ -18,6 +18,6 @@ for fmri in $(svcs -H -ofmri $svc); do
 	svccfg delete $fmri || fatal "could not delete $fmri"
 done
 
-rm ${npm_config_smfdir}/${svc}*.xml || fatal "could not delete manifests"
+rm -f ${npm_config_smfdir}/${svc}*.xml || fatal "could not delete manifests"
 
 exit 0

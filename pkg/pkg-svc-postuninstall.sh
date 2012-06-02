@@ -18,7 +18,8 @@ for fmri in $(svcs -H -ofmri $svc); do
 done
 
 if [[ -n $npm_config_smfdir ]]; then
-	rm -f ${npm_config_smfdir}/${svc}*.xml || fatal "could not delete manifest"
+	rm -f ${npm_config_smfdir}/${svc}*.xml || \
+	    fatal "could not delete manifest"
 fi
 
 exit 0

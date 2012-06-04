@@ -50,7 +50,7 @@ function sh_provision
 		"dataset_uuid": "$dataset_uuid",
 		"owner_uuid": "$cust_uuid",
 		"networks": [ "$net_uuid" ],
-		"alias": "${sh_user}dev3",
+		"alias": "${sh_user}dev",
 		"ram": 256,
 		"max_swap": 512,
 		"quota": 10240,
@@ -62,8 +62,10 @@ function sh_provision
 	echo "done."
 
 	echo "Identifying new zone ... \c "
-	sh_zonename=$(sdc-machine list | grep -w "${sh_user}dev3" | \
+	sh_zonename=$(sdc-machine list | grep -w "${sh_user}dev" | \
 	    awk '{print $3}') || fail "failed to fetch machine list"
+	# Generate a short version of the zonename as a hostname.
+	sh_zonehostname=${sh_zonename:0:8}
 	sh_zoneroot=/zones/$sh_zonename/root
 	[[ -n $sh_zonename ]] || fail "zonename not found"
 
@@ -81,6 +83,7 @@ sh_user="$1"				# desired username
 sh_dataset_name=smartos			# dataset name to provision
 sh_dataset_version=1.6.3		# desired version to provision
 sh_zonename=				# provisioned zone's uuid
+sh_zonehostname=			# provisioned zone's internal hostname
 sh_zoneip=				# provisioned zone's IP
 sh_zoneroot=				# provisioned zone's /
 sh_cust=				# admin user's customer uuid
@@ -160,6 +163,11 @@ function fail
 	echo "\$*"
 	exit 1
 }
+
+echo "Setting hostname to $sh_zonehostname ... \c "
+hostname $sh_zonehostname
+echo $sh_zonehostname > /etc/nodename
+echo "done."
 
 echo "Creating user '$sh_user' ... \c "
 if egrep ^$sh_user: /etc/passwd > /dev/null; then

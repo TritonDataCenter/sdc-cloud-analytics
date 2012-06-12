@@ -44,10 +44,10 @@ function sh_provision
 	echo "$net_uuid"
 
 	echo "Creating dev zone ... \c "
-	sdc-machine create > /var/tmp/casetup.$$.create.log 2>&1 <<-EOF
+	sdc-vm create > /var/tmp/casetup.$$.create.log 2>&1 <<-EOF
 	{
 		"brand": "joyent",
-		"dataset_uuid": "$dataset_uuid",
+		"image_uuid": "$dataset_uuid",
 		"owner_uuid": "$cust_uuid",
 		"networks": [ "$net_uuid" ],
 		"alias": "${sh_user}dev",
@@ -62,14 +62,14 @@ function sh_provision
 	echo "done."
 
 	echo "Identifying new zone ... \c "
-	sh_zonename=$(sdc-machine list | grep -w "${sh_user}dev" | \
+	sh_zonename=$(sdc-vm list | grep -w "${sh_user}dev" | \
 	    awk '{print $3}') || fail "failed to fetch machine list"
 	# Generate a short version of the zonename as a hostname.
 	sh_zonehostname=${sh_zonename:0:8}
 	sh_zoneroot=/zones/$sh_zonename/root
 	[[ -n $sh_zonename ]] || fail "zonename not found"
 
-	sh_zoneip=$(sdc-zapi /machines/$sh_zonename | json -H nics.0.ip) || \
+	sh_zoneip=$(sdc-vmapi /vms/$sh_zonename | json -H nics.0.ip) || \
 	    fail "failed to fetch IP"
 	[[ -n $sh_zoneip ]] || fail "IP not found"
 	echo "$sh_zonename ($sh_zoneip)"
@@ -109,7 +109,11 @@ for zone in $sh_zones; do
 	fi
 
 	echo "Provisioning zone $zone ... \c "
-	sdc-role create $zone > /var/tmp/casetup-$$-$zone.log || fail "failed"
+	# Work around HEAD-1126
+	sdc-role create $zone > /var/tmp/casetup-$$-$zone.log || \
+	    echo "warning: sdc-role returned $? \c "
+	tail -1 /var/tmp/casetup-$$-$zone.log | grep "Success" > /dev/null || \
+	    fail "failed"
 	echo "done."
 done
 

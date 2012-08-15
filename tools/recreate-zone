@@ -57,9 +57,9 @@ cp $rcz_tarball $rcz_dst || fail "FAILED"
 echo "done."
 
 echo "Removing existing zone ($rcz_zonename) ... \c"
-sdc-setup -D $rcz_zonename || fail "FAILED"
+sdc-role destroy ${rcz_zonerole}0 || fail "FAILED"
 echo "done."
 
 echo "Recreating zone with role \"$rcz_zonerole\" ... \c"
-sdc-setup -c $(hostname) -r $rcz_zonerole || fail "FAILED"
+sdc-role create $rcz_zonerole || fail "FAILED"
 echo "done."

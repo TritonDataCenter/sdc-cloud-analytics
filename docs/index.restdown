@@ -2090,15 +2090,15 @@ thread samples.
 
 ## ZFS-related metrics
 
-The ZFS metrics report how disk space is used by ZFS pools and their
-filesystems.  Typically, an individual server will have one or more storage
-pools, each of which may contain any number of datasets (filesystems and
-volumes), each of which may contain any number of snapshots.  Some of these
-datasets are used by the system itself, while the others are allocated to
-individual zones.  Each ZFS metric reports either by dataset or by pool.
-Dataset-level metrics provide a "zdataset" field for decomposing by dataset
-name, while pool-level metrics provide a "zpool" field for decomposing by pool
-name.
+The ZFS metrics report on the operation of the ZFS filesystem and how disk
+space is used by ZFS pools and their filesystems.  Typically, an individual
+server will have one or more storage pools, each of which may contain any
+number of datasets (filesystems and volumes), each of which may contain any
+number of snapshots.  Some of these datasets are used by the system itself,
+while the others are allocated to individual zones.  Some metrics report by
+dataset or by pool.  Dataset-level metrics provide a "zdataset" field for
+decomposing by dataset name, while pool-level metrics provide a "zpool" field
+for decomposing by pool name.
 
 ZFS filesystems are not fixed in size: by default, storage for each filesystem
 is allocated from a single pool.  Most configurations limit filesystem size by
@@ -2108,6 +2108,28 @@ provides reservations, which guarantee space rather than limit it.
 The flexibility of ZFS storage configuration makes space accounting complex.  Be
 sure to understand all of the concepts and metrics here before drawing
 conclusions from these metrics.  See the zfs(1M) man page for details.
+
+
+### ZFS: ARC operations
+
+||**Name**|| zfs.arc_ops||
+||**Raw metric**|| total number of operations on the ARC (adaptive replacement cache) ||
+||**Decompositions**|| hostname, zonename, execname, psargs, pid, pexecname, ppsargs, ppid, optype ("hit" or "miss") ||
+||**Visibility**|| operators and end users||
+
+In raw form, this metric reports all ARC hits and misses.  These can be
+decomposed by "optype" to identify hits and misses.  Operations can also be
+decomposed by the usual process fields (pid, application name, arguments, and
+parent process information) to identify processes responsible for ARC
+operations.
+
+When filesystem data and metadata is requested, ZFS first looks to satisfy the
+request from the in-memory adaptive replacement cache (ARC).  If the request
+hits in the cache, it is satisfied immediately.  If the request misses, ZFS
+generally must fetch the data from secondary storage, which often takes
+significantly more time.  This metric allows users to identify application
+latency resulting from reading filesystem data and to measure the overall
+efficacy of the cache for their workload.
 
 
 ### ZFS: quota size

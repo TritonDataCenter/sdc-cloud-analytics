@@ -671,6 +671,23 @@ var inskMetrics = [ {
 			}
 		}
 	}
+}, {
+	module: 'zfs',
+	stat: 'arc_ops',
+	kstat: { module: 'zfs', name: 'arcstats' },
+	extract: function (fields, kstat, kprev) {
+		var newd = kstat['data'];
+		var oldd = kprev['data'];
+		var key = fields['optype'] == 'hit' ? 'hits' : 'misses';
+		return (newd[key] - oldd[key]);
+	},
+	fields: {
+		optype: {
+			values: function (kstat) {
+				return ([ 'hit', 'miss' ]);
+			}
+		}
+	}
 } ];
 
 function inskNicFilter(kstat)

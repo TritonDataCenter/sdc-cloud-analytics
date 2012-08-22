@@ -481,6 +481,13 @@
 	"fields":	[ "hostname", "zonename", "optype" ]
     }, {
 	"module":	"zfs",
+	"stat":		"arc_ops",
+	"label":	"ARC operations",
+	"unit":		"operations",
+	"fields":	[ "hostname", "optype", "zonename", "execname",
+	    "psargs", "pid", "pexecname", "ppsargs", "ppid" ]
+    }, {
+	"module":	"zfs",
 	"stat":		"dataset_unused_quota",
 	"label":	"unused quota",
 	"type":		"size",

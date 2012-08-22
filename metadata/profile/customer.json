@@ -163,6 +163,11 @@
 		    "pexecname", "ppsargs", "rport", "raddr" ]
 	}, {
 		"module": "zfs",
+		"stat": "arc_ops",
+		"fields": [ "zonename", "execname", "psargs", "pid",
+		    "pexecname", "ppsargs", "ppid", "optype" ]
+	}, {
+		"module": "zfs",
 		"stat": "dataset_unused_quota",
 		"fields": [ "zdataset" ]
 	}, {

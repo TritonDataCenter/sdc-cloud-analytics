@@ -11,6 +11,7 @@ var mod_dbg = require('../lib/ca/ca-dbg');
 var mod_log = require('../lib/ca/ca-log');
 var mod_cageoip = require('../lib/ca/ca-geo');
 var mod_heatmap = require('heatmap');
+var mod_os = require('os');
 var HTTP = require('../lib/ca/http-constants');
 var ASSERT = require('assert');
 
@@ -20,6 +21,7 @@ var agg_http_req_timeout = 5000;	/* max milliseconds to wait for data */
 var agg_http_baseuri = '/ca/';
 var agg_http_port_base = mod_ca.ca_http_port_agg_base;
 var agg_http_ipaddr = '127.0.0.1';	/* HTTP server address */
+var agg_http_nic = 'net0';		/* Expected vnic */
 var agg_http_port;			/* actual http port */
 var agg_profile = false;
 
@@ -50,9 +52,27 @@ var agg_future_warn_interval = 60 * 60 * 1000;	/* warning frequency (1/hour) */
 
 function main()
 {
-	var dbg_log, queue;
+	var dbg_log, queue, ips, ii, ipe;
 
 	agg_start = new Date().getTime();
+
+	/*
+	 * Try and determine the IP address that we should tell someone.
+	 * Thankfully we know that the name of the nic we care about will always
+	 * be net0. However, that nic may someday have multiple IPs and possibly
+	 * IPv6 addresses. As such, we walk the list of IPs until we find the
+	 * first IPv4 one. If we find nothing, then we default to localhost.
+	 */
+	ips = mod_os.networkInterfaces();
+	if (agg_http_nic in ips) {
+		for (ii = 0; ii < ips[agg_http_nic].length; ii++) {
+			ipe = ips[agg_http_nic][ii];
+			if (ipe['family'] == 'IPv4') {
+				agg_http_ipaddr = ipe['address'];
+				break;
+			}
+		}
+	}
 
 	mod_dbg.caEnablePanicOnCrash();
 	caDbg.set('agg_name', agg_name);
@@ -106,6 +126,7 @@ function main()
 	agg_log.info('%-12s %s', 'AMQP broker:',
 	    JSON.stringify(agg_cap.broker()));
 	agg_log.info('%-12s %s', 'Routing key:', queue);
+	agg_log.info('%-12s %s', 'HTTP IP:', agg_http_ipaddr);
 
 	aggInitBackends();
 

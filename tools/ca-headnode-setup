@@ -49,6 +49,7 @@ function sh_provision
 		"brand": "joyent",
 		"image_uuid": "$dataset_uuid",
 		"owner_uuid": "$cust_uuid",
+		"server_uuid": "$sh_headnode",
 		"networks": [ "$net_uuid" ],
 		"alias": "${sh_user}dev",
 		"ram": 256,
@@ -102,6 +103,11 @@ echo "Listing existing SDC zones ... \c "
 sdc-role list | awk '{print $6}' > /var/tmp/casetup.$$.zones || fail "failed"
 echo "done."
 
+echo "Fetching headnode uuid ... \c "
+sh_headnode=$(sysinfo | json UUID) || fail "failed"
+[[ -n "$sh_headnode" ]] || fail "failed"
+echo "$sh_headnode."
+
 for zone in $sh_zones; do
 	if grep -w $zone /var/tmp/casetup.$$.zones > /dev/null; then
 		echo "Skipping zone $zone (already exists)."
@@ -110,7 +116,7 @@ for zone in $sh_zones; do
 
 	echo "Provisioning zone $zone ... \c "
 	# Work around HEAD-1126
-	sdc-role create $zone > /var/tmp/casetup-$$-$zone.log || \
+	sdc-role create $sh_headnode $zone > /var/tmp/casetup-$$-$zone.log || \
 	    echo "warning: sdc-role returned $? \c "
 	tail -1 /var/tmp/casetup-$$-$zone.log | grep "Success" > /dev/null || \
 	    fail "failed"

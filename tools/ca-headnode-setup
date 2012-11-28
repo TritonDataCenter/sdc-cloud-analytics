@@ -43,6 +43,12 @@ function sh_provision
 	[[ -n $net_uuid ]] || fail "not found"
 	echo "$net_uuid"
 
+	echo "Retrieving external network uuid ... \c "
+	local external_net_uuid=$(sdc-napi /networks?name=external | \
+	    json -H 0.uuid) || fail "failed"
+	[[ -n $external_net_uuid ]] || fail "not found"
+	echo "$external_net_uuid"
+
 	echo "Creating dev zone ... \c "
 	sdc-vm create > /var/tmp/casetup.$$.create.log 2>&1 <<-EOF
 	{
@@ -50,7 +56,7 @@ function sh_provision
 		"image_uuid": "$dataset_uuid",
 		"owner_uuid": "$cust_uuid",
 		"server_uuid": "$sh_headnode",
-		"networks": [ "$net_uuid" ],
+		"networks": [ "$external_net_uuid", "$net_uuid" ],
 		"alias": "${sh_user}dev",
 		"ram": 256,
 		"max_swap": 512,

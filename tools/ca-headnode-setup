@@ -94,7 +94,7 @@ sh_zonehostname=			# provisioned zone's internal hostname
 sh_zoneip=				# provisioned zone's IP
 sh_zoneroot=				# provisioned zone's /
 sh_cust=				# admin user's customer uuid
-sh_zones="ca adminui amon cloudapi portal"
+sh_zones="ca adminui amon cloudapi"
 
 [[ -n $sh_user ]] || fail "usage: $sh_arg0 <username>"
 

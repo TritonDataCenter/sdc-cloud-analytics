@@ -86,6 +86,11 @@
 		"stat": "pageins",
 		"fields": [ "hostname", "zonename" ]
 	}, {
+		"module": "moray",
+		"stat": "ops",
+		"fields": [ "hostname", "zonename", "pid", "execname",
+		    "psargs", "optype", "table", "latency", "cputime" ]
+	}, {
 		"module": "mysql",
 		"stat": "connections",
 		"fields": [ "hostname", "zonename", "pid", "execname",
@@ -164,6 +169,11 @@
 		    "pexecname", "ppsargs", "raddr", "rport", "optype", "size",
 		    "buffered"
 		]
+	}, {
+		"module": "postgres",
+		"stat": "queries",
+		"fields": [ "hostname", "zonename", "pid", "execname",
+		    "psargs", "querysubstr", "latency", "cputime" ]
 	}, {
 		"module": "syscall",
 		"stat": "syscalls",

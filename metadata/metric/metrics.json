@@ -7,9 +7,11 @@
 	"fs":		{ "label": "Filesystem"			},
 	"ldapjs":	{ "label": "ldapjs"			},
 	"memory":	{ "label": "Memory"			},
+	"moray":	{ "label": "Moray"			},
 	"mysql":	{ "label": "MySQL"			},
 	"nic":		{ "label": "Network interface"		},
 	"node":		{ "label": "Node.js 0.4.x"		},
+	"postgres":	{ "label": "Postgres"			},
 	"syscall":	{ "label": "System calls"		},
 	"tcp": 		{ "label": "TCP"			},
 	"unix":		{ "label": "OS"				},
@@ -295,6 +297,13 @@
 	"unit":		"pages",
 	"fields":	[ "hostname", "zonename" ]
     }, {
+	"module":	"moray",
+	"stat":		"ops",
+	"label":	"operations",
+	"unit":		"operations",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "optype", "table", "latency", "cputime" ]
+    }, {
 	"module":	"mysql",
 	"stat":		"connections",
 	"label":	"connections",
@@ -404,6 +413,13 @@
 	    "pexecname", "ppsargs", "optype", "raddr", "rport", "size",
 	    "buffered"
 	]
+    }, {
+	"module":	"postgres",
+	"stat":		"queries",
+	"label":	"queries",
+	"unit":		"queries",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "querysubstr", "latency", "cputime" ]
     }, {
 	"module":	"syscall",
 	"stat":		"syscalls",

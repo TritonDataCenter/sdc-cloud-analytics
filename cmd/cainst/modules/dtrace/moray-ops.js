@@ -36,7 +36,7 @@ var desc = {
 				store: 'global[pid,arg0]'
 			},
 			table: {
-				gather: 'copyinstr(arg1)',
+				gather: 'copyinstr(arg2)',
 				store: 'global[pid,arg0]'
 			},
 			latency: {
@@ -94,11 +94,11 @@ var desc = {
 		probes: [ 'moray*:::batch-op-start' ],
 		gather: {
 			optype: {
-				gather: 'copyinstr(arg2)',
+				gather: 'copyinstr(arg3)',
 				store: 'global[pid,arg0]'
 			},
 			table: {
-				gather: 'copyinstr(arg1)',
+				gather: 'copyinstr(arg2)',
 				store: 'global[pid,arg0]'
 			},
 			latency: {

@@ -189,9 +189,9 @@ echo "Creating user '$sh_user' ... \c "
 if egrep ^$sh_user: /etc/passwd > /dev/null; then
 	echo "skipped (already exists)"
 else
+privs=basic,contract_event,dtrace_user,dtrace_proc,sys_mount,hyprlofs_control 
 useradd -c $sh_user -d /home/$sh_user -G staff -s /bin/bash \
-    -K defaultpriv=basic,dtrace_user,dtrace_proc,sys_mount,hyprlofs_control \
-    $sh_user || fail "failed to create user"
+    -K defaultpriv=\$privs $sh_user || fail "failed to create user"
 passwd -N $sh_user > /dev/null || fail "passwd -N failed for $sh_user"
 chown -R $sh_user:staff /home/$sh_user || fail "failed to chmod"
 echo "done."

@@ -702,7 +702,7 @@ function inskNicFilter(kstat)
 	 * as well, which should be fine because it will never show up in the
 	 * global zone where we run in production.
 	 */
-	return (/^(e1000g|bnx|net)\d+$/.test(kstat['name']));
+	return (/^(e1000g|bnx|igb|ixgbe|net)\d+$/.test(kstat['name']));
 }
 
 function inskVnicFilter(kstat)

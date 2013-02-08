@@ -1,5 +1,5 @@
 /*
- * DTrace metric for Moray queries
+ * DTrace metric for Moray operations
  */
 var mod_ca = require('../../../../lib/ca/ca-common');
 
@@ -75,13 +75,16 @@ var desc = {
 			execname: 'execname',
 			psargs: 'curpsinfo->pr_psargs'
 		},
-		clean: {
+		verify: {
 			optype: '$0[pid,arg0]',
 			table: '$0[pid,arg0]',
 			latency: '$0[pid,arg0]',
 			cputime: '$0[pid,arg0]'
-		},
-		verify: {
+		}
+	    },
+	    {
+		probes: doneProbes,
+		clean: {
 			optype: '$0[pid,arg0]',
 			table: '$0[pid,arg0]',
 			latency: '$0[pid,arg0]',
@@ -137,13 +140,16 @@ var desc = {
 			execname: 'execname',
 			psargs: 'curpsinfo->pr_psargs'
 		},
-		clean: {
+		verify: {
 			optype: '$0[pid,arg0]',
 			table: '$0[pid,arg0]',
 			latency: '$0[pid,arg0]',
 			cputime: '$0[pid,arg0]'
-		},
-		verify: {
+		}
+	    },
+	    {
+	        probes: [ 'moray*:::batch-op-done' ],
+		clean: {
 			optype: '$0[pid,arg0]',
 			table: '$0[pid,arg0]',
 			latency: '$0[pid,arg0]',

@@ -49,12 +49,15 @@ var desc = {
 			execname: 'execname',
 			psargs: 'curpsinfo->pr_psargs'
 		},
-		clean: {
+		verify: {
 			querysubstr: '$0',
 			latency: '$0',
 			cputime: '$0'
-		},
-		verify: {
+		}
+	    },
+	    {
+	        probes: [ 'postgres*:::query-done' ],
+		clean: {
 			querysubstr: '$0',
 			latency: '$0',
 			cputime: '$0'

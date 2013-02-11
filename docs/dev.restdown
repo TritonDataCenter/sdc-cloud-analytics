@@ -85,7 +85,7 @@ The only supported build environment is an SDC6 "smartos" zone.
    `sdc-setup` yet.
 3. From the global zone, run:
 
-        /opt/smartdc/agents/lib/node_modules/cabase/tools/ca-headnode-setup <user>
+        /opt/smartdc/agents/lib/node_modules/cabase/tools/devsetup <user>
 
    This will run `sdc-setup` as needed and set up a zone with your desired
    username. It will take several minutes and then report the new zone's name

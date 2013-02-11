@@ -45,7 +45,8 @@ SH_SCRIPTS	= \
 	tools/cainstrfleet		\
 	tools/catest			\
 	tools/caupagent			\
-	tools/ca-headnode-setup		\
+	tools/devsetup			\
+	tools/devsetup.manta		\
 	tools/recreate-zone
 
 SVC_SCRIPTS	 = \

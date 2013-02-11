@@ -1,0 +1,295 @@
+#!/bin/bash
+
+#
+# devsetup [-t zone_type] username: set up a development zone with the given
+# username.
+#
+
+#
+# fail msg [...]: print an error message and exit with failure.
+#
+function fail
+{
+	local msg="$*"
+	[[ -z "$msg" ]] && msg="failed"
+	echo "$sh_arg0: $msg" >&2
+	exit 1
+}
+
+#
+# usage msg [...]: print an error message, then the usage message, then exit
+# with failure.
+#
+function usage
+{
+	echo "$sh_arg0: $*" >&2
+	echo "usage: $sh_arg0 [-t zone_type] username"
+	exit 2
+}
+
+#
+# setup_sdc_zones: provision any SDC zones that we require that aren't already
+# provisioned.
+#
+function setup_sdc_zones
+{
+	echo "Listing existing SDC zones ... \c "
+	sdc-role list | awk '{print $6}' > /var/tmp/casetup.$$.zones || \
+	    fail "failed"
+	echo "done."
+
+	echo "Fetching headnode uuid ... \c "
+	sh_headnode=$(sysinfo | json UUID) || fail "failed"
+	[[ -n "$sh_headnode" ]] || fail "failed"
+	echo "$sh_headnode."
+
+	for zone in $sh_sdczones; do
+		if grep -w $zone /var/tmp/casetup.$$.zones > /dev/null; then
+			echo "Skipping zone $zone (already exists)."
+			continue
+		fi
+	
+		echo "Provisioning zone $zone ... \c "
+		# Work around HEAD-1126
+		sdc-role create $sh_headnode $zone > \
+		    /var/tmp/casetup-$$-$zone.log || \
+		    echo "warning: sdc-role returned $? \c "
+		tail -1 /var/tmp/casetup-$$-$zone.log | \
+		    grep "Success" > /dev/null || fail "failed"
+		echo "done."
+	done
+}
+
+#
+# provision_devzone: provision a zone for the Admin user using the globally-
+# configured dataset and wait for the zone to be ready for setup.  The resulting
+# zone will have addresses on both the admin and external networks.
+#
+function provision_devzone
+{
+	echo "Fetching uuid for $sh_dataset_name $sh_dataset_version ... \c "
+	local dataset_uuid=$(sdc-dsapi \
+	    "/datasets?name=$sh_dataset_name&version=$sh_dataset_version" | \
+	    json -H 0.uuid) || fail "failed"
+	[[ -n $dataset_uuid ]] || fail "not found"
+	echo $dataset_uuid
+
+	echo "Retrieving admin customer uuid ... \c "
+	local cust_uuid=$(sdc-ldap search cn=Admin | grep uuid: | \
+	    awk '{print $2}') || fail "failed"
+	[[ -n $cust_uuid ]] || fail "not found"
+	echo "$cust_uuid"
+
+	echo "Retrieving admin network uuid ... \c "
+	local net_uuid=$(sdc-napi /networks?name=admin | json -H 0.uuid) || \
+	    fail "failed"
+	[[ -n $net_uuid ]] || fail "not found"
+	echo "$net_uuid"
+
+	echo "Retrieving external network uuid ... \c "
+	local external_net_uuid=$(sdc-napi /networks?name=external | \
+	    json -H 0.uuid) || fail "failed"
+	[[ -n $external_net_uuid ]] || fail "not found"
+	echo "$external_net_uuid"
+
+	echo "Creating dev zone ... \c "
+	sdc-vm create > /var/tmp/casetup.$$.create.log 2>&1 <<-EOF
+	{
+		"brand": "joyent",
+		"image_uuid": "$dataset_uuid",
+		"owner_uuid": "$cust_uuid",
+		"server_uuid": "$sh_headnode",
+		"networks": [ "$external_net_uuid", "$net_uuid" ],
+		"alias": "${sh_user}dev",
+		"ram": 256,
+		"max_swap": 512,
+		"quota": 10240,
+		"cpu_cap": 100,
+		"max_lwps": 1000,
+		"zfs_io_priority": 10
+	}
+	EOF
+	echo "done."
+
+	echo "Identifying new zone ... \c "
+	sh_zonename=$(sdc-vm list | grep -w "${sh_user}dev" | \
+	    awk '{print $3}') || fail "failed to fetch machine list"
+	# Generate a short version of the zonename as a hostname.
+	sh_zonehostname=${sh_zonename:0:8}
+	sh_zoneroot=/zones/$sh_zonename/root
+	[[ -n $sh_zonename ]] || fail "zonename not found"
+
+	sh_zoneip=$(sdc-vmapi /vms/$sh_zonename | json -H nics.0.ip) || \
+	    fail "failed to fetch IP"
+	[[ -n $sh_zoneip ]] || fail "IP not found"
+	echo "$sh_zonename ($sh_zoneip)"
+
+	#
+	# Work around PROV-487.  The zone may be booted, but it might be running
+	# zoneinit, after which it will reboot.  We need to wait for this second
+	# boot before trying to log in.  We separately wait for the reboot to
+	# complete and then for logins to work again.  We check for network
+	# connectivity to make sure that when we run our real setup script later
+	# it can assume a working network environment.
+	#
+	echo "Waiting for zone $sh_zonename to reboot ... \c "
+	while zlogin $sh_zonename pgrep -x reboot > /dev/null 2>&1; do
+		echo ".\c "
+		sleep 1
+	done
+	echo " done."
+
+	echo "Waiting for zone $sh_zonename to boot (+ net) ... \c "
+	while ! zlogin $sh_zonename ping 8.8.8.8 > /dev/null 2>&1; do
+		echo ".\c "
+		sleep 1
+	done
+	echo " done."
+}
+
+#
+# Set up the newly provisioned development zone.
+#
+function setup_devzone
+{
+	echo "Creating $sh_user's home directory ... \c "
+	mkdir -p $sh_zoneroot/home/$sh_user/.ssh || fail "failed to mkdir"
+	cat > $sh_zoneroot/home/$sh_user/.profile <<-PROFILE
+	export PATH=/opt/local/bin:/usr/bin:/usr/sbin:/usr/sfw/bin:/usr/xpg4/bin
+	export MANPATH=/opt/local/man:/opt/local/share/man:/usr/share/man
+	PROFILE
+	echo "done."
+
+	if [[ -f /root/.ssh/authorized_keys ]]; then
+		echo "Setting up ssh keys for $sh_user ... \c "
+		cp /root/.ssh/authorized_keys $sh_zoneroot/home/$sh_user/.ssh \
+		    || fail "failed to copy /root/.ssh/authorized_keys"
+		chmod 600 $sh_zoneroot/home/$sh_user/.ssh/authorized_keys
+		echo "done."
+	fi
+
+	cat > $sh_zoneroot/root/setup_zone.sh <<-EOF
+	#!/bin/bash
+	shopt -s xpg_echo
+
+	function fail
+	{
+		echo "\$*"
+		exit 1
+	}
+	
+	echo "Setting hostname to $sh_zonehostname ... \c "
+	hostname $sh_zonehostname
+	echo $sh_zonehostname > /etc/nodename
+	echo "done."
+	
+	echo "Creating user '$sh_user' ... \c "
+	if egrep ^$sh_user: /etc/passwd > /dev/null; then
+		echo "skipped (already exists)"
+	else
+	useradd -c $sh_user -d /home/$sh_user -G staff -s /bin/bash \
+	    -K defaultpriv="$sh_privs" $sh_user || fail "failed to create user"
+	passwd -N $sh_user > /dev/null || fail "passwd -N failed for $sh_user"
+	chown -R $sh_user:staff /home/$sh_user || fail "failed to chmod"
+	echo "done."
+	fi
+
+	echo "Fetching user's public key from $sh_manta_host ... \c"
+	if curl -s -f -o /var/tmp/${sh_user}key.pub \
+	    $sh_manta_host/$sh_user/public/.ssh/id_rsa.pub; then
+		mv /var/tmp/${sh_user}key.pub \
+		    /home/${sh_user}/.ssh/authorized_keys
+		chown $sh_user /home/${sh_user}/.ssh/authorized_keys
+		chmod 644 /home/${sh_user}/.ssh/authorized_keys
+		echo "done."
+	else
+		echo "not found."
+	fi
+	
+	#
+	# binutils (which we want for c++filt) is a superset of gcc-tools, but
+	# you cannot have both of these packages installed at the same time.
+	# gcc-compiler depends on gcc-tools, but it will successfully install as
+	# long as binutils is installed first.
+	#
+	export PATH=/opt/local/bin:$PATH
+	echo "Setting up pkgsrc and packages ... \c "
+	pkgin -f update > /var/tmp/pkgin_update.out || fail "failed"
+	pkgin -y in binutils > /var/tmp/pkgin_install.out || fail "failed"
+	pkgin -y in $sh_pkgs >> /var/tmp/pkgin_install.out || fail "failed"
+	echo "done."
+	EOF
+
+	chmod +x $sh_zoneroot/root/setup_zone.sh
+	zlogin $sh_zonename /root/setup_zone.sh || fail
+}
+
+
+#
+# Static configuration
+#
+
+# Dataset for development zone
+sh_dataset_name="smartos"
+sh_dataset_version="1.6.3"
+
+# Datacenter zones to create with sdc-role
+sh_sdczones="ca adminui amon keyapi cloudapi"
+
+# Global Manta instance (for storing public keys)
+sh_manta_host="manta-beta.joyentcloud.com"
+
+#
+# Packages to install into development zone.  This is currently the union of
+# packages required for Cloud Analytics and Marlin.  More can be added here as
+# needed.  If the union becomes too large, we could split these off by type, but
+# for now it's convenient to have a zone that can work with both CA and Marlin.
+#
+sh_pkgs="gcc-compiler gcc-runtime cscope pkg-config gmake scmgit python26"
+sh_pkgs="$sh_pkgs png GeoIP GeoLiteCity ghostscript"
+
+#
+# Privileges for the development user.  As with packages, this is the union of
+# privileges required for CA and Marlin.
+#
+sh_privs="basic,dtrace_user,dtrace_proc"
+sh_privs="$sh_privs,contract_event,sys_mount,hyprlofs_control"
+
+#
+# Dynamic configuration
+#
+sh_arg0=$(basename $0)			# this script's name
+sh_zonename=				# provisioned zone's uuid
+sh_zonehostname=			# provisioned zone's internal hostname
+sh_zoneip=				# provisioned zone's IP
+sh_zoneroot=				# provisioned zone's /
+opt_t=					# special configuration to load
+
+shopt -s xpg_echo
+
+while getopts ":t:" c $@; do
+	case "$c" in
+	t)	eval opt_$c="$OPTARG" ;;
+	:)	usage "option requires an argument -- $OPTARG" ;;
+	*)	usage "invalid option: $OPTARG" ;;
+	esac
+done
+
+shift $((OPTIND-1))
+sh_user="$1"				# desired username
+[[ -n $sh_user ]] || usage "no user specified"
+
+if [[ -n $opt_t ]]; then
+	source "$(dirname $0)/devsetup.$opt_t" || \
+	    fail "failed to load $(dirname $0)/devsetup.$opt_t"
+
+	devsetup_custom_precheck
+fi
+
+setup_sdc_zones
+provision_devzone
+setup_devzone
+
+[[ -n $opt_t ]] && devsetup_custom_postsetup
+
+echo "Setup complete for zone $sh_zonename at $sh_zoneip."

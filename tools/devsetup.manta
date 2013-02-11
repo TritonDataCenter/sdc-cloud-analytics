@@ -1,0 +1,60 @@
+#
+# Manta "devsetup" configuration.
+#
+
+function devsetup_custom_precheck
+{
+	[[ -n "$(vmadm lookup tags.manta_role=nameservice)" ]] || \
+	    fail "no Manta nameservice zones present; has manta-init been run?"
+}
+
+function devsetup_custom_postsetup
+{
+	local opszone domain userid keyid
+
+	echo "Identifying ops zone ... \c"
+	opszone=$(vmadm lookup tags.manta_role=ops)
+	[[ -n "$opszone" ]] || fail "couldn't identify ops zone"
+	echo "$opszone."
+
+	echo "Copying ssh keys from ops zone ... \c"
+	cp /zones/$opszone/root/root/.ssh/id_rsa \
+	    /zones/$sh_zonename/root/home/$sh_user/.ssh/id_rsa
+	cp /zones/$opszone/root/root/.ssh/id_rsa.pub \
+	    /zones/$sh_zonename/root/home/$sh_user/.ssh/id_rsa.pub
+	zlogin $sh_zonename chown $sh_user \
+	    /home/$sh_user/.ssh/id_rsa /home/$sh_user/.ssh/id_rsa.pub
+	echo "done."
+
+	echo "Updating resolv.conf in $sh_zonename ... \c"
+	mv /zones/$sh_zonename/root/etc/resolv.conf \
+	    /zones/$sh_zonename/root/etc/resolv.conf.orig
+	grep ^nameserver /zones/$opszone/root/etc/resolv.conf | head -2 > \
+	    /zones/$sh_zonename/root/etc/resolv.conf
+	cat /zones/$sh_zonename/root/etc/resolv.conf.orig >> \
+	    /zones/$sh_zonename/root/etc/resolv.conf
+	echo "done."
+
+	echo "Identifying Manta DNS domain ... \c"
+	domain=$(awk '$1 == "domain"{ print $2 }' \
+	    /zones/$opszone/root/etc/resolv.conf )
+	[[ -n "$domain" ]] || fail "couldn't identify manta domain"
+	echo "$domain."
+
+	echo "Finding poseidon's key fingerprint ... \c"
+	keyid=$(sdc-ldap search -b "$(sdc-ldap search login=poseidon | \
+	    head -1 | cut -c5-)" objectclass=sdckey | \
+	    awk '/^fingerprint:/{ print $2 }')
+	[[ -n "$keyid" ]] || fail "couldn't find poseidon's key in UFDS"
+	echo "$keyid."
+
+	echo "Updating profile for user \"$sh_user\" ... \c"
+	cat >> /zones/$sh_zonename/root/home/$sh_user/.profile <<-EOF
+	export MANTA_USER=poseidon
+	export MANTA_URL=https://manta.$domain
+	export MANTA_KEY_ID=$keyid
+	export MAHI_URL=tcp://auth.$domain:6379
+	export MORAY_URL=tcp://1.moray.$domain:2020
+	EOF
+	echo "done."
+}

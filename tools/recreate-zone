@@ -57,9 +57,9 @@ cp $rcz_tarball $rcz_dst || fail "FAILED"
 echo "done."
 
 echo "Removing existing zone ($rcz_zonename) ... \c"
-sdc-role destroy ${rcz_zonerole}0 || fail "FAILED"
+vmadm destroy $rcz_zonename || fail "FAILED"
 echo "done."
 
 echo "Recreating zone with role \"$rcz_zonerole\" ... \c"
-sdc-role create $rcz_zonerole || fail "FAILED"
+sdc-role create $(sysinfo | json UUID) $rcz_zonerole || fail "FAILED"
 echo "done."

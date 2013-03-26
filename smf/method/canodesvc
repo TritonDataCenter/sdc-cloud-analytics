@@ -39,19 +39,10 @@ function load_amqp
 	export AMQP_HOST=$host
 }
 
-function load_mapi
+function load_sdc
 {
-	local host port user pass
-
-	host=$(getprop caconfig/mapi-host)
-	port=$(getprop caconfig/mapi-port)
-	user=$(getprop caconfig/mapi-user)
-	pass=$(getprop caconfig/mapi-password)
-
-	export MAPI_HOST=$host
-	export MAPI_PORT=$port
-	export MAPI_USER=$user
-	export MAPI_PASSWORD=$pass
+	export CNAPI_URL=$(getprop caconfig/cnapi-url)
+	export VMAPI_URL=$(getprop caconfig/vmapi-url)
 }
 
 function load_nodepath
@@ -124,7 +115,7 @@ ns_args=
 case $SMF_FMRI in
 	*caconfigsvc*)	ns_name=caconfigsvc
 			load_logfiles
-			load_mapi
+			load_sdc
 			ns_args="$ns_dbglogfile $ns_rqlogfile"
 			;;
 	*caaggsvc*)	export HOST=$(uname -n)-${SMF_FMRI/*:}
@@ -162,7 +153,7 @@ ns_exec=cmd/$ns_name.js
 load_amqp || fail "failed to load amqp config"
 load_nodepath || fail "failed to load node path"
 load_path || fail "failed to load path"
-env | sort | egrep '^(AMQP_|MAPI_|NODE_PATH)' | grep -v PASSWORD
+env | sort | egrep '^(AMQP_|CNAPI_|VMAPI_|NODE_PATH)' | grep -v PASSWORD
 
 #
 # Launch the daemon.

@@ -327,6 +327,27 @@ $(PKGROOT)/cainstsvc/%: %
 FORCE:
 .PHONY: FORCE
 
+#
+# XXX This can be removed once CA upgrades beyond node 0.6 along with patches/
+#
+# In node 0.6, to build v8, node requires the use of scons. scons makes various
+# assumptions about what happens if you're on SunOS. Particularly, it tries to
+# ensure that /opt/SUNWspro/bin is rather far up on your path. Generally this
+# shouldn't be a problem because when we build, we don't have studio
+# installed; however, this is not actually the case. Sun Studio is still used as
+# a part of building parts of the platform that are not illumos itself. On
+# jenkins build slaves which can also build the platform, it turns out that we
+# can end up where scons finds studio. There are multiple problems with this.
+# The most significant is that studio assumes and requires ar to be in
+# /usr/ccs/bin. This obviously will not work for us. Fixing this correctly is
+# challenging as node doesn't have an easy way to pass flags to scons. The most
+# expedient solution is just to remove the portion of the scons source embedded
+# in node that does this.
+#
+deps/node/.git:
+	git submodule update --init deps/node
+	patch -d deps/node -p1 < patches/node-scons.patch
+
 include $(INCMAKE)/Makefile.deps
 include $(INCMAKE)/Makefile.targ
 include $(INCMAKE)/Makefile.smf.targ

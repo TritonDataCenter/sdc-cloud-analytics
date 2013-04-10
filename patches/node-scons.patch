@@ -1,0 +1,9 @@
+diff --git a/tools/scons/scons-local-1.2.0/SCons/Platform/sunos.py b/tools/scons/scons-local-1.2.0/SCons/Platform/sunos.py
+index 03435c6..22374e4 100644
+--- a/tools/scons/scons-local-1.2.0/SCons/Platform/sunos.py
++++ b/tools/scons/scons-local-1.2.0/SCons/Platform/sunos.py
+@@ -41,4 +41,3 @@ def generate(env):
+     env['MAXLINELENGTH']  = 1045320
+     env['PKGINFO'] = 'pkginfo'
+     env['PKGCHK'] = '/usr/sbin/pkgchk'
+-    env['ENV']['PATH'] = env['ENV']['PATH'] + ':/opt/SUNWspro/bin:/usr/ccs/bin'

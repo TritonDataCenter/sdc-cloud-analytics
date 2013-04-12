@@ -75,7 +75,7 @@ function provision_devzone
 	echo $dataset_uuid
 
 	echo "Retrieving admin customer uuid ... \c "
-	local cust_uuid=$(sdc-ldap search cn=Admin | grep uuid: | \
+	local cust_uuid=$(sdc-ldap search login=admin | grep uuid: | \
 	    awk '{print $2}') || fail "failed"
 	[[ -n $cust_uuid ]] || fail "not found"
 	echo "$cust_uuid"

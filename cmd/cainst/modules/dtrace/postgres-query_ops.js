@@ -14,7 +14,7 @@ var desc = {
 		probes: [ 'postgres*:::query-start' ],
 		gather: {
 			querysubstr: {
-				gather: 'substr(copyinstr(arg0), 0, 32)',
+				gather: 'substr(copyinstr(arg0), 0, 10)',
 				store: 'thread'
 			}, latency: {
 				gather: 'timestamp',

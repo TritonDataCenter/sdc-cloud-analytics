@@ -304,6 +304,13 @@
 	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
 	    "optype", "table", "latency", "cputime" ]
     }, {
+	"module":	"moray",
+	"stat":		"queries",
+	"label":	"SQL queries",
+	"unit":		"queries",
+	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
+	    "querysubstr", "latency", "cputime" ]
+    }, {
 	"module":	"mysql",
 	"stat":		"connections",
 	"label":	"connections",

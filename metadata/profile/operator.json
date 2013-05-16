@@ -62,6 +62,49 @@
 		    "ldapfilter", "ldapscope", "latency"
 		]
 	}, {
+		"module": "mantaop",
+		"stat": "jobs_assigned",
+		"fields": [ "hostname", "zonename" ]
+	}, {
+		"module": "mantaop",
+		"stat": "tasks_dispatched",
+		"fields": [ "hostname", "zonename", "jobid" ]
+	}, {
+		"module": "mantaop",
+		"stat": "tasks_committed",
+		"fields": [ "hostname", "zonename", "jobid" ]
+	}, {
+		"module": "mantaop",
+		"stat": "supervisor_errors",
+		"fields": [ "hostname", "zonename", "jobid" ]
+	}, {
+		"module": "mantaop",
+		"stat": "supervisor_auths",
+		"fields": [ "hostname", "zonename", "user", "latency",
+		    "errname" ]
+	}, {
+		"module": "mantaop",
+		"stat": "supervisor_deletes",
+		"fields": [ "hostname", "zonename", "objname", "latency",
+		    "errname" ]
+	}, {
+		"module": "mantaop",
+		"stat": "supervisor_locates",
+		"fields": [ "hostname", "zonename", "objname", "latency",
+		    "errname" ]
+	}, {
+		"module": "mantaop",
+		"stat": "tasks_executed",
+		"fields": [ "hostname", "jobid", "latency" ]
+	}, {
+		"module": "mantaop",
+		"stat": "tasks_killed",
+		"fields": [ "hostname", "jobid" ]
+	}, {
+		"module": "mantaop",
+		"stat": "zone_resets",
+		"fields": [ "hostname", "zonename", "latency", "errname" ]
+	}, {
 		"module": "memory",
 		"stat": "rss",
 		"fields": [ "hostname", "zonename" ]

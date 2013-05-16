@@ -6,6 +6,7 @@
 	"disk":		{ "label": "Disk"			},
 	"fs":		{ "label": "Filesystem"			},
 	"ldapjs":	{ "label": "ldapjs"			},
+	"mantaop":	{ "label": "Manta (operator)"		},
 	"memory":	{ "label": "Memory"			},
 	"moray":	{ "label": "Moray"			},
 	"mysql":	{ "label": "MySQL"			},
@@ -70,6 +71,7 @@
 	"disk":		{ "label": "device name" },
 	"direction":	{ "label": "sent/received" },
 	"execname":	{ "label": "application name" },
+	"errname":	{ "label": "error name" },
 	"errno":	{ "label": "error code","type": "string" },
 	"errtype":	{ "label": "error type" },
 	"fstype":	{ "label": "filesystem type" },
@@ -83,6 +85,7 @@
 	"iops_read":	{ "label": "read I/O operations", "type": "number" },
 	"iops_write":	{ "label": "write I/O operations", "type": "number" },
 	"irqvector":	{ "label": "IRQ vector", "type": "string"},
+	"jobid":	{ "label": "jobid" },
 	"latency":	{ "label": "latency", "type": "time" },
 	"ldapbinddn":	{ "label": "bind DN" },
 	"ldapfilter":	{ "label": "search filter" },
@@ -91,6 +94,7 @@
 	"leavereason":	{ "label": "reason leaving CPU" },
 	"nic":		{ "label": "NIC name" },
 	"nthreads":	{ "label": "number of threads", "type": "number" },
+	"objname":	{ "label": "object name" },
 	"offset":	{ "label": "offset", "type": "size" },
 	"optype":	{ "label": "operation type" },
 	"packets":	{ "label": "packets sent and received",
@@ -256,6 +260,68 @@
 	"fields":	[ "hostname", "zonename", "pid", "execname", "psargs",
 	    "raddr", "ldapbinddn", "ldaprequestdn", "status", "ldapfilter",
 	    "ldapscope", "latency" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"jobs_assigned",
+	"label":	"jobs assigned",
+	"unit":		"jobs",
+	"fields":	[ "hostname", "zonename" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"tasks_dispatched",
+	"label":	"tasks dispatched",
+	"unit":		"tasks",
+	"fields":	[ "hostname", "zonename", "jobid" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"tasks_committed",
+	"label":	"tasks committed",
+	"unit":		"tasks",
+	"fields":	[ "hostname", "zonename", "jobid" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"supervisor_errors",
+	"label":	"supervisor errors",
+	"unit":		"errors",
+	"fields":	[ "hostname", "zonename", "jobid" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"supervisor_auths",
+	"label":	"supervisor auth requests",
+	"unit":		"requests",
+	"fields":	[ "hostname", "zonename", "user", "latency", "errname" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"supervisor_deletes",
+	"label":	"supervisor delete requests",
+	"unit":		"requests",
+	"fields":	[ "hostname", "zonename", "objname", "latency",
+	    "errname" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"supervisor_locates",
+	"label":	"supervisor locate requests",
+	"unit":		"requests",
+	"fields":	[ "hostname", "zonename", "objname", "latency",
+	    "errname" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"tasks_executed",
+	"label":	"tasks executed",
+	"unit":		"tasks",
+	"fields":	[ "hostname", "jobid", "latency" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"tasks_killed",
+	"label":	"tasks killed",
+	"unit":		"tasks",
+	"fields":	[ "hostname", "jobid" ]
+    }, {
+	"module":	"mantaop",
+	"stat":		"zone_resets",
+	"label":	"zone resets",
+	"unit":		"resets",
+	"fields":	[ "hostname", "zonename", "latency", "errname" ]
     }, {
 	"module":	"memory",
 	"stat":		"rss",

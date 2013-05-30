@@ -28,14 +28,16 @@ function usage
 }
 
 #
-# setup_sdc_zones: provision any SDC zones that we require that aren't already
-# provisioned.
+# provision_devzone: provision a zone for the Admin user using the globally-
+# configured dataset and wait for the zone to be ready for setup.  The resulting
+# zone will have addresses on both the admin and external networks.
 #
-function setup_sdc_zones
+function provision_devzone
 {
-	echo "Listing existing SDC zones ... \c "
-	sdc-role list | awk '{print $6}' > /var/tmp/casetup.$$.zones || \
-	    fail "failed"
+	echo "Importing smartos 1.6.3 image into datacenter imgapi ... \c"
+	/opt/smartdc/bin/sdc-imgadm import \
+	    -m /usbkey/datasets/smartos-1.6.3.dsmanifest \
+	    -f /usbkey/datasets/smartos-1.6.3.zfs.bz2
 	echo "done."
 
 	echo "Fetching headnode uuid ... \c "
@@ -43,30 +45,6 @@ function setup_sdc_zones
 	[[ -n "$sh_headnode" ]] || fail "failed"
 	echo "$sh_headnode."
 
-	for zone in $sh_sdczones; do
-		if grep -w $zone /var/tmp/casetup.$$.zones > /dev/null; then
-			echo "Skipping zone $zone (already exists)."
-			continue
-		fi
-	
-		echo "Provisioning zone $zone ... \c "
-		# Work around HEAD-1126
-		sdc-role create $sh_headnode $zone > \
-		    /var/tmp/casetup-$$-$zone.log || \
-		    echo "warning: sdc-role returned $? \c "
-		tail -1 /var/tmp/casetup-$$-$zone.log | \
-		    grep "Success" > /dev/null || fail "failed"
-		echo "done."
-	done
-}
-
-#
-# provision_devzone: provision a zone for the Admin user using the globally-
-# configured dataset and wait for the zone to be ready for setup.  The resulting
-# zone will have addresses on both the admin and external networks.
-#
-function provision_devzone
-{
 	echo "Fetching uuid for $sh_dataset_name $sh_dataset_version ... \c "
 	local dataset_uuid=$(sdc-dsapi \
 	    "/datasets?name=$sh_dataset_name&version=$sh_dataset_version" | \
@@ -233,9 +211,6 @@ function setup_devzone
 sh_dataset_name="smartos"
 sh_dataset_version="1.6.3"
 
-# Datacenter zones to create with sdc-role
-sh_sdczones="ca adminui amon keyapi cloudapi"
-
 # Global Manta instance (for storing public keys)
 sh_manta_host="manta-beta.joyentcloud.com"
 
@@ -286,7 +261,6 @@ if [[ -n $opt_t ]]; then
 	devsetup_custom_precheck
 fi
 
-setup_sdc_zones
 provision_devzone
 setup_devzone
 

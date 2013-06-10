@@ -46,8 +46,7 @@ SH_SCRIPTS	= \
 	tools/catest			\
 	tools/caupagent			\
 	tools/devsetup			\
-	tools/devsetup.manta		\
-	tools/recreate-zone
+	tools/devsetup.manta
 
 SVC_SCRIPTS	 = \
 	pkg/pkg-svc-postinstall.sh	\

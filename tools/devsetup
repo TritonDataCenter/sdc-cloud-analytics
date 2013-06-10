@@ -212,7 +212,7 @@ sh_dataset_name="smartos"
 sh_dataset_version="1.6.3"
 
 # Global Manta instance (for storing public keys)
-sh_manta_host="manta-beta.joyentcloud.com"
+sh_manta_host="us-east.manta.joyent.com"
 
 #
 # Packages to install into development zone.  This is currently the union of

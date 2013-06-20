@@ -2294,6 +2294,34 @@ required to disable an instrumentation on each instrumenter.
 This metric is intended for use in supporting Cloud Analytics.  It is not
 useful for understanding general system performance.
 
+### Restify: server operations
+
+||**Name**|| restify.server_ops ||
+||**Raw metric**|| total number of restify server operations||
+||**Decompositions**|| "hostname", "zonename", "execname", "pid", "ppid", "pexecname", "psargs", "ppsargs", "restify_sname", "restify_rname", "http_url", "http_method", "http_status", "latency" || 
+||**Visibility**|| operators only||
+
+This metric counts the number of operations from a Node.js program using
+the restify module. The given operations can be broken down on a number
+of parameters related to HTTP, the specifics of the restify server, and
+basic properties about where it is running. The "latency" heatmap allows
+visualizing the response time of the server operations as a heatmap.
+
+### Restify: handler operations
+
+||**Name**|| restify.handler_ops ||
+||**Raw metric**|| total number of restify handler operations||
+||**Decompositions**|| "hostname", "zonename", "execname", "pid", "ppid", "pexecname", "psargs", "ppsargs", "restify_sname", "restify_rname", "restify_hname", "latency" ||
+||**Visibility**|| operators only||
+
+This metric looks at the individual handlers that are used in a Node.js
+program with the restify module. Series of handlers make up a given
+restify server operation. Valid decompositions include information about
+the specific restify route, server, and handler, as well as additional
+information about the running environment. Finally, the "latency"
+heatmap allows for visualizing the latency of each of the handlers that
+run.
+
 
 # Fields
 
@@ -2326,6 +2354,7 @@ individual values, a vector rather than a scalar).
 || **http_method** || HTTP request method (e.g., "GET") ||
 || **http_origin** || Origin IP address for HTTP request, as reported by "X-Forwarded-For" header ||
 || **http_path** || HTTP request URL path (URL without query parameters) ||
+|| **http_status** || HTTP status code ||
 || **http_url** || HTTP request URL ||
 || **irqvector** || IRQ vector ||
 || **ldapbinddn** || LDAP bind DN ||
@@ -2343,6 +2372,9 @@ individual values, a vector rather than a scalar).
 || **ppsargs** || parent process name and arguments ||
 || **querysubstr** || query substring (first 6 characters of the raw query string) ||
 || **raddr** || remote IP address ||
+|| *restify_hname** || Restify handler name ||
+|| *restify_rname** || Restify route name ||
+|| *restify_sname** || Restify server name ||
 || **rport** || remote TCP port ||
 || **syscall** || name of a system call ||
 || **table** || database table name ||

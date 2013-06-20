@@ -393,5 +393,21 @@
 		    "hostname", "zonename", "execname", "pid", "ppid", "rss",
 		    "contract", "psargs", "pmodel", "nthreads"
 		]
+	}, {
+		"module": "restify",
+		"stat":	"server_ops",
+		"fields": [
+		    "hostname", "zonename", "execname", "pid", "ppid", "pexecname",
+		    "psargs", "ppsargs", "restify_sname", "restify_rname", "http_url",
+		    "http_method", "http_status", "latency"
+		]
+	}, {
+		"module": "restify",
+		"stat": "handler_ops",
+		"fields": [
+		    "hostname", "zonename", "execname", "pid", "ppid", "pexecname",
+		    "psargs", "ppsargs", "restify_sname", "restify_rname",
+		    "restify_hname", "latency"
+		]
 	} ]
 }

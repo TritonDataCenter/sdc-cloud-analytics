@@ -13,6 +13,7 @@
 	"nic":		{ "label": "Network interface"		},
 	"node":		{ "label": "Node.js 0.4.x"		},
 	"postgres":	{ "label": "Postgres"			},
+	"restify":	{ "label": "Restify"			},
 	"syscall":	{ "label": "System calls"		},
 	"tcp": 		{ "label": "TCP"			},
 	"unix":		{ "label": "OS"				},
@@ -80,6 +81,7 @@
 	"http_method":	{ "label": "method" },
 	"http_origin":	{ "label": "reported origin IP" },
 	"http_path":	{ "label": "URL path" },
+	"http_status":	{ "label": "Status Code" },
 	"http_url":	{ "label": "URL" },
 	"iops":		{ "label": "I/O operations", "type": "number" },
 	"iops_read":	{ "label": "read I/O operations", "type": "number" },
@@ -110,6 +112,9 @@
 	"ppsargs":	{ "label": "parent process arguments" },
 	"querysubstr":	{ "label": "query substring" },
 	"raddr":	{ "label": "remote IP address" },
+	"restify_hname":	{ "label": "restify handler name" },
+	"restify_rname":	{ "label": "restify route name" },
+	"restify_sname":	{ "label": "restify server name" },
 	"rowsmatched":	{ "label": "rows matched", "type": "number" },
 	"rowschanged":	{ "label": "rows changed", "type": "number" },
 	"rport":	{ "label": "remote TCP port" },
@@ -689,6 +694,26 @@
 	"fields":	[
 	    "hostname", "zonename", "execname", "pid", "ppid", "rss",
 	    "contract", "psargs", "pmodel", "nthreads"
+	]
+    }, {
+	"module":	"restify",
+	"stat":		"server_ops",
+	"label":	"server operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "execname", "pid", "ppid", "pexecname",
+	    "psargs", "ppsargs", "restify_sname", "restify_rname", "http_url",
+	    "http_method", "http_status", "latency"
+	]
+    }, {
+	"module":	"restify",
+	"stat":		"handler_ops",
+	"label":	"handler operations",
+	"unit":		"operations",
+	"fields":	[
+	    "hostname", "zonename", "execname", "pid", "ppid", "pexecname",
+	    "psargs", "ppsargs", "restify_sname", "restify_rname",
+	    "restify_hname", "latency"
 	]
     } ]
 }

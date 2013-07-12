@@ -1,6 +1,6 @@
 #
 # Makefile: top-level makefile.
-# 
+#
 # This Makefile uses many conventions documented in the eng.git Makefile
 # system.  We also make heavy use of the Makefiles in that repo.
 #
@@ -104,6 +104,9 @@ PKGDIRS_cabase = \
 	$(PKGROOT)/cabase/metadata/metric		\
 	$(PKGROOT)/cabase/metadata/profile		\
 	$(PKGROOT)/cabase/pkg				\
+	$(PKGROOT)/cabase/sapi_manifests		\
+	$(PKGROOT)/cabase/sapi_manifests/ca		\
+	$(PKGROOT)/cabase/sapi_manifests/registrar	\
 	$(PKGROOT)/cabase/smf				\
 	$(PKGROOT)/cabase/smf/manifest			\
 	$(PKGROOT)/cabase/smf/method			\
@@ -125,6 +128,10 @@ PKGFILES_cabase = \
 	$(METADATA_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(PKGROOT)/cabase/lib/httpd.d			\
 	$(PKGROOT)/cabase/lib/node.d			\
+	$(PKGROOT)/cabase/sapi_manifests/ca/manifest.json	\
+	$(PKGROOT)/cabase/sapi_manifests/ca/template		\
+	$(PKGROOT)/cabase/sapi_manifests/registrar/manifest.json	\
+	$(PKGROOT)/cabase/sapi_manifests/registrar/template		\
 	$(PKGROOT)/cabase/tools/nhttpsnoop
 
 DEPS_cabase = \

@@ -55,6 +55,7 @@ function devsetup_custom_postsetup
 	export MANTA_KEY_ID=$keyid
 	export MAHI_URL=tcp://authcache.$domain:6379
 	export MORAY_URL=tcp://1.moray.$domain:2020
+	export MANTA_TLS_INSECURE=1
 	EOF
 	echo "done."
 }

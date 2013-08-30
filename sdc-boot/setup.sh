@@ -15,6 +15,7 @@ CONFIG_AGENT_LOCAL_MANIFESTS_DIRS=/opt/smartdc/${role}
 
 # Source this to include the fatal() function
 source /opt/smartdc/sdc-boot/scripts/util.sh
+sdc_common_setup
 
 # Cookie to identify this as a SmartDC zone and its role
 mkdir -p /var/smartdc/ca

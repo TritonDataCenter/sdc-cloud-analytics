@@ -225,7 +225,7 @@ distclean:: clean
 #
 # "release" target implementation
 #
-release: $(RELEASE_TARBALL) deps/sdc-scripts/.git
+release: $(RELEASE_TARBALL) sdc-scripts
 
 $(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
 	mkdir -p $(BUILD)/root/opt/smartdc/sdc-boot/scripts
@@ -360,3 +360,6 @@ include $(INCMAKE)/Makefile.deps
 include $(INCMAKE)/Makefile.targ
 include $(INCMAKE)/Makefile.smf.targ
 include $(INCMAKE)/Makefile.node.targ
+
+sdc-scripts: deps/sdc-scripts/.git
+.PHONY: sdc-scripts

@@ -225,10 +225,12 @@ distclean:: clean
 #
 # "release" target implementation
 #
-release: $(RELEASE_TARBALL)
+release: $(RELEASE_TARBALL) deps/sdc-scripts/.git
 
 $(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
-	mkdir -p $(BUILD)/root/opt/smartdc
+	mkdir -p $(BUILD)/root/opt/smartdc/sdc-boot/scripts
+	cp $(TOP)/sdc-boot/*.sh $(BUILD)/root/opt/smartdc/sdc-boot/
+	cp $(TOP)/deps/sdc-scripts/*.sh $(BUILD)/root/opt/smartdc/sdc-boot/scripts/
 	[[ -e $(BUILD)/root/pkg ]] || ln -s $(TOP)/$(BUILD)/pkg $(BUILD)/root/pkg
 	[[ -e $(BUILD)/root/opt/smartdc/ca ]] || \
 	    ln -s $(TOP)/$(BUILD)/pkg/cabase $(BUILD)/root/opt/smartdc/ca

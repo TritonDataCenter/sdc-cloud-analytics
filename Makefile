@@ -228,9 +228,9 @@ distclean:: clean
 release: $(RELEASE_TARBALL) sdc-scripts
 
 $(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
-	mkdir -p $(BUILD)/root/opt/smartdc/sdc-boot/scripts
-	cp $(TOP)/sdc-boot/*.sh $(BUILD)/root/opt/smartdc/sdc-boot/
-	cp $(TOP)/deps/sdc-scripts/*.sh $(BUILD)/root/opt/smartdc/sdc-boot/scripts/
+	mkdir -p $(BUILD)/root/opt/smartdc/sdc-boot
+	cp -R $(TOP)/deps/sdc-scripts/* $(BUILD)/root/opt/smartdc/sdc-boot/
+	cp -R $(TOP)/sdc-boot/* $(BUILD)/root/opt/smartdc/sdc-boot/
 	[[ -e $(BUILD)/root/pkg ]] || ln -s $(TOP)/$(BUILD)/pkg $(BUILD)/root/pkg
 	[[ -e $(BUILD)/root/opt/smartdc/ca ]] || \
 	    ln -s $(TOP)/$(BUILD)/pkg/cabase $(BUILD)/root/opt/smartdc/ca
@@ -362,4 +362,3 @@ include $(INCMAKE)/Makefile.smf.targ
 include $(INCMAKE)/Makefile.node.targ
 
 sdc-scripts: deps/sdc-scripts/.git
-.PHONY: sdc-scripts

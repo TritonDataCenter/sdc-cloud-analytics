@@ -361,4 +361,5 @@ include $(INCMAKE)/Makefile.targ
 include $(INCMAKE)/Makefile.smf.targ
 include $(INCMAKE)/Makefile.node.targ
 
+.PHONY: sdc-scripts
 sdc-scripts: deps/sdc-scripts/.git

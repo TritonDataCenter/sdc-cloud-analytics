@@ -228,9 +228,9 @@ distclean:: clean
 release: $(RELEASE_TARBALL) sdc-scripts
 
 $(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
-	mkdir -p $(BUILD)/root/opt/smartdc/sdc-boot
-	cp -R $(TOP)/deps/sdc-scripts/* $(BUILD)/root/opt/smartdc/sdc-boot/
-	cp -R $(TOP)/sdc-boot/* $(BUILD)/root/opt/smartdc/sdc-boot/
+	mkdir -p $(BUILD)/root/opt/smartdc/boot
+	cp -R $(TOP)/deps/sdc-scripts/* $(BUILD)/root/opt/smartdc/boot/
+	cp -R $(TOP)/boot/* $(BUILD)/root/opt/smartdc/boot/
 	[[ -e $(BUILD)/root/pkg ]] || ln -s $(TOP)/$(BUILD)/pkg $(BUILD)/root/pkg
 	[[ -e $(BUILD)/root/opt/smartdc/ca ]] || \
 	    ln -s $(TOP)/$(BUILD)/pkg/cabase $(BUILD)/root/opt/smartdc/ca

@@ -2,6 +2,8 @@
 # Manta "devsetup" configuration.
 #
 
+devsetup_extra_networks="manta"
+
 function devsetup_custom_precheck
 {
 	[[ -n "$(vmadm lookup tags.manta_role=nameservice)" ]] || \

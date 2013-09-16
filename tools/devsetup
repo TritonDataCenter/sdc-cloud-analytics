@@ -52,23 +52,23 @@ function provision_devzone
 	[[ -n $dataset_uuid ]] || fail "not found"
 	echo $dataset_uuid
 
-	echo "Retrieving admin customer uuid ... \c "
+	echo "Retrieving \"admin\" customer uuid ... \c "
 	local cust_uuid=$(sdc-ldap search login=admin | grep uuid: | \
 	    awk '{print $2}') || fail "failed"
 	[[ -n $cust_uuid ]] || fail "not found"
 	echo "$cust_uuid"
 
-	echo "Retrieving admin network uuid ... \c "
-	local net_uuid=$(sdc-napi /networks?name=admin | json -H 0.uuid) || \
-	    fail "failed"
-	[[ -n $net_uuid ]] || fail "not found"
-	echo "$net_uuid"
-
-	echo "Retrieving external network uuid ... \c "
-	local external_net_uuid=$(sdc-napi /networks?name=external | \
-	    json -H 0.uuid) || fail "failed"
-	[[ -n $external_net_uuid ]] || fail "not found"
-	echo "$external_net_uuid"
+	local networknames="external admin $devsetup_extra_networks"
+	local networks uuid
+	for net in $networknames; do
+		echo "Retrieving \"$net\" network uuid ... \c"
+		uuid=$(sdc-napi /networks?name=$net | json -H 0.uuid) || \
+		    fail "failed"
+		[[ -n "$uuid" ]] || fail "not found"
+		echo "$uuid"
+		[[ -n "$networks" ]] && networks="$networks,"
+		networks="$networks \"$uuid\""
+	done
 
 	echo "Creating dev zone ... \c "
 	sdc-vm create > /var/tmp/casetup.$$.create.log 2>&1 <<-EOF
@@ -77,7 +77,7 @@ function provision_devzone
 		"image_uuid": "$dataset_uuid",
 		"owner_uuid": "$cust_uuid",
 		"server_uuid": "$sh_headnode",
-		"networks": [ "$external_net_uuid", "$net_uuid" ],
+		"networks": [ $networks ],
 		"alias": "${sh_user}dev",
 		"ram": 1024,
 		"max_swap": 1024,

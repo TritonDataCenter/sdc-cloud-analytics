@@ -79,12 +79,12 @@ function provision_devzone
 		"server_uuid": "$sh_headnode",
 		"networks": [ "$external_net_uuid", "$net_uuid" ],
 		"alias": "${sh_user}dev",
-		"ram": 256,
-		"max_swap": 512,
+		"ram": 1024,
+		"max_swap": 1024,
 		"quota": 10240,
-		"cpu_cap": 100,
+		"cpu_cap": 200,
 		"max_lwps": 1000,
-		"zfs_io_priority": 10
+		"zfs_io_priority": 20
 	}
 	EOF
 	echo "done."

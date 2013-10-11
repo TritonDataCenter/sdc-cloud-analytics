@@ -74,6 +74,18 @@ function configure
 		svcadm refresh $fmri || cafail "failed to refresh $fmri"
 		svcadm enable -s $fmri || cafail "failed to re-enable $fmri"
 	done
+
+	# Log rotation.
+	sdc_log_rotation_add amon-agent /var/svc/log/*amon-agent*.log 1g
+	sdc_log_rotation_add config-agent /var/svc/log/*config-agent*.log 1g
+	sdc_log_rotation_add registrar /var/svc/log/*registrar*.log 1g
+	sdc_log_rotation_add caconfigsvc /var/svc/log/*caconfigsvc*.log 1g
+	sdc_log_rotation_add castashsvc /var/svc/log/*castashsvc*.log 1g
+	for inst in $(svcs -H -o inst caaggsvc); do
+		sdc_log_rotation_add caaggsvc-$inst /var/svc/log/*caaggsvc\:$inst.log 1g
+	done
+	sdc_log_rotation_setup_end
+
 	# rm $SAPI_METADATA
 }
 

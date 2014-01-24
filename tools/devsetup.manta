@@ -46,11 +46,24 @@ function devsetup_custom_postsetup
 	echo "Finding poseidon's key fingerprint ... \c"
 	keyid=$(sdc-ldap search -b "$(sdc-ldap search login=poseidon | \
 	    head -1 | cut -c5-)" objectclass=sdckey | \
-	    awk '/^fingerprint:/{ print $2 }')
+	    awk '/^fingerprint:/{ print $2 }' | tail -1)
 	[[ -n "$keyid" ]] || fail "couldn't find poseidon's key in UFDS"
 	echo "$keyid."
 
-	echo "Updating profile for user \"$sh_user\" ... \c"
+	echo "Resolving UFDS host \c "
+	search="$(awk '$1 == "search"{ print $2; exit; }' /etc/resolv.conf)"
+	dcname="$(sysinfo | json 'Datacenter Name')"
+	ufds_host="ufds.$dcname.$search"
+	echo "$ufds_host ... \c "
+	ufds_ip="$(set -o pipefail; dig "$ufds_host" +short | tail -1)" || \
+	    ufds_ip=
+	if [[ -z "$ufds_ip" ]]; then
+		echo "FAILED"
+	else
+		echo "$ufds_ip"
+	fi
+
+	echo "Updating profile for user \"$sh_user\" ... \c "
 	cat >> /zones/$sh_zonename/root/home/$sh_user/.profile <<-EOF
 	export MANTA_USER=poseidon
 	export MANTA_URL=https://manta.$domain
@@ -58,6 +71,11 @@ function devsetup_custom_postsetup
 	export MAHI_URL=tcp://authcache.$domain:6379
 	export MORAY_URL=tcp://1.moray.$domain:2020
 	export MANTA_TLS_INSECURE=1
+	EOF
+
+	[[ -n "$ufds_ip" ]] && \
+	    cat >> /zones/$sh_zonename/root/home/$sh_user/.profile<<-EOF
+	export UFDS_URL=ldaps://$ufds_ip
 	EOF
 	echo "done."
 }

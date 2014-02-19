@@ -356,6 +356,14 @@ deps/node/.git:
 	git submodule update --init deps/node
 	patch -d deps/node -p1 < patches/node-scons.patch
 
+#
+# XXX The following patch can be removed if/when we upgrade CA past node-amqp
+# 0.1.8.  See INTRO-698 for details.
+#
+deps/node-amqp/.git:
+	git submodule update --init deps/node-amqp
+	patch -d deps/node-amqp -p1 < patches/node-amqp-framesize.patch
+
 include $(INCMAKE)/Makefile.deps
 include $(INCMAKE)/Makefile.targ
 include $(INCMAKE)/Makefile.smf.targ

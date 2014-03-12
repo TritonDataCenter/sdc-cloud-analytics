@@ -34,10 +34,10 @@ function usage
 #
 function provision_devzone
 {
-	echo "Importing smartos 1.6.3 image into datacenter imgapi ... \c"
+	echo "Importing sdc-smartos 1.6.3 image into datacenter imgapi ... \c"
 	/opt/smartdc/bin/sdc-imgadm import \
-	    -m /usbkey/datasets/smartos-1.6.3.dsmanifest \
-	    -f /usbkey/datasets/smartos-1.6.3.zfs.bz2
+	    -m /usbkey/datasets/sdc-smartos-1.6.3.dsmanifest \
+	    -f /usbkey/datasets/sdc-smartos-1.6.3.zfs.bz2
 	echo "done."
 
 	echo "Fetching headnode uuid ... \c "
@@ -46,9 +46,9 @@ function provision_devzone
 	echo "$sh_headnode."
 
 	echo "Fetching uuid for $sh_dataset_name $sh_dataset_version ... \c "
-	local dataset_uuid=$(sdc-dsapi \
-	    "/datasets?name=$sh_dataset_name&version=$sh_dataset_version" | \
-	    json -H 0.uuid) || fail "failed"
+	local dataset_uuid=$(sdc-imgadm list \
+	    name=$sh_dataset_name version=$sh_dataset_version -H -o uuid | \
+	    head -1) || fail "failed"
 	[[ -n $dataset_uuid ]] || fail "not found"
 	echo $dataset_uuid
 
@@ -209,7 +209,7 @@ function setup_devzone
 #
 
 # Dataset for development zone
-sh_dataset_name="smartos"
+sh_dataset_name="sdc-smartos"
 sh_dataset_version="1.6.3"
 
 # Global Manta instance (for storing public keys)

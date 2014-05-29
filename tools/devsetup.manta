@@ -68,7 +68,7 @@ function devsetup_custom_postsetup
 	export MANTA_USER=poseidon
 	export MANTA_URL=https://manta.$domain
 	export MANTA_KEY_ID=$keyid
-	export MAHI_URL=tcp://authcache.$domain:6379
+	export MAHI_URL=http://authcache.$domain
 	export MORAY_URL=tcp://1.moray.$domain:2020
 	export MANTA_TLS_INSECURE=1
 	EOF

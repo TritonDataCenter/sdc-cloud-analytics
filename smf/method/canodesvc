@@ -122,7 +122,7 @@ case $SMF_FMRI in
 			ns_name=caaggsvc
 			load_logfiles
 			load_geoip
-			ns_args="$ns_dbglogfile"
+			ns_args=""
 			;;
 	*cainstsvc*)	ns_name=cainstsvc
 			load_logfiles

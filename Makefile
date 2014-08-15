@@ -225,7 +225,29 @@ distclean:: clean
 #
 # "release" target implementation
 #
-release: $(RELEASE_TARBALL) sdc-scripts
+release: $(RELEASE_TARBALL) agent-manifests sdc-scripts
+
+#./build/pkg/cainstsvc/package.json
+agent-manifests: $(RELEASE_TARBALL) $(PKGROOT)/cabase/package.json \
+    $(PKGROOT)/cainstsvc/package.json
+	cat cabase-manifest.tmpl | sed \
+		-e "s/UUID/$$(uuid -v4)/" \
+		-e "s/DESCRIPTION/$$(json description < $(PKGROOT)/cabase/package.json)/" \
+		-e "s/NAME/$$(json name < $(PKGROOT)/cabase/package.json)/" \
+		-e "s/VERSION/$$(json version < $(PKGROOT)/cabase/package.json)/" \
+		-e "s/BUILDSTAMP/$(STAMP)/" \
+		-e "s/SIZE/$$(stat --printf="%s" $(PKGROOT)/cabase.tar.gz)/" \
+		-e "s/SHA/$$(openssl sha1 $(PKGROOT)/cabase.tar.gz | cut -d ' ' -f2)/" \
+		> $(PKGROOT)/cabase.manifest
+	cat cainstsvc-manifest.tmpl | sed \
+		-e "s/UUID/$$(uuid -v4)/" \
+		-e "s/DESCRIPTION/$$(json description < $(PKGROOT)/cainstsvc/package.json)/" \
+		-e "s/NAME/$$(json name < $(PKGROOT)/cainstsvc/package.json)/" \
+		-e "s/VERSION/$$(json version < $(PKGROOT)/cainstsvc/package.json)/" \
+		-e "s/BUILDSTAMP/$(STAMP)/" \
+		-e "s/SIZE/$$(stat --printf="%s" $(PKGROOT)/cainstsvc.tar.gz)/" \
+		-e "s/SHA/$$(openssl sha1 $(PKGROOT)/cainstsvc.tar.gz | cut -d ' ' -f2)/" \
+		> $(PKGROOT)/cainstsvc.manifest
 
 $(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
 	mkdir -p $(BUILD)/root/opt/smartdc/boot
@@ -264,7 +286,7 @@ check-json: $(JSON_FILES:%=%.check)
 # The "publish" target copies the build bits to the given BITS_DIR.  This is
 # invoked by an external driver (e.g. CI).
 #
-publish: $(RELEASE_TARBALL)
+publish: $(RELEASE_TARBALL) agent-manifests
 	@if [[ -z "$(BITS_DIR)" ]]; then \
 		echo "error: 'BITS_DIR' must be set for 'publish' target"; \
 		exit 1; \
@@ -272,7 +294,9 @@ publish: $(RELEASE_TARBALL)
 	mkdir -p $(BITS_DIR)/ca
 	cp $(RELEASE_TARBALL) $(BITS_DIR)/ca/ca-pkg-$(STAMP).tar.bz2
 	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/ca/cabase-$(STAMP).tar.gz
+	cp $(PKGROOT)/cabase.manifest $(BITS_DIR)/ca/cabase-$(STAMP).manifest
 	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/ca/cainstsvc-$(STAMP).tar.gz
+	cp $(PKGROOT)/cainstsvc.manifest $(BITS_DIR)/ca/cainstsvc-$(STAMP).manifest
 
 #
 # The "pkg" target builds tarballs for each of the npm packages based on the

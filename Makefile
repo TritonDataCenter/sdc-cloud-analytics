@@ -162,6 +162,8 @@ DOC_FILES	 = \
 	dev.restdown			\
 	index.restdown			\
 
+RESTDOWN_FLAGS   = --brand-dir=deps/restdown-brand-remora
+
 JSL_FILES_NODE	 = $(JS_FILES) $(DEMO_JSFILES)
 JSL_FILES_WEB    = $(DEMO_WEBJSFILES)
 JSL_CONF_WEB	 = tools/jsl.web.conf

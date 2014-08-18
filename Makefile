@@ -231,7 +231,7 @@ release: $(RELEASE_TARBALL) agent-manifests sdc-scripts
 agent-manifests: $(RELEASE_TARBALL) $(PKGROOT)/cabase/package.json \
     $(PKGROOT)/cainstsvc/package.json
 	cat cabase-manifest.tmpl | sed \
-		-e "s/UUID/$$(uuid -v4)/" \
+		-e "s/UUID/$$(cat $(PKGROOT)/cabase/image_uuid)/" \
 		-e "s/DESCRIPTION/$$(json description < $(PKGROOT)/cabase/package.json)/" \
 		-e "s/NAME/$$(json name < $(PKGROOT)/cabase/package.json)/" \
 		-e "s/VERSION/$$(json version < $(PKGROOT)/cabase/package.json)/" \
@@ -240,7 +240,7 @@ agent-manifests: $(RELEASE_TARBALL) $(PKGROOT)/cabase/package.json \
 		-e "s/SHA/$$(openssl sha1 $(PKGROOT)/cabase.tar.gz | cut -d ' ' -f2)/" \
 		> $(PKGROOT)/cabase.manifest
 	cat cainstsvc-manifest.tmpl | sed \
-		-e "s/UUID/$$(uuid -v4)/" \
+		-e "s/UUID/$$(cat $(PKGROOT)/cainstsvc/image_uuid)/" \
 		-e "s/DESCRIPTION/$$(json description < $(PKGROOT)/cainstsvc/package.json)/" \
 		-e "s/NAME/$$(json name < $(PKGROOT)/cainstsvc/package.json)/" \
 		-e "s/VERSION/$$(json version < $(PKGROOT)/cainstsvc/package.json)/" \
@@ -306,6 +306,7 @@ publish: $(RELEASE_TARBALL) agent-manifests
 pkg: $(PKG_TARBALLS)
 
 $(PKGROOT)/%.tar.gz:
+	uuid -v4 > $(PKGROOT)/$*/image_uuid
 	(cd $(PKGROOT) && $(TAR) cf - $*) | gzip > $@
 
 $(PKGROOT)/cabase.tar.gz:	$(PKGFILES_cabase) | $(PKGDEPS_cabase)

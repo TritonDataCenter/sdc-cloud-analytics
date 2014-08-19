@@ -16,6 +16,17 @@ $(INCMAKE)/%:
 	git submodule update --init deps/eng
 
 #
+# Hack for including remora brand for doc
+#   The other SDC7 API repos automatically
+#   update deps/*. This one doesn't.
+# My attempts to do this the right way have
+#   broken the build, so I'm doing this the ugly way.
+
+RESTDOWN_FLAGS   = --brand-dir=deps/restdown-brand-remora
+docs: deps/restdown-brand-remora/.git
+deps/restdown-brand-remora/.git:
+	git submodule update --init deps/restdown-brand-remora
+#
 # Directories and files used during the build.
 #
 DEMO_DIRS	:= $(shell find demo -type d)

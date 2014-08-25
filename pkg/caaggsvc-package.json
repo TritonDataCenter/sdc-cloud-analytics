@@ -1,6 +1,7 @@
 {
 	"name":		"caaggsvc",
 	"description":	"Joyent Cloud Analytics Aggregator Service",
+	"license":      "MPL-2.0",
 	"version":	"0.1.0v@@CA_VERSION@@",
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",

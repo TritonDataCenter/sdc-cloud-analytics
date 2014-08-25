@@ -1,6 +1,7 @@
 {
 	"name":		"cainstsvc",
 	"description":	"Joyent Cloud Analytics Instrumenter Service",
+	"license":      "MPL-2.0",
 	"version":	"0.0.3v@@CA_VERSION@@",
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",

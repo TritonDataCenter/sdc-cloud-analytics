@@ -1,4 +1,14 @@
 /*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+/*
+ * Copyright (c) 2014, Joyent, Inc.
+ */
+
+/*
  * caflot.js: flot-based visualization of CA metrics for demo purposes.
  * Note that variables declared here may be overwritten by cademo.js via the
  * pseudo-file cavars.js (included after caflot.js in graph.htm).

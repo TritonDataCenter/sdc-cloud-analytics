@@ -1,6 +1,7 @@
 {
 	"name":		"cabase",
 	"description":	"Joyent Cloud Analytics Common Libraries",
+	"license":      "MPL-2.0",
 	"version":	"1.0.3v@@CA_VERSION@@",
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",

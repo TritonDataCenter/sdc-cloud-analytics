@@ -15,7 +15,7 @@
 	url = git@git.joyent.com:node-png-joyent.git
 [submodule "deps/node-heatmap"]
 	path = deps/node-heatmap
-	url = git@git.joyent.com:node-heatmap.git
+	url = git@github.com:joyent/node-timeseries-heatmap.git
 [submodule "deps/connect"]
 	path = deps/connect
 	url = git://github.com/senchalabs/connect.git

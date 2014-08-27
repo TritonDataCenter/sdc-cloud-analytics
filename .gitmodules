@@ -36,7 +36,7 @@
 	url = git://github.com/rmustacc/node-ctype.git
 [submodule "deps/eng"]
 	path = deps/eng
-	url = git@git.joyent.com:eng.git
+	url = git@github.com:joyent/eng.git
 [submodule "deps/javascriptlint"]
 	path = deps/javascriptlint
 	url = git://github.com/davepacheco/javascriptlint.git

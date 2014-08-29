@@ -1,6 +1,6 @@
 [submodule "deps/node-amqp"]
 	path = deps/node-amqp
-	url = git@git.joyent.com:node-amqp-joyent.git
+	url = git@github.com:joyent/node-amqp-joyent.git
 [submodule "deps/node-libdtrace"]
 	path = deps/node-libdtrace
 	url = git://github.com/bcantrill/node-libdtrace.git
@@ -12,7 +12,7 @@
 	url = git://github.com/joyent/node.git
 [submodule "deps/node-png"]
 	path = deps/node-png
-	url = git@git.joyent.com:node-png-joyent.git
+	url = git@github.com:joyent/node-png-joyent.git
 [submodule "deps/node-heatmap"]
 	path = deps/node-heatmap
 	url = git@github.com:joyent/node-timeseries-heatmap.git

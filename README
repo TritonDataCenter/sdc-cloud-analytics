@@ -1,5 +1,0 @@
-This is the repo for the cloud-analytics project, including agents, daemons,
-libraries, etc.  Project lead is Dave Pacheco (dap@joyent.com).  The JIRA bug
-category is "INTRO" (Introspection).
-
-For an overview of the repo and development workflow, see docs/dev.restdown.

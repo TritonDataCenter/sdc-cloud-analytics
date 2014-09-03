@@ -52,7 +52,7 @@ Subdirectories in this repo include:
 
 To browse the source, first build a cscope database with:
 
-        # gmake xref
+        # make xref
 
 and then launch the cscope browser:
 
@@ -84,10 +84,10 @@ module when you try to use the library.
 
 ## Workflow
 
-The only supported build environment is an SDC6 "smartos" zone.
+The only supported build environment is an SDC7 "smartos" zone.
 
 1. First, download the latest stock COAL-147. Before building the image, copy a
-   public key into usb-headnode/config/config.coal.inc/root.authorized_keys.
+   public key into usb-headnode/config/config.coal.inc/root.authorized\_keys.
    This will allow you to log into the VM, CA zone, and development zone with
    no additional setup.
 2. Build the headnode image, boot it, and get it setup. Don't bother with
@@ -113,10 +113,9 @@ The only supported build environment is an SDC6 "smartos" zone.
    want this for git.
 6. Copy any dotfiles you need (especially .gitconfig and .gitignore to your
    user's home directory).
-
 7. Once the zone is set up:
 
-        # git clone git@git.joyent.com:cloud-analytics.git ca-work
+        # git clone git@github.com:joyent/sdc-cloud-analytics.git ca-work
         # cd ca-work
         # gmake xref release
 
@@ -143,7 +142,7 @@ services or the agent:
         # node cmd/caaggsvc.js &
         # node cmd/cainstsvc.js &
 
-The "ws" tool takes care of setting NODE_PATH appropriately to include all
+The "ws" tool takes care of setting NODE\_PATH appropriately to include all
 of our dependencies.  You can choose exactly what you need to run this way.
 
 ## Demo

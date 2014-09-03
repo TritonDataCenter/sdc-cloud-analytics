@@ -51,7 +51,6 @@ SH_SCRIPTS	= \
 	pkg/pkg-svc-postinstall.sh	\
 	pkg/pkg-svc-postuninstall.sh	\
 	smf/method/canodesvc		\
-	tools/cabranch			\
 	tools/cainstrfleet		\
 	tools/catest			\
 	tools/caupagent			\

@@ -172,6 +172,7 @@ DOC_FILES	 = \
 	index.restdown			\
 
 RESTDOWN_FLAGS   = --brand-dir=deps/restdown-brand-remora
+EXTRA_DOC_DEPS += deps/restdown-brand-remora/.git
 
 JSL_FILES_NODE	 = $(JS_FILES) $(DEMO_JSFILES)
 JSL_FILES_WEB    = $(DEMO_WEBJSFILES)
@@ -275,7 +276,7 @@ $(DIST):
 #
 # "check" target implementation.
 #
-check: check-metadata check-metad check-json
+check:: check-metadata check-metad check-json
 
 check-metadata: $(METADATA_FILES:%=%.check)
 

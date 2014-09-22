@@ -1,7 +1,7 @@
 ---
 title: Joyent Cloud Analytics
 apisections: API Introduction, Instrumentations API, Values API
-markdown2extras: wiki-tables
+markdown2extras: tables
 ---
 <!--
     This Source Code Form is subject to the terms of the Mozilla Public
@@ -112,7 +112,7 @@ specify:
 Here's an example of creating such an instrumentation.  For syntax details, see
 the API documentation:
 
-	# cat request.json 
+	# cat request.json
 	{
 		"module": "disk",
 		"stat": "physio_ops"
@@ -168,7 +168,7 @@ retrieve the **value** of the instrumentation for that time:
 		"requested_start_time": 1308862501,
 		"requested_duration": 1,
 		"requested_end_time": 1308862502
-	}	
+	}
 
 To summarize: *metrics* define what data the system is capable of reporting.
 *Fields* enhance the raw numbers with additional metadata about each event that
@@ -265,7 +265,7 @@ This type of instrumentation is called a **numeric decomposition**.
 
 ### Combining decompositions
 
-It's possible to combine a single discrete and numeric decomposition to produce 
+It's possible to combine a single discrete and numeric decomposition to produce
 an object mapping discrete key to numeric distribution, whose value looks like
 this:
 
@@ -445,7 +445,7 @@ decomposition to transformed values.  For example:
 		"requested_duration": 1,
 		"requested_end_time": 1308863800
 	}
-		
+
 Transformations are always performed asynchronously and the results cached
 internally for future requests.  So the first time you request a transformation
 like "reversedns", you may see no values transformed at all.  As you retrieve
@@ -458,7 +458,7 @@ addresses in the data and they will be included in the returned value.
 ## Versioning
 
 The API version _must_ be specified in the `X-API-Version header`. All protocol
-versions start with `ca/` and end with a semantic version number.  
+versions start with `ca/` and end with a semantic version number.
 This protocol version is `ca/0.1.8`. If no `X-API-Version header` is specified,
 version `ca/0.1.0` is assumed.
 
@@ -550,7 +550,7 @@ example of the CA resource return value:
 			}
 		}
 	}
-	
+
 Each of these objects is covered in detail below.  **This information is
 provided so that clients need not hardcode anything about particular metrics,
 types, or fields in order to present appropriate visualizations, labels, and
@@ -929,17 +929,21 @@ automatically to enable people to build tools to work with them.
 
 The following leaf predicates are available:
 
-||{ eq: [ fieldname, value ] }|| equality (string or number, as appropriate).||
-||{ ne: [ fieldname, value ] }|| inequality (string or number, as appropriate).||
-||{ le: [ fieldname, value ] }|| less than or equal to (numbers only).||
-||{ lt: [ fieldname, value ] }|| less than (numbers only).||
-||{ ge: [ fieldname, value ] }|| greater than or equal to (numbers only).||
-||{ gt: [ fieldname, value ] }|| greater than (numbers only).||
+| Predicate                    | Description                                    |
+| ---------------------------- | ---------------------------------------------- |
+| { eq: [ fieldname, value ] } | equality (string or number, as appropriate).   |
+| { ne: [ fieldname, value ] } | inequality (string or number, as appropriate). |
+| { le: [ fieldname, value ] } | less than or equal to (numbers only).          |
+| { lt: [ fieldname, value ] } | less than (numbers only).                      |
+| { ge: [ fieldname, value ] } | greater than or equal to (numbers only).       |
+| { gt: [ fieldname, value ] } | greater than (numbers only).                   |
 
 Additionally, the following compound predicates are available:
 
-||{ and: [ predicate, ... ] }|| all of subpredicates must be true.||
-||{ or: [ predicate, ... ] }|| at least one of subpredicates must be true.||
+| Predicate                   | Description                                 |
+| --------------------------- | ------------------------------------------- |
+| { and: [ predicate, ... ] } | all of subpredicates must be true.          |
+| { or: [ predicate, ... ] }  | at least one of subpredicates must be true. |
 
 All of these can be combined to form complex filters for drilling down.  For
 example, this predicate could be used with the "logical filesystem operations" metric to
@@ -1070,7 +1074,7 @@ in the `value` property for each data point.  For example:
 		"requested_start_time": 1308862501,
 		"requested_duration": 1,
 		"requested_end_time": 1308862502
-	}	
+	}
 
 ## List Heatmap Resources (GET /ca/instrumentations/:id/value/heatmap)
 
@@ -1142,7 +1146,7 @@ For examples, see "Heatmaps" under "Cloud Analytics" above.
 
 This resource allows you to retrieve the estimated average value for a
 particular time as computed from the heatmap.  For example, if you're looking
-at a heatmap of system calls decomposed by latency, you can retrieve the 
+at a heatmap of system calls decomposed by latency, you can retrieve the
 average system call latency using this resource.  The following properties can
 be specified:
 
@@ -1187,10 +1191,12 @@ grouped into buckets.
 
 Each description of a metric in this section begins with the following table:
 
-|| **Name** || The name of the metric used in the API. ||
-|| **Raw metric** || What the metric itself measures.  Note that with no decompositions or predicates, a metric reports data for *all servers within a data center*. ||
-|| **Decompositions** || A list of fields you can use for filtering and decomposition.  All metrics contain a "hostname" field, which means you can choose to examine only the data from a single server ("predicating") or  breakdown the raw value by server name ("decomposition"). ||
-|| **Visibility** || Indicates whether the metric is available for cloud operators only or both operators and end users.  The "hostname" field is always hidden from end users.  End users are also only allowed to see data pertaining to their own zones and ZFS datasets. ||
+| Datum              | Value                                                                                                                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | The name of the metric used in the API.                                                                                                                                                                                                                       |
+| **Raw metric**     | What the metric itself measures.  Note that with no decompositions or predicates, a metric reports data for *all servers within a data center*.                                                                                                               |
+| **Decompositions** | A list of fields you can use for filtering and decomposition.  All metrics contain a "hostname" field, which means you can choose to examine only the data from a single server ("predicating") or  breakdown the raw value by server name ("decomposition"). |
+| **Visibility**     | Indicates whether the metric is available for cloud operators only or both operators and end users.  The "hostname" field is always hidden from end users.  End users are also only allowed to see data pertaining to their own zones and ZFS datasets.       |
 
 
 To learn about the various decompositions provided by metrics, see "Fields" below.
@@ -1205,10 +1211,12 @@ to understand their usage of CPU resources and compare that to their limits.
 ### CPU: CPUs
 
 
-||**Name**||cpu.cpus||
-||**Raw metric**||Number of CPUs||
-||**Decompositions**||hostname, cpu, utilization (heatmap)||
-||**Visibility:** ||operators only||
+| Datum              | Value                                |
+| ------------------ | ------------------------------------ |
+| **Name**           | cpu.cpus                             |
+| **Raw metric**     | Number of CPUs                       |
+| **Decompositions** | hostname, cpu, utilization (heatmap) |
+| **Visibility**     | operators only                       |
 
 This raw metric measures the number of CPUs, which itself may not be very
 interesting.  However, the raw value can be decomposed by current utilization
@@ -1218,10 +1226,12 @@ within the datacenter or on a particular server.
 
 ### CPU: thread samples
 
-||**Name** || cpu.thread_samples ||
-||**Raw metric** || number of samples a thread was running on-CPU ||
-||**Decompositions** || hostname, zonename, pid, execname, psargs, ppid,<br/>pexecname, ppsargs, subsecond (heatmap)||
-||**Visibility** || operators and end users||
+| Datum              | Value                                                                                        |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| **Name**           | cpu.thread_samples                                                                           |
+| **Raw metric**     | number of samples a thread was running on-CPU                                                |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid,<br/>pexecname, ppsargs, subsecond (heatmap) |
+| **Visibility**     | operators and end users                                                                      |
 
 This raw metric counts the number of times a non-idle thread was sampled on-CPU.
 The sampling is performed at 99 Hertz (samples per second) per CPU, not 100
@@ -1245,10 +1255,12 @@ investigations.  For more detail, see the CPU thread executions metric.
 
 ### CPU: thread executions
 
-||**Name**|| cpu.thread_executions||
-||**Raw metric**|| number of times any thread runs continuously on CPU||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname,<br/>ppsargs, leavereason, runtime (heatmap), subsecond (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | cpu.thread_executions                                                                                                        |
+| **Raw metric**     | number of times any thread runs continuously on CPU                                                                          |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname,<br/>ppsargs, leavereason, runtime (heatmap), subsecond (heatmap) |
+| **Visibility**     | operators and end users                                                                                                      |
 
 This raw metric counts the number of times any thread was taken off CPU (with
 the exception of the kernel idle theads).  This can be used to understand CPU
@@ -1266,10 +1278,12 @@ as the CPU thread samples subsecond heatmap.
 
 ### CPU: aggregated CPU usage
 
-||**Name**|| cpu.usage||
-||**Raw metric**|| total amount of available CPU time used expressed as a percent of 1 CPU||
-||**Decompositions**|| hostname, zonename, cpumode||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                   |
+| ------------------ | ----------------------------------------------------------------------- |
+| **Name**           | cpu.usage                                                               |
+| **Raw metric**     | total amount of available CPU time used expressed as a percent of 1 CPU |
+| **Decompositions** | hostname, zonename, cpumode                                             |
+| **Visibility**     | operators and end users                                                 |
 
 This raw metric reports the percent of CPU time used as a percent of 1 CPU's
 maximum possible utilization.  For example, if a system has 8 CPUs, the maximum
@@ -1290,10 +1304,12 @@ metric, which can show the reason why an application is not using more CPU.
 
 ### CPU: aggregated wait time
 
-||**Name**|| cpu.waittime||
-||**Raw metric**|| total amount of time spent by runnable threads waiting for a CPU||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                            |
+| ------------------ | ---------------------------------------------------------------- |
+| **Name**           | cpu.waittime                                                     |
+| **Raw metric**     | total amount of time spent by runnable threads waiting for a CPU |
+| **Decompositions** | hostname, zonename                                               |
+| **Visibility**     | operators and end users                                          |
 
 This raw metric measures the total amount of time spent by runnable threads
 waiting for a CPU.  The longer the aggregated wait time, the more time threads
@@ -1305,10 +1321,12 @@ CPU saturation.
 
 ### CPU: 1-minute load average
 
-||**Name**|| cpu.loadavg1||
-||**Raw metric**|| 1-minute load average. This loosely correlates with the average number of threads either running or runnable over the last minute||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators only.
+| Datum              | Value                                                                                                                             |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | cpu.loadavg1                                                                                                                      |
+| **Raw metric**     | 1-minute load average. This loosely correlates with the average number of threads either running or runnable over the last minute |
+| **Decompositions** | hostname, zonename                                                                                                                |
+| **Visibility**     | operators only                                                                                                                    |
 
 This raw metric roughly correlates with the average number of threads ready to
 run at any given time over the last minute.  In raw form or when decomposed by
@@ -1335,10 +1353,12 @@ The disk metrics provide observability into disk I/O across a datacenter.
 
 ### Disk: disks
 
-||**Name**|| disk.disks||
-||**Raw metric**|| number of disks||
-||**Decompositions**|| hostname, disk, iops (heatmap), iops\_read (heatmap), iops\_write (heatmap), bytes (heatmap), bytes\_read (heatmap), bytes\_write (heatmap), busytime (heatmap)||
-||**Visibility**|| operators only||
+| Datum              | Value                                                                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | disk.disks                                                                                                                                                      |
+| **Raw metric**     | number of disks                                                                                                                                                 |
+| **Decompositions** | hostname, disk, iops (heatmap), iops\_read (heatmap), iops\_write (heatmap), bytes (heatmap), bytes\_read (heatmap), bytes\_write (heatmap), busytime (heatmap) |
+| **Visibility**     | operators only                                                                                                                                                  |
 
 This raw metric measures the number of disks, which itself may not be very
 interesting.  However, the raw value can be decomposed by percent busy time,
@@ -1353,10 +1373,12 @@ may be limiters for application performance.
 
 ### Disk: bytes read and written
 
-||**Name**|| disk.physio_bytes||
-||**Raw metric**|| number of bytes read or written to disk||
-||**Decompositions**|| hostname, disk, optype||
-||**Visibility**|| operators only||
+| Datum              | Value                                   |
+| ------------------ | --------------------------------------- |
+| **Name**           | disk.physio_bytes                       |
+| **Raw metric**     | number of bytes read or written to disk |
+| **Decompositions** | hostname, disk, optype                  |
+| **Visibility**     | operators only                          |
 
 This metric measures the raw number of bytes read and/or written to disks.  This
 allows operators to see whether disks are being driven to maximum throughput
@@ -1366,10 +1388,12 @@ decomposition of read and write operations in the workload.
 
 ### Disk: I/O operations
 
-||**Name**|| disk.physio_ops||
-||**Raw metric**|| number of disk I/O operations completed||
-||**Decompositions**|| hostname, disk, optype, size (heatmap), offset (heatmap), latency (heatmap)||
-||**Visibility**|| operators only||
+| Datum              | Value                                                                       |
+| ------------------ | --------------------------------------------------------------------------- |
+| **Name**           | disk.physio_ops                                                             |
+| **Raw metric**     | number of disk I/O operations completed                                     |
+| **Decompositions** | hostname, disk, optype, size (heatmap), offset (heatmap), latency (heatmap) |
+| **Visibility**     | operators only                                                              |
 
 This raw metric measures the raw number of read and write operations completed
 by disks.  This allows operators to see whether disks are being driven to
@@ -1418,10 +1442,12 @@ experiencing that latency.
 
 ### Filesystem: logical filesystem operations
 
-||**Name**|| fs.logical_ops||
-||**Raw metric**|| number of logical filesystem operations||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, fstype, optype, latency (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| **Name**           | fs.logical_ops                                                                                         |
+| **Raw metric**     | number of logical filesystem operations                                                                |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, fstype, optype, latency (heatmap) |
+| **Visibility**     | operators and end users                                                                                |
 
 This raw metric measures the total number of logical filesystem operations,
 including read, write, create, fsync, ioctl, mkdir, and many others.  The result
@@ -1433,10 +1459,12 @@ description under "filesystem-related metrics" above.
 
 ### Filesystem: logical read/write operations
 
-||**Name**|| fs.logical_rwops||
-||**Raw metric**|| number of logical filesystem read/write operations||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, fstype, optype, size (heatmap), offset (hetamap), latency (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | fs.logical_rwops                                                                                                                         |
+| **Raw metric**     | number of logical filesystem read/write operations                                                                                       |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, fstype, optype, size (heatmap), offset (hetamap), latency (heatmap) |
+| **Visibility**     | operators and end users                                                                                                                  |
 
 This raw metric measures the total number of read/write operations.  Unlike the
 "logical filesystem operations" metric, this metric *only* counts reads and
@@ -1452,10 +1480,12 @@ the disk level.
 
 ### Filesystem: logical bytes read/written
 
-||**Name**|| fs.logical_rwbytes||
-||**Raw metric**|| number of logical bytes read/written||
-||**Decompositions**|| hostname, zonename, optype||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                |
+| ------------------ | ------------------------------------ |
+| **Name**           | fs.logical_rwbytes                   |
+| **Raw metric**     | number of logical bytes read/written |
+| **Decompositions** | hostname, zonename, optype           |
+| **Visibility**     | operators and end users              |
 
 This raw metric measures the total number of bytes logically read and written to
 the filesystem.  This metric *only* counts reads and writes, not the various
@@ -1469,10 +1499,12 @@ well as events related to memory use like memory reclamations and page-ins.
 
 ### Memory: resident set size
 
-||**Name**|| memory.rss||
-||**Raw metric**|| total bytes of physical memory in use by applications||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                 |
+| ------------------ | ----------------------------------------------------- |
+| **Name**           | memory.rss                                            |
+| **Raw metric**     | total bytes of physical memory in use by applications |
+| **Decompositions** | hostname, zonename                                    |
+| **Visibility**     | operators and end users                               |
 
 The resident set of an application is the amount of physical memory it's
 currently using.  This metric provides that information in total, by hostname,
@@ -1481,10 +1513,12 @@ or by zonename.
 
 ### Memory: maximum resident set size
 
-||**Name**|| memory.rss_limit||
-||**Raw metric**|| maximum bytes of physical memory allowed for applications||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                     |
+| ------------------ | --------------------------------------------------------- |
+| **Name**           | memory.rss_limit                                          |
+| **Raw metric**     | maximum bytes of physical memory allowed for applications |
+| **Decompositions** | hostname, zonename                                        |
+| **Visibility**     | operators and end users                                   |
 
 This metric reports the system-imposed maximum resident set size in total, by
 hostname, or by zonename.  See "Memory: resident set size."
@@ -1492,10 +1526,12 @@ hostname, or by zonename.  See "Memory: resident set size."
 
 ### Memory: virtual memory reserved
 
-||**Name**|| memory.swap||
-||**Raw metric**|| total bytes of virtual memory reserved by applications||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                  |
+| ------------------ | ------------------------------------------------------ |
+| **Name**           | memory.swap                                            |
+| **Raw metric**     | total bytes of virtual memory reserved by applications |
+| **Decompositions** | hostname, zonename                                     |
+| **Visibility**     | operators and end users                                |
 
 This metric measures the total amount of virtual memory reserved by
 applications, optionally decomposed by hostname and zonename.  The operating
@@ -1509,10 +1545,12 @@ limit.
 
 ### Memory: maximum virtual memory used
 
-||**Name**|| memory.swap_limit||
-||**Raw metric**|| maximum bytes of virtual memory reservable by applications||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| **Name**           | memory.swap_limit                                          |
+| **Raw metric**     | maximum bytes of virtual memory reservable by applications |
+| **Decompositions** | hostname, zonename                                         |
+| **Visibility**     | operators and end users                                    |
 
 This metric reports the maximum amount of virtual memory reservable by
 applications, optionally decomposed by hostname and zonename.  See "Memory:
@@ -1521,10 +1559,12 @@ virtual memory reserved."
 
 ### Memory: excess memory reclaimed
 
-||**Name**|| memory.reclaimed_bytes||
-||**Raw metric**|| total bytes of memory reclaimed by the system||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                         |
+| ------------------ | --------------------------------------------- |
+| **Name**           | memory.reclaimed_bytes                        |
+| **Raw metric**     | total bytes of memory reclaimed by the system |
+| **Decompositions** | hostname, zonename                            |
+| **Visibility**     | operators and end users                       |
 
 This metric reports the total number of bytes of physical memory (resident set)
 reclaimed by the system because a zone has exceeded its allowable resident set
@@ -1534,10 +1574,12 @@ physical memory limit and its memory is being paged out.
 
 ### Memory: pages paged in
 
-||**Name**|| memory.pageins||
-||**Raw metric**|| total pages of memory paged in||
-||**Decompositions**|| hostname, zonename||
-||**Visibility**|| operators and end users||
+| Datum              | Value                          |
+| ------------------ | ------------------------------ |
+| **Name**           | memory.pageins                 |
+| **Raw metric**     | total pages of memory paged in |
+| **Decompositions** | hostname, zonename             |
+| **Visibility**     | operators and end users        |
 
 This metric reports the total number of pages of virtual memory paged in.
 Memory is paged in when it's needed by an application but is not currently in
@@ -1559,10 +1601,12 @@ ldapjs library version 0.3.2 or later.
 
 ### ldapjs: connections
 
-||**Name**|| ldapjs.connections ||
-||**Raw metric**|| number of client connections to the server ||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, raddr ||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                            |
+| ------------------ | ------------------------------------------------ |
+| **Name**           | ldapjs.connections                               |
+| **Raw metric**     | number of client connections to the server       |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, raddr |
+| **Visibility**     | operators and end users                          |
 
 This metric reports client connections to an LDAP server, with decompositions
 to identify the server process and client IP address.
@@ -1570,10 +1614,12 @@ to identify the server process and client IP address.
 
 ### ldapjs: all operations
 
-||**Name**|| ldapjs.ops ||
-||**Raw metric**|| number of server LDAP operations ||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, raddr, optype, ldapbinddn, ldaprequestdn, status, latency (heatmap) ||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **Name**           | ldapjs.ops                                                                                                     |
+| **Raw metric**     | number of server LDAP operations                                                                               |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, raddr, optype, ldapbinddn, ldaprequestdn, status, latency (heatmap) |
+| **Visibility**     | operators and end users                                                                                        |
 
 This metric reports LDAP operations executed by the server, with decompositions
 to identify the server process, client IP address, and operation details
@@ -1588,10 +1634,12 @@ search operations" metric.
 
 ### ldapjs: search operations
 
-||**Name**|| ldapjs.search_ops ||
-||**Raw metric**|| number of LDAP "search" operations ||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, raddr, ldapbinddn, ldaprequestdn, status, ldapfilter, ldapscope, latency (heatmap) ||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | ldapjs.search_ops                                                                                                             |
+| **Raw metric**     | number of LDAP "search" operations                                                                                            |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, raddr, ldapbinddn, ldaprequestdn, status, ldapfilter, ldapscope, latency (heatmap) |
+| **Visibility**     | operators and end users                                                                                                       |
 
 This metric reports LDAP "search" operations executed by the server, with
 decompositions to identify the server process, client IP address, and search
@@ -1623,9 +1671,9 @@ Some of these metrics follow an execution heirarchy, which is:
 	 |  |  |  |
 	 |  |  |  V
 	 |  |  V
-	 |  V  
+	 |  V
 	 | ...
-	 V     
+	 V
 
 This makes it possible to analyze the MySQL database from different
 perspectives.  The commands metric is the most inclusive, covering queries and
@@ -1636,10 +1684,12 @@ statement in terms of rows.
 
 ### MySQL: connections
 
-||**Name**|| mysql.connections||
-||**Raw metric**|| number of client connections to the database||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, user, client, latency (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                      |
+| ------------------ | -------------------------------------------------------------------------- |
+| **Name**           | mysql.connections                                                          |
+| **Raw metric**     | number of client connections to the database                               |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, user, client, latency (heatmap) |
+| **Visibility**     | operators and end users                                                    |
 
 This shows client connections to the database, providing breakdowns to show
 the client username and client hostname.  The "latency" field shows a heatmap
@@ -1649,10 +1699,12 @@ and span many queries.
 
 ### MySQL: commands
 
-||**Name**|| mysql.commands||
-||**Raw metric**|| number of database commands||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, command, user, client, status, latency (heatmap), cputime (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **Name**           | mysql.commands                                                                                                 |
+| **Raw metric**     | number of database commands                                                                                    |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, command, user, client, status, latency (heatmap), cputime (heatmap) |
+| **Visibility**     | operators and end users                                                                                        |
 
 This shows commands that are served by the database, and has a number
 of breakdowns to show general characteristics of the workload: including the
@@ -1684,10 +1736,12 @@ descriptions.  Common command types include:
 
 ### MySQL: queries
 
-||**Name**|| mysql.queries||
-||**Raw metric**|| number of database queries||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, querysubstr, database, user, client, status, latency (heatmap), cputime (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | mysql.queries                                                                                                                |
+| **Raw metric**     | number of database queries                                                                                                   |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, querysubstr, database, user, client, status, latency (heatmap), cputime (heatmap) |
+| **Visibility**     | operators and end users                                                                                                      |
 
 This shows the queries performed by the database, including query cache hits
 and the execution of prepared statements.  This metric has a number of
@@ -1702,10 +1756,12 @@ earlier.
 
 ### MySQL: statements
 
-||**Name**|| mysql.statements||
-||**Raw metric**|| number of database statements||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, statement, status, rowsmatched, rowschanged, latency (heatmap), cputime (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | mysql.statements                                                                                                             |
+| **Raw metric**     | number of database statements                                                                                                |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, statement, status, rowsmatched, rowschanged, latency (heatmap), cputime (heatmap) |
+| **Visibility**     | operators and end users                                                                                                      |
 
 This metric shows the execution of SQL statements contained within a query,
 and can be used to characterize the workload applied to the database, and to
@@ -1727,10 +1783,12 @@ queries metric described earlier.
 
 ### MySQL: filesort
 
-||**Name**|| mysql.filesort||
-||**Raw metric**|| number of database filesorts||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, database, table, latency (heatmap), cputime (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| **Name**           | mysql.filesort                                                                                   |
+| **Raw metric**     | number of database filesorts                                                                     |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, database, table, latency (heatmap), cputime (heatmap) |
+| **Visibility**     | operators and end users                                                                          |
 
 This shows the filesort operation in MySQL databases, which can be expensive
 component of a query, both in terms of CPU time and file system I/O.
@@ -1748,10 +1806,12 @@ created, and when they exit.
 
 ### OS: process execs
 
-||**Name**|| unix.proc_execs ||
-||**Raw Metric**|| number of successful process exec operations ||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
-||**Visibility**|| operators and customers||
+| Datum              | Value                                                                          |
+| ------------------ | ------------------------------------------------------------------------------ |
+| **Name**           | unix.proc_execs                                                                |
+| **Raw Metric**     | number of successful process exec operations                                   |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond |
+| **Visibility**     | operators and customers                                                        |
 
 This metric reports each time a process has successfully finished an exec(2) or
 equivalent call. This is useful for understanding how often a new process is
@@ -1761,10 +1821,12 @@ spawn new threads instead of processes, which may improve performance.
 
 ### OS: process exits
 
-||**Name**|| unix.proc_exits ||
-||**Raw Metric**|| number of processes exited ||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond, walltime||
-||**Visibility**|| operators and customers||
+| Datum              | Value                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| **Name**           | unix.proc_exits                                                                          |
+| **Raw Metric**     | number of processes exited                                                               |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond, walltime |
+| **Visibility**     | operators and customers                                                                  |
 
 This metric reports each time a process finishes. This is useful for
 understanding when processes complete and how long they were running. The
@@ -1775,10 +1837,12 @@ configuration and other errors.
 
 ### OS: process forks
 
-||**Name**|| unix.proc_forks ||
-||**Raw Metric**|| number of processes forked ||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, subsecond||
-||**Visibility**|| operators and customers||
+| Datum              | Value                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| **Name**           | unix.proc_forks                                            |
+| **Raw Metric**     | number of processes forked                                 |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, subsecond |
+| **Visibility**     | operators and customers                                    |
 
 This metric reports each time a process forks. When a process forks it may
 either be for an exec(2) (see unix.proc_execs) or the child will be used for the
@@ -1788,19 +1852,25 @@ process that called fork(2). "pexecname" and "ppsargs" are not included because
 they are identical to "execname" and "psargs".
 
 ### OS: thread creations
-||**Name**|| unix.thr_creates||
-||**Raw Metric**|| number of threads created||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond||
-||**Visibility**|| operators and customers||
+
+| Datum              | Value                                                                          |
+| ------------------ | ------------------------------------------------------------------------------ |
+| **Name**           | unix.thr_creates                                                               |
+| **Raw Metric**     | number of threads created                                                      |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, subsecond |
+| **Visibility**     | operators and customers                                                        |
 
 This metric reports each time a thread is created. Several applications create
 threads on each request. If an application is regularly creating a high number
 of threads per second, that may negatively impact performance.
 
 ### OS: processes
-||**Name**|| unix.processes||
-||**Raw Metric**|| number of process||
-||**Decompositions**|| hostname, zonename, execname, pid, ppid, rss, contract, psargs, pmodel, nthreads||
+
+| Datum              | Value                                                                            |
+| ------------------ | -------------------------------------------------------------------------------- |
+| **Name**           | unix.processes                                                                   |
+| **Raw Metric**     | number of process                                                                |
+| **Decompositions** | hostname, zonename, execname, pid, ppid, rss, contract, psargs, pmodel, nthreads |
 
 This metric reports the total number of processes on the system. This is useful
 for understanding what is running and characteristics of that set.  Decomposing
@@ -1828,10 +1898,12 @@ activity).
 
 ### NIC: NICs
 
-||**Name**|| nic.nics||
-||**Raw metric**|| number of physical NICs||
-||**Decompositions**|| hostname, nic, packets (heatmap), packets\_in (heatmap), packets\_out (heatmap), bytes (heatmap), bytes\_in (heatmap), bytes\_out (heatmap)||
-||**Visibility**|| operators only||
+| Datum              | Value                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | nic.nics                                                                                                                                    |
+| **Raw metric**     | number of physical NICs                                                                                                                     |
+| **Decompositions** | hostname, nic, packets (heatmap), packets\_in (heatmap), packets\_out (heatmap), bytes (heatmap), bytes\_in (heatmap), bytes\_out (heatmap) |
+| **Visibility**     | operators only                                                                                                                              |
 
 This raw metric measures the number of physical network cards, which itself may
 not be very interesting.  However, the raw value can be decomposed by the number
@@ -1842,10 +1914,12 @@ busy within the datacenter or on a particular server.
 
 ### NIC: bytes sent and received
 
-||**Name**|| nic.bytes||
-||**Raw metric**|| number of bytes sent and received over physical NICs||
-||**Decompositions**|| hostname, nic, direction||
-||**Visibility**|| operators only||
+| Datum              | Value                                                |
+| ------------------ | ---------------------------------------------------- |
+| **Name**           | nic.bytes                                            |
+| **Raw metric**     | number of bytes sent and received over physical NICs |
+| **Decompositions** | hostname, nic, direction                             |
+| **Visibility**     | operators only                                       |
 
 This raw metric measures the number of bytes sent and/or received over physical
 network cards, optionally decomposed by hostname, NIC, or direction.
@@ -1853,10 +1927,12 @@ network cards, optionally decomposed by hostname, NIC, or direction.
 
 ### NIC: packets sent and received
 
-||**Name**|| nic.packets||
-||**Raw metric**|| number of packets sent and received over physical NICs||
-||**Decompositions**|| hostname, nic, direction||
-||**Visibility**|| operators only||
+| Datum              | Value                                                  |
+| ------------------ | ------------------------------------------------------ |
+| **Name**           | nic.packets                                            |
+| **Raw metric**     | number of packets sent and received over physical NICs |
+| **Decompositions** | hostname, nic, direction                               |
+| **Visibility**     | operators only                                         |
 
 This raw metric measures the number of packets sent and/or received over
 physical network cards, optionally decomposed by hostname, NIC, or direction.
@@ -1864,10 +1940,12 @@ physical network cards, optionally decomposed by hostname, NIC, or direction.
 
 ### NIC: VNIC bytes sent and received
 
-||**Name**|| nic.vnic_bytes||
-||**Raw metric**|| number of bytes sent and received over per-zone VNICs||
-||**Decompositions**|| hostname, zonename, direction||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                 |
+| ------------------ | ----------------------------------------------------- |
+| **Name**           | nic.vnic_bytes                                        |
+| **Raw metric**     | number of bytes sent and received over per-zone VNICs |
+| **Decompositions** | hostname, zonename, direction                         |
+| **Visibility**     | operators and end users                               |
 
 This raw metric measures the number of bytes sent and/or received by a
 particular zone's VNICs, optionally decomposed by hostname, zonename, or
@@ -1876,10 +1954,12 @@ direction.
 
 ### NIC: VNIC packets sent and received
 
-||**Name**|| nic.vnic_packets||
-||**Raw metric**|| number of packets sent and received over per-zone VNICs||
-||**Decompositions**|| hostname, zonename, direction||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                   |
+| ------------------ | ------------------------------------------------------- |
+| **Name**           | nic.vnic_packets                                        |
+| **Raw metric**     | number of packets sent and received over per-zone VNICs |
+| **Decompositions** | hostname, zonename, direction                           |
+| **Visibility**     | operators and end users                                 |
 
 This raw metric measures the number of packets sent and/or received by a
 particular zone's VNICs, optionally decomposed by hostname, zonename, or
@@ -1895,10 +1975,12 @@ decomposing by host, zone, or application.
 
 ### Node.js 0.4.x: garbage collection operations
 
-||**Name**|| node.gc_ops||
-||**Raw metric**|| number of garbage collection operations||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, gctype, latency (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| **Name**           | node.gc_ops                                                                                    |
+| **Raw metric**     | number of garbage collection operations                                                        |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, gctype, latency (heatmap) |
+| **Visibility**     | operators and end users                                                                        |
 
 This metric measures the total number of garbage collection operations for
 Node.js programs, optionally decomposed by type of GC (mark-and-sweep or
@@ -1908,10 +1990,12 @@ heatmap.
 
 ### Node.js 0.4.x: HTTP client operations
 
-||**Name**|| node.httpc\_ops||
-||**Raw metric**|| HTTP client operations||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, http\_method, http\_url, http\_path, raddr, rport, latency (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | node.httpc\_ops                                                                                                                           |
+| **Raw metric**     | HTTP client operations                                                                                                                    |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, http\_method, http\_url, http\_path, raddr, rport, latency (heatmap) |
+| **Visibility**     | operators and end users                                                                                                                   |
 
 This metric measures the total number of HTTP client operations for Node.js
 programs, where each operation consists of a request and a response.  The result
@@ -1921,10 +2005,12 @@ field enables visualizing HTTP client request latency as a heatmap.
 
 ### Node.js 0.4.x: HTTP server operations
 
-||**Name**|| node.httpd\_ops||
-||**Raw metric**|| HTTP server operations||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, http\_method, http\_url, http\_path, http\_origin, raddr, rport, latency (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | node.httpd\_ops                                                                                                                                         |
+| **Raw metric**     | HTTP server operations                                                                                                                                  |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, http\_method, http\_url, http\_path, http\_origin, raddr, rport, latency (heatmap) |
+| **Visibility**     | operators and end users                                                                                                                                 |
 
 This metric measures the total number of HTTP server operations for Node.js
 programs, where each operation consists of a request and a response.  The result
@@ -1934,10 +2020,12 @@ field enables visualizing HTTP server request latency as a heatmap.
 
 ### Node.js 0.4.x: socket operations
 
-||**Name**|| node.socket_ops||
-||**Raw metric**|| socket operations||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, optype, raddr, rport, size (heatmap), buffered (heatmap)
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | node.socket\_ops                                                                                                               |
+| **Raw metric**     | socket operations                                                                                                             |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, optype, raddr, rport, size (heatmap), buffered (heatmap) |
+| **Visibility**     | operators and end users                                                                                                       |
 
 This metric measures the total number of socket read/write operations for
 Node.js programs.  The result can be decomposed by the remote address or port
@@ -1950,10 +2038,12 @@ inadequate flow control.
 ## Syscall-related metrics
 ### System calls: system calls
 
-||**Name**|| syscall.syscalls||
-||**Raw metric**|| number of system calls completed||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, syscall, subsecond (heatmap), latency (heatmap), cputime (heatmap)||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | syscall.syscalls                                                                                                                        |
+| **Raw metric**     | number of system calls completed                                                                                                        |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, syscall, subsecond (heatmap), latency (heatmap), cputime (heatmap) |
+| **Visibility**     | operators and end users                                                                                                                 |
 
 This raw metric reports the total number of system calls (syscalls), which
 represent application requests to the operating system.  Since applications
@@ -1981,10 +2071,12 @@ The TCP metrics provide visibility into TCP activity and errors.
 
 ### TCP: accepts
 
-||**Name**|| tcp.accepts||
-||**Raw metric**|| number of TCP connections accepted||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, rport, raddr||
-||**Visibility**|| operators and customers||
+| Datum              | Value                                                                             |
+| ------------------ | --------------------------------------------------------------------------------- |
+| **Name**           | tcp.accepts                                                                       |
+| **Raw metric**     | number of TCP connections accepted                                                |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, rport, raddr |
+| **Visibility**     | operators and customers                                                           |
 
 This metric reports the number of TCP connections accepted.  For
 connection-oriented applications, this metric is useful for understanding new
@@ -1995,10 +2087,12 @@ of TCP connection setup and teardown.
 
 ### TCP: connects
 
-||**Name**|| tcp.connects||
-||**Raw metric**|| number of outbound TCP connections completed||
-||**Decompositions**|| hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, rport, raddr||
-||**Visibility**|| operators and customers||
+| Datum              | Value                                                                             |
+| ------------------ | --------------------------------------------------------------------------------- |
+| **Name**           | tcp.connects                                                                      |
+| **Raw metric**     | number of outbound TCP connections completed                                      |
+| **Decompositions** | hostname, zonename, pid, execname, psargs, ppid, pexecname, ppsargs, rport, raddr |
+| **Visibility**     | operators and customers                                                           |
 
 This metric reports the number of outbound TCP connections completed.  For
 connection-oriented applications, this metric is useful for understanding new
@@ -2009,10 +2103,12 @@ of TCP connection setup and teardown.
 
 ### TCP: errors
 
-||**Name**|| tcp.errors||
-||**Raw metric**|| total number of TCP errors||
-||**Decompositions**|| hostname, errtype||
-||**Visibility**|| operators only ||
+| Datum              | Value                      |
+| ------------------ | -------------------------- |
+| **Name**           | tcp.errors                 |
+| **Raw metric**     | total number of TCP errors |
+| **Decompositions** | hostname, errtype          |
+| **Visibility**     | operators only             |
 
 This metric reports the number of TCP errors and can be decomposed by the error
 type.  Different TCP errors have different underlying causes, all of which can
@@ -2023,10 +2119,12 @@ as long as the configured TCP retransmit timeout (typically multiple seconds).
 
 ### TCP: segments
 
-||**Name**|| tcp.segments||
-||**Raw metric**|| total number of TCP segments (packets) sent and received||
-||**Decompositions**|| hostname, direction||
-||**Visibility**|| operators only||
+| Datum              | Value                                                    |
+| ------------------ | -------------------------------------------------------- |
+| **Name**           | tcp.segments                                             |
+| **Raw metric**     | total number of TCP segments (packets) sent and received |
+| **Decompositions** | hostname, direction                                      |
+| **Visibility**     | operators only                                           |
 
 This metric reports the total number of TCP segments (packets) sent and received
 and can be used to observe network activity over TCP.
@@ -2034,10 +2132,12 @@ and can be used to observe network activity over TCP.
 
 ### VM: exits
 
-||**Name**|| vm.exits||
-||**Raw metric**|| number of times the Virtual Machine exits back to the host||
-||**Decomposition**|| hostname, zonename, vleavereason, vcpuid||
-||**Visibility**|| operators only||
+| Datum             | Value                                                      |
+| ----------------- | ---------------------------------------------------------- |
+| **Name**          | vm.exits                                                   |
+| **Raw metric**    | number of times the Virtual Machine exits back to the host |
+| **Decomposition** | hostname, zonename, vleavereason, vcpuid                   |
+| **Visibility**    | operators only                                             |
 
 This metric measures the number of times a virutal machine must stop running the
 guest and handle some operation. Exits can be caused because of disk and network
@@ -2047,10 +2147,12 @@ performance.
 
 ### VM: interrupt requests
 
-||**Name**|| vm.irqs||
-||**Raw Metric**|| number of interrupt requests made by Virtual Machines||
-||**Decomposition**|| hostname, subsecond, zonename, irqvector||
-||**Visibility**|| operators and end users||
+| Datum             | Value                                                 |
+| ----------------- | ----------------------------------------------------- |
+| **Name**          | vm.irqs                                               |
+| **Raw Metric**    | number of interrupt requests made by Virtual Machines |
+| **Decomposition** | hostname, subsecond, zonename, irqvector              |
+| **Visibility**    | operators and end users                               |
 
 This metric measures the raw number of interrupt requests that are being made to
 the guest. An interrupt request occurs because of an emulated hardware device
@@ -2059,10 +2161,12 @@ understanding how the guest is using its virtualized hardware resources.
 
 ### VM: disk I/O operations
 
-||**Name**|| vm.physio_ops||
-||**Raw Metric**|| number of Virtual Machine disk I/O operations completed||
-||**Decompositions**|| hostname, zonename, optype, latency, size, offset, errno||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                    |
+| ------------------ | -------------------------------------------------------- |
+| **Name**           | vm.physio_ops                                            |
+| **Raw Metric**     | number of Virtual Machine disk I/O operations completed  |
+| **Decompositions** | hostname, zonename, optype, latency, size, offset, errno |
+| **Visibility**     | operators and end users                                  |
 
 This metric gives visibility into the I/O Virtual Machines are doing to their
 virtual disks. This is the primary metric for understanding Virtual Machine disk
@@ -2070,10 +2174,12 @@ performance.
 
 ### VM: disk bytes read and written
 
-||**Name**|| vm.physio_bytes||
-||**Raw Metric**|| number of bytes read or written to Virtual Machine disks||
-||**Decompositions**|| hostname, zonename, optype||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                    |
+| ------------------ | -------------------------------------------------------- |
+| **Name**           | vm.physio_bytes                                          |
+| **Raw Metric**     | number of bytes read or written to Virtual Machine disks |
+| **Decompositions** | hostname, zonename, optype                               |
+| **Visibility**     | operators and end users                                  |
 
 This metric measures the raw number of bytes read and/or written to virtual
 disks provided to Virtual Machines. This allows operators and end users to see
@@ -2081,10 +2187,12 @@ if the virtual disks are being driven to maximum throughput.
 
 ### VM: thread samples
 
-||**Name**|| vm.thread_samples||
-||**Raw Metric**|| number of samples a thread was running on-CPU||
-||**Decompositions**|| hostname, zonename, subsecond, vmmuctx||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                         |
+| ------------------ | --------------------------------------------- |
+| **Name**           | vm.thread_samples                             |
+| **Raw Metric**     | number of samples a thread was running on-CPU |
+| **Decompositions** | hostname, zonename, subsecond, vmmuctx        |
+| **Visibility**     | operators and end users                       |
 
 This raw metric counts the number of times a vCPU was sampled on-CPU. The
 sampling is performed at 99 Hertz (samples per second) per CPU, not 100 Hertz,
@@ -2120,10 +2228,12 @@ conclusions from these metrics.  See the zfs(1M) man page for details.
 
 ### ZFS: ARC operations
 
-||**Name**|| zfs.arc_ops||
-||**Raw metric**|| total number of operations on the ARC (adaptive replacement cache) ||
-||**Decompositions**|| hostname, zonename, execname, psargs, pid, pexecname, ppsargs, ppid, optype ("hit" or "miss") ||
-||**Visibility**|| operators and end users||
+| Datum              | Value                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| **Name**           | zfs.arc_ops                                                                                   |
+| **Raw metric**     | total number of operations on the ARC (adaptive replacement cache)                            |
+| **Decompositions** | hostname, zonename, execname, psargs, pid, pexecname, ppsargs, ppid, optype ("hit" or "miss") |
+| **Visibility**     | operators and end users                                                                       |
 
 In raw form, this metric reports all ARC hits and misses.  These can be
 decomposed by "optype" to identify hits and misses.  Operations can also be
@@ -2142,10 +2252,12 @@ efficacy of the cache for their workload.
 
 ### ZFS: quota size
 
-||**Name**|| zfs.dataset_quota||
-||**Raw metric**|| total of all ZFS dataset quotas||
-||**Decompositions**|| hostname, zdataset||
-||**Visibility**|| operators and end users||
+| Datum              | Value                           |
+| ------------------ | ------------------------------- |
+| **Name**           | zfs.dataset_quota               |
+| **Raw metric**     | total of all ZFS dataset quotas |
+| **Decompositions** | hostname, zdataset              |
+| **Visibility**     | operators and end users         |
 
 In raw form, this metric reports the sum of all quotas.  This can be decomposed
 by hostname and ZFS dataset.  This metric only applies to datasets with quotas.
@@ -2158,10 +2270,12 @@ of quotas could be less than, equal to, or greater than the total space.
 
 ### ZFS: unused quota
 
-||**Name**|| zfs.dataset_unused_quota||
-||**Raw metric**|| total unused quota for all ZFS datasets||
-||**Decompositions**|| hostname, zdataset||
-||**Visibility**|| operators and end user||
+| Datum              | Value                                   |
+| ------------------ | --------------------------------------- |
+| **Name**           | zfs.dataset_unused_quota                |
+| **Raw metric**     | total unused quota for all ZFS datasets |
+| **Decompositions** | hostname, zdataset                      |
+| **Visibility**     | operators and end user                  |
 
 In raw form, this metric reports the sum of unused quota for all ZFS datasets.
 This can be decomposed by hostname and ZFS dataset.  Like the "quota size"
@@ -2182,10 +2296,12 @@ true that the unused quota is space that's available for use.
 
 ### ZFS: used space
 
-||**Name**|| zfs.dataset_used||
-||**Raw metric**|| total used space for all ZFS datasets||
-||**Decompositions**|| hostname, zdataset||
-||**Visibility**|| operators and end user||
+| Datum              | Value                                 |
+| ------------------ | ------------------------------------- |
+| **Name**           | zfs.dataset_used                      |
+| **Raw metric**     | total used space for all ZFS datasets |
+| **Decompositions** | hostname, zdataset                    |
+| **Visibility**     | operators and end user                |
 
 In raw form, this metric reports the sum of used space for all ZFS datasets.
 This can be decomposed by hostname and ZFS dataset.
@@ -2201,10 +2317,12 @@ accounting.
 
 ### ZFS: free space in pool
 
-||**Name**|| zfs.pool_free||
-||**Raw metric**|| total free space for all ZFS pools||
-||**Decompositions**|| hostname, zpool||
-||**Visibility**|| operators only||
+| Datum              | Value                              |
+| ------------------ | ---------------------------------- |
+| **Name**           | zfs.pool_free                      |
+| **Raw metric**     | total free space for all ZFS pools |
+| **Decompositions** | hostname, zpool                    |
+| **Visibility**     | operators only                     |
 
 In raw form, this metric reports the sum of free space for all ZFS pools.  This
 can be decomposed by hostname and ZFS dataset.
@@ -2212,10 +2330,12 @@ can be decomposed by hostname and ZFS dataset.
 
 ### ZFS: used space in pool
 
-||**Name**|| zfs.pool_used||
-||**Raw metric**|| total used space for all ZFS pools||
-||**Decompositions**|| hostname, zpool||
-||**Visibility**|| operators only||
+| Datum              | Value                              |
+| ------------------ | ---------------------------------- |
+| **Name**           | zfs.pool_used                      |
+| **Raw metric**     | total used space for all ZFS pools |
+| **Decompositions** | hostname, zpool                    |
+| **Visibility**     | operators only                     |
 
 In raw form, this metric reports the sum of used space for all ZFS pools.  This
 can be decomposed by hostname and ZFS dataset.
@@ -2223,10 +2343,12 @@ can be decomposed by hostname and ZFS dataset.
 
 ### ZFS: total space in pool
 
-||**Name**|| zfs.pool_total||
-||**Raw metric**|| total space in all ZFS pools||
-||**Decompositions**|| hostname, zpool||
-||**Visibility**|| operators only||
+| Datum              | Value                        |
+| ------------------ | ---------------------------- |
+| **Name**           | zfs.pool_total               |
+| **Raw metric**     | total space in all ZFS pools |
+| **Decompositions** | hostname, zpool              |
+| **Visibility**     | operators only               |
 
 In raw form, this metric reports the sum of all space for all ZFS pools.  This
 can be decomposed by hostname and ZFS dataset.
@@ -2237,10 +2359,12 @@ These metrics provide visibility into the Cloud Analytics service itself.
 
 ### CA: instrumenter ticks
 
-||**Name**|| ca.instr_ticks ||
-||**Raw metric**|| total number of instrumenter ticks||
-||**Decompositions**|| hostname, latency (heatmap), subsecond (heatmap)||
-||**Visibility**|| operators only||
+| Datum              | Value                                            |
+| ------------------ | ------------------------------------------------ |
+| **Name**           | ca.instr_ticks                                   |
+| **Raw metric**     | total number of instrumenter ticks               |
+| **Decompositions** | hostname, latency (heatmap), subsecond (heatmap) |
+| **Visibility**     | operators only                                   |
 
 This metric counts the number of ticks by all instrumenters in the CA service.
 Each instrumenter normally ticks once per second to gather data.  The latency
@@ -2252,10 +2376,12 @@ data and whether data is being reported on time.
 
 ### CA: instrumenter backend operations
 
-||**Name**|| ca.instr_beops ||
-||**Raw metric**|| total number of instrumenter backend operations||
-||**Decompositions**|| hostname, cabackend, cainstnid, cametric, latency (heatmap), subsecond (heatmap)||
-||**Visibility**|| operators only||
+| Datum              | Value                                                                            |
+| ------------------ | -------------------------------------------------------------------------------- |
+| **Name**           | ca.instr_beops                                                                   |
+| **Raw metric**     | total number of instrumenter backend operations                                  |
+| **Decompositions** | hostname, cabackend, cainstnid, cametric, latency (heatmap), subsecond (heatmap) |
+| **Visibility**     | operators only                                                                   |
 
 This metric counts the number of data requests to instrumenter backends.
 During each instrumenter tick (see above), the instrumenter requests data from
@@ -2272,10 +2398,12 @@ understand which backends are responsible for that time.
 
 ### CA: instrumenter enable operations
 
-||**Name**|| ca.instr_enables ||
-||**Raw metric**|| total number of instrumenter enable operations||
-||**Decompositions**|| hostname, cabackend, cainstnid, cametric, latency (heatmap)||
-||**Visibility**|| operators only||
+| Datum              | Value                                                       |
+| ------------------ | ----------------------------------------------------------- |
+| **Name**           | ca.instr_enables                                            |
+| **Raw metric**     | total number of instrumenter enable operations              |
+| **Decompositions** | hostname, cabackend, cainstnid, cametric, latency (heatmap) |
+| **Visibility**     | operators only                                              |
 
 This metric counts the number of times an instrumenter enables a Cloud
 Analytics instrumentation.  Such events are usually triggered when a user
@@ -2289,10 +2417,12 @@ useful for understanding general system performance.
 
 ### CA: instrumenter disable operations
 
-||**Name**|| ca.instr_disables ||
-||**Raw metric**|| total number of instrumenter disable operations||
-||**Decompositions**|| hostname, cabackend, cainstnid, cametric, latency (heatmap)||
-||**Visibility**|| operators only||
+| Datum              | Value                                                       |
+| ------------------ | ----------------------------------------------------------- |
+| **Name**           | ca.instr_disables                                           |
+| **Raw metric**     | total number of instrumenter disable operations             |
+| **Decompositions** | hostname, cabackend, cainstnid, cametric, latency (heatmap) |
+| **Visibility**     | operators only                                              |
 
 This metric counts the number of times an instrumenter disables an
 instrumentation.  Such events are usually triggered when a user deletes an
@@ -2304,10 +2434,12 @@ useful for understanding general system performance.
 
 ### Restify: server operations
 
-||**Name**|| restify.server_ops ||
-||**Raw metric**|| total number of restify server operations||
-||**Decompositions**|| "hostname", "zonename", "execname", "pid", "ppid", "pexecname", "psargs", "ppsargs", "restify_sname", "restify_rname", "http_url", "http_method", "http_status", "latency" || 
-||**Visibility**|| operators only||
+| Datum              | Value                                                                                                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | restify.server_ops                                                                                                                                                         |
+| **Raw metric**     | total number of restify server operations                                                                                                                                  |
+| **Decompositions** | "hostname", "zonename", "execname", "pid", "ppid", "pexecname", "psargs", "ppsargs", "restify_sname", "restify_rname", "http_url", "http_method", "http_status", "latency" |
+| **Visibility**     | operators only                                                                                                                                                             |
 
 This metric counts the number of operations from a Node.js program using
 the restify module. The given operations can be broken down on a number
@@ -2317,10 +2449,12 @@ visualizing the response time of the server operations as a heatmap.
 
 ### Restify: handler operations
 
-||**Name**|| restify.handler_ops ||
-||**Raw metric**|| total number of restify handler operations||
-||**Decompositions**|| "hostname", "zonename", "execname", "pid", "ppid", "pexecname", "psargs", "ppsargs", "restify_sname", "restify_rname", "restify_hname", "latency" ||
-||**Visibility**|| operators only||
+| Datum              | Value                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**           | restify.handler_ops                                                                                                                               |
+| **Raw metric**     | total number of restify handler operations                                                                                                        |
+| **Decompositions** | "hostname", "zonename", "execname", "pid", "ppid", "pexecname", "psargs", "ppsargs", "restify_sname", "restify_rname", "restify_hname", "latency" |
+| **Visibility**     | operators only                                                                                                                                    |
 
 This metric looks at the individual handlers that are used in a Node.js
 program with the restify module. Series of handlers make up a given
@@ -2342,84 +2476,88 @@ The values of the following fields are strings. Decomposing by one of these fiel
 could yield a stacked line graph rather than a single line graph (or, for
 individual values, a vector rather than a scalar).
 
-|| **cabackend** || backend module ||
-|| **cainstnid** || instrumentation identifier ||
-|| **cametric** || metric name ||
-|| **client** || client hostname ||
-|| **conntype** || type of TCP connection, either "active" (client) or "passive"  (server) ||
-|| **contract** || contract identifier ||
-|| **cpu** || CPU identifier (e.g., "cpu0") ||
-|| **cpumode** || CPU mode, either "user" or "kernel" ||
-|| **database** || database name ||
-|| **disk** || disk identifier ||
-|| **direction** || direction of bytes transferred, either "sent" or "received" ||
-|| **errno** || error code ||
-|| **execname** || application name ||
-|| **errtype** || TCP error description ||
-|| **fstype** || filesystem name (e.g., "zfs") ||
-|| **gctype** || type of garbage collection (e.g., "scavenge") ||
-|| **hostname** || server name ||
-|| **http_method** || HTTP request method (e.g., "GET") ||
-|| **http_origin** || Origin IP address for HTTP request, as reported by "X-Forwarded-For" header ||
-|| **http_path** || HTTP request URL path (URL without query parameters) ||
-|| **http_status** || HTTP status code ||
-|| **http_url** || HTTP request URL ||
-|| **irqvector** || IRQ vector ||
-|| **ldapbinddn** || LDAP bind DN ||
-|| **ldapfilter** || LDAP search filter ||
-|| **ldaprequestdn** || LDAP request DN ||
-|| **ldapscope** || LDAP search scope ||
-|| **leavereason** || description of why a process came off-CPU ||
-|| **nic** || network interface identifier (e.g., "e1000g0") ||
-|| **optype** || operation type, often "read" or "write" but can be any operation depending on the  metric ||
-|| **pexecname** || parent process application name ||
-|| **pid** || process identifier ||
-|| **pmodel** || process model (e.g., 32-bit, 64-bit) ||
-|| **ppid** || parent process identifier ||
-|| **psargs** || process name and arguments ||
-|| **ppsargs** || parent process name and arguments ||
-|| **querysubstr** || query substring (first 6 characters of the raw query string) ||
-|| **raddr** || remote IP address ||
-|| *restify_hname** || Restify handler name ||
-|| *restify_rname** || Restify route name ||
-|| *restify_sname** || Restify server name ||
-|| **rport** || remote TCP port ||
-|| **syscall** || name of a system call ||
-|| **table** || database table name ||
-|| **user** || client username ||
-|| **vcpuid** || vCPU identifier ||
-|| **vleavereason** || reason leaving vCPU ||
-|| **vmmuctx** || VM MMU context ||
-|| **zdataset** || ZFS dataset name ||
-|| **zonename** || Zone (or SmartMachine or Virtual Machine) name ||
-|| **zpool** || ZFS pool name ||
+| Field             | Description                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| **cabackend**     | backend module                                                                            |
+| **cainstnid**     | instrumentation identifier                                                                |
+| **cametric**      | metric name                                                                               |
+| **client**        | client hostname                                                                           |
+| **conntype**      | type of TCP connection, either "active" (client) or "passive"  (server)                   |
+| **contract**      | contract identifier                                                                       |
+| **cpu**           | CPU identifier (e.g., "cpu0")                                                             |
+| **cpumode**       | CPU mode, either "user" or "kernel"                                                       |
+| **database**      | database name                                                                             |
+| **disk**          | disk identifier                                                                           |
+| **direction**     | direction of bytes transferred, either "sent" or "received"                               |
+| **errno**         | error code                                                                                |
+| **execname**      | application name                                                                          |
+| **errtype**       | TCP error description                                                                     |
+| **fstype**        | filesystem name (e.g., "zfs")                                                             |
+| **gctype**        | type of garbage collection (e.g., "scavenge")                                             |
+| **hostname**      | server name                                                                               |
+| **http_method**   | HTTP request method (e.g., "GET")                                                         |
+| **http_origin**   | Origin IP address for HTTP request, as reported by "X-Forwarded-For" header               |
+| **http_path**     | HTTP request URL path (URL without query parameters)                                      |
+| **http_status**   | HTTP status code                                                                          |
+| **http_url**      | HTTP request URL                                                                          |
+| **irqvector**     | IRQ vector                                                                                |
+| **ldapbinddn**    | LDAP bind DN                                                                              |
+| **ldapfilter**    | LDAP search filter                                                                        |
+| **ldaprequestdn** | LDAP request DN                                                                           |
+| **ldapscope**     | LDAP search scope                                                                         |
+| **leavereason**   | description of why a process came off-CPU                                                 |
+| **nic**           | network interface identifier (e.g., "e1000g0")                                            |
+| **optype**        | operation type, often "read" or "write" but can be any operation depending on the  metric |
+| **pexecname**     | parent process application name                                                           |
+| **pid**           | process identifier                                                                        |
+| **pmodel**        | process model (e.g., 32-bit, 64-bit)                                                      |
+| **ppid**          | parent process identifier                                                                 |
+| **psargs**        | process name and arguments                                                                |
+| **ppsargs**       | parent process name and arguments                                                         |
+| **querysubstr**   | query substring (first 6 characters of the raw query string)                              |
+| **raddr**         | remote IP address                                                                         |
+| *restify_hname**  | Restify handler name                                                                      |
+| *restify_rname**  | Restify route name                                                                        |
+| *restify_sname**  | Restify server name                                                                       |
+| **rport**         | remote TCP port                                                                           |
+| **syscall**       | name of a system call                                                                     |
+| **table**         | database table name                                                                       |
+| **user**          | client username                                                                           |
+| **vcpuid**        | vCPU identifier                                                                           |
+| **vleavereason**  | reason leaving vCPU                                                                       |
+| **vmmuctx**       | VM MMU context                                                                            |
+| **zdataset**      | ZFS dataset name                                                                          |
+| **zonename**      | Zone (or SmartMachine or Virtual Machine) name                                            |
+| **zpool**         | ZFS pool name                                                                             |
 
 ## Numeric fields
 
 The values of the following fields are numbers. Decomposing by one of these fields
 typically yields a heatmap rather than a scalar or vector.
 
-|| **busytime** || percent of time spent doing work (e.g., processing I/O) ||
-|| **bytes** || number of bytes, both read and written ||
-|| **bytes_read** || number of bytes read ||
-|| **bytes_write** || number of bytes written ||
-|| **buffered** || number of bytes currently buffered in memory ||
-|| **cputime** || time spent actually on-CPU ||
-|| **iops** || I/O operations, both read and write ||
-|| **iops_read** || read I/O operations ||
-|| **iops_write** || write I/O operations ||
-|| **latency** || how long an operation took ||
-|| **offset** || byte offset within a file or block device ||
-|| **nthreads** || number of threads in a process ||
-|| **packets** || number of packets sent or received ||
-|| **packets_in** || number of packets received ||
-|| **packets_out** || number of packets sent ||
-|| **rss** || process resident set size ||
-|| **runtime** || time spent running continuously on CPU ||
-|| **size** || size in bytes of a packet or operation ||
-|| **subsecond** || time offset during a second for when the event occurred ||
-|| **utilization** || percent of overall resource utilized (for CPUs, this is the same as percent of time busy) ||
-|| **walltime** || total time between program start and finish ||
+| Field           | Description                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| **busytime**    | percent of time spent doing work (e.g., processing I/O)                                   |
+| **bytes**       | number of bytes, both read and written                                                    |
+| **bytes_read**  | number of bytes read                                                                      |
+| **bytes_write** | number of bytes written                                                                   |
+| **buffered**    | number of bytes currently buffered in memory                                              |
+| **cputime**     | time spent actually on-CPU                                                                |
+| **iops**        | I/O operations, both read and write                                                       |
+| **iops_read**   | read I/O operations                                                                       |
+| **iops_write**  | write I/O operations                                                                      |
+| **latency**     | how long an operation took                                                                |
+| **offset**      | byte offset within a file or block device                                                 |
+| **nthreads**    | number of threads in a process                                                            |
+| **packets**     | number of packets sent or received                                                        |
+| **packets_in**  | number of packets received                                                                |
+| **packets_out** | number of packets sent                                                                    |
+| **rss**         | process resident set size                                                                 |
+| **runtime**     | time spent running continuously on CPU                                                    |
+| **size**        | size in bytes of a packet or operation                                                    |
+| **subsecond**   | time offset during a second for when the event occurred                                   |
+| **utilization** | percent of overall resource utilized (for CPUs, this is the same as percent of time busy) |
+| **walltime**    | total time between program start and finish                                               |
 
 # Appendix A: Version History
 

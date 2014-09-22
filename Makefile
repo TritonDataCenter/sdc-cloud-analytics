@@ -130,7 +130,7 @@ PKGFILES_cabase = \
 	$(PKGROOT)/cabase/cmd/cactl.js			\
 	$(PKGROOT)/cabase/cmd/ctf2json			\
 	$(DEMO_FILES:%=$(PKGROOT)/cabase/%)		\
-	$(DOC_FILES:%.restdown=$(PKGROOT)/cabase/docs/%.html)	\
+	$(DOC_FILES:%.md=$(PKGROOT)/cabase/docs/%.html)	\
 	$(JS_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(BASH_FILES:%=$(PKGROOT)/cabase/%)		\
 	$(SMF_MANIFESTS:%=$(PKGROOT)/cabase/%)		\
@@ -168,8 +168,8 @@ CLEAN_FILES	+= $(BUILD)
 CSCOPE_DIRS	 = cmd demo lib tst deps
 
 DOC_FILES	 = \
-	dev.restdown			\
-	index.restdown			\
+	dev.md			\
+	index.md			\
 
 RESTDOWN_FLAGS   = --brand-dir=deps/restdown-brand-remora
 EXTRA_DOC_DEPS += deps/restdown-brand-remora/.git

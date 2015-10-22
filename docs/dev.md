@@ -225,7 +225,7 @@ With no arguments, `cactl` will print out detailed usage notes.
       and customers **except** that customers are never allowed to see the
       `hostname` field.
 4. Implement the metric. See below.
-5. **Document the metric** in docs/index.restdown.
+5. **Document the metric** in docs/index.md.
 
 The actual metric implementation depends on the type of metric you're adding.
 

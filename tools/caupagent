@@ -70,7 +70,7 @@ cus_image=$1
 [[ -n $cus_image ]] || usage
 [[ -f $cus_image ]] || fail "no such file: $cus_image"
 
-npm=$(which npm) || npm=/opt/smartdc/agents/bin/agents-npm
+npm=$(which npm) || npm=/opt/smartdc/agents/bin/apm
 [[ -n $npm && -x $npm ]] || \
     fail "can't find executable npm in PATH or /opt/smartdc/agents/bin"
 echo "using npm = $npm"

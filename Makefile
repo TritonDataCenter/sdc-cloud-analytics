@@ -61,6 +61,8 @@ SH_SCRIPTS	= \
 
 SVC_SCRIPTS	 = \
 	pkg/pkg-svc-postinstall.sh	\
+	pkg/cainstsvc-postinstall.sh	\
+	pkg/cabase-postinstall.sh	\
 	pkg/pkg-svc-postuninstall.sh
 
 TOOLSDIR	 = tools

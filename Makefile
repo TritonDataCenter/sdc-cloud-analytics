@@ -50,6 +50,8 @@ SH_SCRIPTS	= \
 	cmd/cazoneinstall		\
 	pkg/pkg-svc-postinstall.sh	\
 	pkg/pkg-svc-postuninstall.sh	\
+	pkg/cainstsvc-postinstall.sh	\
+	pkg/cabase-postinstall.sh	\
 	smf/method/canodesvc		\
 	tools/cainstrfleet		\
 	tools/catest			\

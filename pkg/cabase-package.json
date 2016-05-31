@@ -11,6 +11,9 @@
 		"caprof":	"tools/caprof.js",
 		"nhttpsnoop":	"tools/nhttpsnoop"
 	},
+	"scripts": {
+		"postinstall":		"pkg/cabase-postinstall.sh"
+	},
 	"engines": {
 		"node":	"*"
 	},

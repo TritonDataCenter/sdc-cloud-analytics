@@ -6,7 +6,7 @@
 	"homepage":	"https://hub.joyent.com/wiki/display/dev/Introspection",
 	"author":	"Joyent (joyent.com)",
 	"scripts": {
-		"postinstall":		"pkg/pkg-svc-postinstall.sh",
+		"postinstall":		"pkg/cainstsvc-postinstall.sh",
 		"postuninstall":	"pkg/pkg-svc-postuninstall.sh"
 	},
 	"engines": {

@@ -6,7 +6,7 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc.
+# Copyright (c) 2016, Joyent, Inc.
 #
 
 #
@@ -91,11 +91,11 @@ function load_logfiles
 	ns_rqlogfile="$ns_logbase/$ns_name/requests-$(date +%F.%T).$$"
 }
 
-function run_realtime
+function run_fx
 {
 	local pid=$1
 
-	priocntl -s -c RT -i pid $pid
+	priocntl -s -c FX -m 60 -p 60 -i pid $pid
 	[[ $? != 0 ]] && echo "Failed to move process into the RT class"
 }
 
@@ -170,5 +170,5 @@ env | sort | egrep '^(AMQP_|CNAPI_|VMAPI_|NODE_PATH)' | grep -v PASSWORD
 smf_clear_env
 $ns_node $ns_exec $ns_args &
 ns_pid=$!
-[[ $ns_rt == "true" ]] && run_realtime $ns_pid
+[[ $ns_rt == "true" ]] && run_fx $ns_pid
 exit $SMF_EXIT_OK

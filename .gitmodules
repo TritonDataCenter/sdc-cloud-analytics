@@ -1,51 +1,51 @@
 [submodule "deps/node-amqp"]
 	path = deps/node-amqp
-	url = git@github.com:joyent/node-amqp-joyent.git
+	url = https://github.com/joyent/node-amqp-joyent.git
 [submodule "deps/node-libdtrace"]
 	path = deps/node-libdtrace
-	url = git://github.com/bcantrill/node-libdtrace.git
+	url = https://github.com/bcantrill/node-libdtrace.git
 [submodule "deps/node-kstat"]
 	path = deps/node-kstat
-	url = git://github.com/bcantrill/node-kstat.git
+	url = https://github.com/bcantrill/node-kstat.git
 [submodule "deps/node"]
 	path = deps/node
-	url = git://github.com/joyent/node.git
+	url = https://github.com/joyent/node.git
 [submodule "deps/node-png"]
 	path = deps/node-png
-	url = git@github.com:joyent/node-png-joyent.git
+	url = https://github.com/joyent/node-png-joyent.git
 [submodule "deps/node-heatmap"]
 	path = deps/node-heatmap
-	url = git@github.com:joyent/node-timeseries-heatmap.git
+	url = https://github.com/joyent/node-timeseries-heatmap.git
 [submodule "deps/connect"]
 	path = deps/connect
-	url = git://github.com/senchalabs/connect.git
+	url = https://github.com/senchalabs/connect.git
 [submodule "deps/node-uname"]
 	path = deps/node-uname
-	url = git://github.com/davepacheco/node-uname.git
+	url = https://github.com/davepacheco/node-uname.git
 [submodule "deps/node-libGeoIP"]
 	path = deps/node-libGeoIP
-	url = git://github.com/bcantrill/node-libGeoIP.git
+	url = https://github.com/bcantrill/node-libGeoIP.git
 [submodule "deps/restdown"]
 	path = deps/restdown
-	url = git://github.com/trentm/restdown.git
+	url = https://github.com/trentm/restdown.git
 [submodule "deps/ctf2json"]
 	path = deps/ctf2json
-	url = git://github.com/rmustacc/ctf2json
+	url = https://github.com/rmustacc/ctf2json
 [submodule "deps/node-ctype"]
 	path = deps/node-ctype
-	url = git://github.com/rmustacc/node-ctype.git
+	url = https://github.com/rmustacc/node-ctype.git
 [submodule "deps/eng"]
 	path = deps/eng
-	url = git@github.com:joyent/eng.git
+	url = https://github.com/joyent/eng.git
 [submodule "deps/javascriptlint"]
 	path = deps/javascriptlint
-	url = git://github.com/davepacheco/javascriptlint.git
+	url = https://github.com/davepacheco/javascriptlint.git
 [submodule "deps/jsstyle"]
 	path = deps/jsstyle
-	url = git://github.com/davepacheco/jsstyle.git
+	url = https://github.com/davepacheco/jsstyle.git
 [submodule "deps/sdc-scripts"]
 	path = deps/sdc-scripts
-	url = git@github.com:joyent/sdc-scripts.git
+	url = https://github.com/joyent/sdc-scripts.git
 [submodule "deps/restdown-brand-remora"]
 	path = deps/restdown-brand-remora
-	url = git@github.com:joyent/restdown-brand-remora.git
+	url = https://github.com/joyent/restdown-brand-remora.git

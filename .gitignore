@@ -3,10 +3,12 @@
 #
 *.pyc
 *.o
+/bits
 build
 cscope.*
 deps/node-install
 lib/ca/errno.js
+/make_stamps
 tools/webrev_support/bin/codereview
 webrev
 cacore.*

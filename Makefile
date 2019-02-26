@@ -5,7 +5,7 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -22,8 +22,16 @@
 .DEFAULT_GOAL	:= all
 INCMAKE		 = deps/eng/tools/mk
 
+ENGBLD_USE_BUILDIMAGE	= true
+ENGBLD_REQUIRE		:= $(shell git submodule update --init deps/eng)
+
 $(INCMAKE)/%:
 	git submodule update --init deps/eng
+
+include $(INCMAKE)/Makefile.defs
+include $(INCMAKE)/Makefile.smf.defs
+include $(INCMAKE)/Makefile.node.defs
+include $(INCMAKE)/Makefile.agent_prebuilt.defs
 
 #
 # Directories and files used during the build.
@@ -74,7 +82,17 @@ TST_DIRS	 := $(shell find tst -type d)
 #
 BUILD		 = build
 DIST		 = $(BUILD)/dist
-RELEASE_TARBALL  = $(DIST)/ca-pkg-$(STAMP).tar.bz2
+RELEASE_TARBALL  = $(DIST)/ca-pkg-$(STAMP).tar.gz
+
+BASE_IMAGE_UUID		= fd2cc906-8938-11e3-beab-4359c665ac99
+BUILDIMAGE_NAME		= ca
+BUILDIMAGE_PKGSRC	= zlib-1.2.3 \
+				png-1.5.9 \
+				openssl-0.9.8w \
+				GeoIP-1.4.8 \
+				GeoLiteCity-201203
+BUILDIMAGE_DESC		= SDC Cloud Analytics
+AGENTS 			= amon config registrar
 
 #
 # Package definitions: since cloud-analytics delivers multiple packages, we
@@ -205,17 +223,18 @@ SMF_MANIFESTS	 = \
 #
 NODE_ENV	 = $(shell tools/npath)
 
-BASHSTYLE	 = deps/eng/tools/bashstyle
 CAMCHK		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/camchk.js > /dev/null
 CAMD		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/camd.js
 CAPROF		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/caprof.js
 JSONCHK		 = $(NODE_ENV) $(NODE) $(TOOLSDIR)/jsonchk.js
 RESTDOWN	 = python2.6 $(TOP)/deps/restdown/bin/restdown
-TAR		 = tar
+TAR		 = gtar
 
-include $(INCMAKE)/Makefile.defs
-include $(INCMAKE)/Makefile.smf.defs
-include $(INCMAKE)/Makefile.node.defs
+#
+# MG Variables
+#
+ROOT            := $(shell pwd)
+NAME		:= ca
 
 #
 # Targets.  See the Joyent Engineering Guidelines or the included Makefiles for
@@ -272,7 +291,7 @@ $(RELEASE_TARBALL): $(PKG_TARBALLS) | $(DIST)
 	[[ -e $(BUILD)/root/pkg ]] || ln -s $(TOP)/$(BUILD)/pkg $(BUILD)/root/pkg
 	[[ -e $(BUILD)/root/opt/smartdc/ca ]] || \
 	    ln -s $(TOP)/$(BUILD)/pkg/cabase $(BUILD)/root/opt/smartdc/ca
-	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz root/opt) | bzip2 > $@
+	(cd $(BUILD) && $(TAR) chf - root/pkg/*.gz root/opt) | pigz > $@
 
 $(DIST):
 	mkdir -p $@
@@ -299,20 +318,16 @@ check-json: $(JSON_FILES:%=%.check)
 	$(JSONCHK) $<
 
 #
-# The "publish" target copies the build bits to the given BITS_DIR.  This is
+# The "publish" target copies the build bits to the given ENGBLD_BITS_DIR.  This is
 # invoked by an external driver (e.g. CI).
 #
 publish: $(RELEASE_TARBALL) agent-manifests
-	@if [[ -z "$(BITS_DIR)" ]]; then \
-		echo "error: 'BITS_DIR' must be set for 'publish' target"; \
-		exit 1; \
-	fi
-	mkdir -p $(BITS_DIR)/ca
-	cp $(RELEASE_TARBALL) $(BITS_DIR)/ca/ca-pkg-$(STAMP).tar.bz2
-	cp $(PKGROOT)/cabase.tar.gz $(BITS_DIR)/ca/cabase-$(STAMP).tar.gz
-	cp $(PKGROOT)/cabase.manifest $(BITS_DIR)/ca/cabase-$(STAMP).manifest
-	cp $(PKGROOT)/cainstsvc.tar.gz $(BITS_DIR)/ca/cainstsvc-$(STAMP).tar.gz
-	cp $(PKGROOT)/cainstsvc.manifest $(BITS_DIR)/ca/cainstsvc-$(STAMP).manifest
+	mkdir -p $(ENGBLD_BITS_DIR)/ca
+	cp $(RELEASE_TARBALL) $(ENGBLD_BITS_DIR)/ca/ca-pkg-$(STAMP).tar.gz
+	cp $(PKGROOT)/cabase.tar.gz $(ENGBLD_BITS_DIR)/ca/cabase-$(STAMP).tar.gz
+	cp $(PKGROOT)/cabase.manifest $(ENGBLD_BITS_DIR)/ca/cabase-$(STAMP).manifest
+	cp $(PKGROOT)/cainstsvc.tar.gz $(ENGBLD_BITS_DIR)/ca/cainstsvc-$(STAMP).tar.gz
+	cp $(PKGROOT)/cainstsvc.manifest $(ENGBLD_BITS_DIR)/ca/cainstsvc-$(STAMP).manifest
 
 #
 # The "pkg" target builds tarballs for each of the npm packages based on the
@@ -323,7 +338,7 @@ pkg: $(PKG_TARBALLS)
 
 $(PKGROOT)/%.tar.gz:
 	uuid -v4 > $(PKGROOT)/$*/image_uuid
-	(cd $(PKGROOT) && $(TAR) cf - $*) | gzip > $@
+	(cd $(PKGROOT) && $(TAR) cf - $*) | pigz > $@
 
 $(PKGROOT)/cabase.tar.gz:	$(PKGFILES_cabase) | $(PKGDEPS_cabase)
 $(PKGROOT)/cainstsvc.tar.gz:	$(PKGFILES_cainstsvc)
@@ -395,12 +410,27 @@ FORCE:
 #
 deps/node/.git:
 	git submodule update --init deps/node
+
+deps/node/patch-scons: deps/node/.git
 	patch -d deps/node -p1 < patches/node-scons.patch
+	touch deps/node/patch-scons
+
+$(NODE_EXEC): deps/node/patch-scons
+
+.PHONY: revert-node-patch
+revert-node-scons-patch:
+	# remove our change to scons so the repository isn't marked 'dirty' after a build
+	rm -f deps/node/patch-scons
+	git -C deps/node checkout tools/scons/scons-local-1.2.0/SCons/Platform/sunos.py
+
+bits-upload bits-upload-latest: revert-node-scons-patch
+
 
 include $(INCMAKE)/Makefile.deps
 include $(INCMAKE)/Makefile.targ
 include $(INCMAKE)/Makefile.smf.targ
 include $(INCMAKE)/Makefile.node.targ
+include $(INCMAKE)/Makefile.agent_prebuilt.targ
 
 .PHONY: sdc-scripts
 sdc-scripts: deps/sdc-scripts/.git

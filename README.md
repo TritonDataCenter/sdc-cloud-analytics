@@ -10,6 +10,8 @@
 
 # sdc-cloud-analytics
 
+***NOTICE: the code in this repository is no longer in use. See TRITON-884.***
+
 This repository is part of the Joyent SmartDataCenter project (SDC).  For 
 contribution guidelines, issues, and general documentation, visit the main
 [SDC](http://github.com/joyent/sdc) project page.
